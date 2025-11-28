@@ -2,12 +2,22 @@
   "name": "reachdem-monorepo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "sync-env": "node sync-env.js",
+    "predev": "pnpm sync-env",
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "db:generate": "pnpm --filter @reachdem/database db:generate",
+    "db:push": "pnpm --filter @reachdem/database db:push",
+    "db:migrate": "pnpm --filter @reachdem/database db:migrate",
+    "db:studio": "pnpm --filter @reachdem/database db:studio"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.23.0"
+  "packageManager": "pnpm@10.23.0",
+  "devDependencies": {
+    "dotenv-cli": "^7.4.4"
+  }
 }
