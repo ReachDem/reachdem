@@ -13,12 +13,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signIn } from "@/lib/auth-client"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleGoogleSignIn = async () => {
     try {
@@ -30,6 +33,36 @@ export function LoginForm({
     } catch (error) {
       console.error("Erreur login Google:", error)
     } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEmailPasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    try {
+      const result = await signIn.email({
+        email,
+        password,
+      })
+
+      if (result.error) {
+        setError(result.error.message || "Invalid email or password")
+        setLoading(false)
+        return
+      }
+
+      // Redirect to dashboard on successful login
+      router.push("/dashboard")
+    } catch (err) {
+      console.error("Login error:", err)
+      setError("An error occurred during login")
       setLoading(false)
     }
   }
@@ -51,6 +84,7 @@ export function LoginForm({
                 className="w-full" 
                 onClick={handleGoogleSignIn}
                 disabled={loading}
+                type="button"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
                   <path
@@ -66,14 +100,21 @@ export function LoginForm({
                 Or continue with
               </span>
             </div>
-            <div className="grid gap-6">
+            <form className="grid gap-6" onSubmit={handleEmailPasswordLogin}>
+              {error && (
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="m@example.com"
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -86,12 +127,18 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input 
+                  id="password" 
+                  name="password" 
+                  type="password" 
+                  required 
+                  disabled={loading}
+                />
               </div>
-              <Button type="submit" className="w-full">
-                Login
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
               </Button>
-            </div>
+            </form>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <a href="/signup" className="underline underline-offset-4">
