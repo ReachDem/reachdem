@@ -14,7 +14,7 @@
         "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"
     },
     "dependencies": {
-        "@prisma/client": "^6.1.0"
+        "@prisma/client": "^6.19.0"
     },
     "devDependencies": {
         "@types/node": "^20.19.25",
