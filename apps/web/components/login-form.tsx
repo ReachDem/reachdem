@@ -30,9 +30,9 @@ export function LoginForm({
         provider: "google",
         callbackURL: "/dashboard", // Redirection après login
       })
+      // Don't reset loading state on success - we're redirecting
     } catch (error) {
       console.error("Erreur login Google:", error)
-    } finally {
       setLoading(false)
     }
   }
@@ -60,6 +60,7 @@ export function LoginForm({
 
       // Redirect to dashboard on successful login
       router.push("/dashboard")
+      // Don't reset loading state on success - we're redirecting
     } catch (err) {
       console.error("Login error:", err)
       setError("An error occurred during login")
