@@ -20,19 +20,33 @@ export default function DashboardPage() {
     const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true)
 
     useEffect(() => {
+        async function checkOnboardingAndLoadWorkspaces() {
+            if (!session) return
+
+            try {
+                // First, check onboarding status
+                const onboardingRes = await fetch("/api/onboarding")
+                const onboardingData = await onboardingRes.json()
+
+                if (onboardingRes.ok && !onboardingData.onboardingCompleted) {
+                    // Onboarding not completed, redirect
+                    router.push("/onboarding")
+                    return
+                }
+
+                // Load workspaces
+                const workspacesRes = await fetch("/api/workspaces")
+                const workspacesData = await workspacesRes.json()
+                setWorkspaces(workspacesData.workspaces || [])
+            } catch (error) {
+                console.error("Error loading dashboard:", error)
+            } finally {
+                setIsLoadingWorkspaces(false)
+            }
+        }
+
         if (session) {
-            fetch("/api/workspaces")
-                .then((res) => res.json())
-                .then((data) => {
-                    setWorkspaces(data.workspaces || [])
-                    setIsLoadingWorkspaces(false)
-                    
-                    // Rediriger vers onboarding si pas de workspace
-                    if (!data.workspaces || data.workspaces.length === 0) {
-                        router.push("/onboarding")
-                    }
-                })
-                .catch(() => setIsLoadingWorkspaces(false))
+            checkOnboardingAndLoadWorkspaces()
         }
     }, [session, router])
 

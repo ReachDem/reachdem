@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
+import { emailOTP } from "better-auth/plugins"
 import { prisma } from "@/lib/prisma"
+import { sendOTPEmail } from "@/lib/resend"
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL as string,
@@ -10,6 +12,8 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
+        autoSignIn: true,
+        requireEmailVerification: true,
     },
     session: {
         expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -29,4 +33,17 @@ export const auth = betterAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
         },
     },
+    plugins: [
+        emailOTP({
+            otpLength: 6,
+            expiresIn: 300, // 5 minutes
+            sendVerificationOnSignUp: true,
+            async sendVerificationOTP({ email, otp, type }) {
+                // Don't await to avoid timing attacks
+                sendOTPEmail({ to: email, otp, type }).catch((err) => {
+                    console.error("Failed to send OTP:", err);
+                });
+            },
+        }),
+    ],
 })
