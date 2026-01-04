@@ -8,7 +8,10 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false, // Set to true in production with email provider
+    // Email verification is disabled for development. 
+    // IMPORTANT: Enable in production by setting to true and configuring an email provider
+    // You can also use an environment variable: process.env.NODE_ENV === 'production'
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === "true",
   },
   socialProviders: {
     // Add OAuth providers as needed

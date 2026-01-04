@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -98,9 +99,9 @@ export default function SignIn() {
           <div className="text-center text-sm">
             <p className="text-zinc-600 dark:text-zinc-400">
               Don&apos;t have an account?{" "}
-              <a href="/auth/signup" className="font-medium text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
+              <Link href="/auth/signup" className="font-medium text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
                 Sign up
-              </a>
+              </Link>
             </p>
           </div>
         </form>

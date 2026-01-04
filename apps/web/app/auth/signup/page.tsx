@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signUp } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SignUp() {
   const [name, setName] = useState("");
@@ -144,9 +145,9 @@ export default function SignUp() {
           <div className="text-center text-sm">
             <p className="text-zinc-600 dark:text-zinc-400">
               Already have an account?{" "}
-              <a href="/auth/signin" className="font-medium text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
+              <Link href="/auth/signin" className="font-medium text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
                 Sign in
-              </a>
+              </Link>
             </p>
           </div>
         </form>
