@@ -2,8 +2,8 @@ import Dm20151123, * as $Dm20151123 from '@alicloud/dm20151123';
 import OpenApi, * as $OpenApi from '@alicloud/openapi-client';
 import Util, * as $Util from '@alicloud/tea-util';
 
-const ACCESS_KEY_ID = process.env.ALIBABA_ACCESS_KEY_ID || 'LTAI5tCiAoydKorbGvafhiTB';
-const ACCESS_KEY_SECRET = process.env.ALIBABA_ACCESS_KEY_SECRET || 'QUvMfHhlicgnMhqyFvPhxnbrKs7i8Z';
+const ACCESS_KEY_ID = process.env.ALIBABA_ACCESS_KEY_ID 
+const ACCESS_KEY_SECRET = process.env.ALIBABA_ACCESS_KEY_SECRET
 const REGION = process.env.ALIBABA_REGION || 'eu-central-1';
 
 export interface SendEmailParams {
