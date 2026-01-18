@@ -1,0 +1,112 @@
+[
+  {
+    "domain": "mail.rcdm.li",
+    "provider": "alibaba_dm",
+    "records": [
+      {
+        "type": "TXT",
+        "name": "mail",
+        "value": "f41fdf45e7c5d4224b96",
+        "required": true,
+        "description": "Ownership Verification (Alibaba DM)"
+      },
+      {
+        "type": "TXT",
+        "name": "mail",
+        "value": "v=spf1 include:spfdm-eu-central-1.aliyun.com -all",
+        "required": true,
+        "description": "SPF Verification (Alibaba DM)"
+      },
+      {
+        "type": "TXT",
+        "name": "aliyun-eu-central-1._domainkey.mail",
+        "value": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCn0Z7sxZiq8ukJQyyZTei5FxOMBeOqC4yH/HjRVaTzJ71a1ceOmQTZBX5n1keEZbTtRmZ/Wz48j5APnKgKZfuPFKsbGdSt4+ia7UyRQg5l2WkDYOaCmQcLVw2MaHL3pxAX6ddWBM3YEoCBRAWNYQn9wZV8W6rWLCh2QLcNmUF1/QIDAQAB",
+        "required": true,
+        "description": "DKIM Verification (Alibaba DM)"
+      },
+      {
+        "type": "TXT",
+        "name": "_dmarc.mail",
+        "value": "v=DMARC1;p=none;rua=mailto:dmarc_report@service.aliyun.com",
+        "required": false,
+        "description": "DMARC Verification (Alibaba DM)"
+      },
+      {
+        "type": "MX",
+        "name": "mail",
+        "value": "mxdm-eu-central-1.aliyun.com",
+        "required": true,
+        "description": "MX Record for receiving emails (Alibaba DM)"
+      }
+    ],
+    "id": "domain_1768695337511_27i5xzi",
+    "status": "verified",
+    "createdAt": "2026-01-18T00:15:37.511Z",
+    "updatedAt": "2026-01-18T01:03:07.798Z",
+    "lastCheckAt": "2026-01-18T01:03:07.798Z",
+    "lastCheckResult": {
+      "ok": false,
+      "missing": [
+        {
+          "type": "TXT",
+          "name": "mail",
+          "value": "f41fdf45e7c5d4224b96",
+          "required": true,
+          "description": "Ownership Verification (Alibaba DM)"
+        },
+        {
+          "type": "TXT",
+          "name": "mail",
+          "value": "v=spf1 include:spfdm-eu-central-1.aliyun.com -all",
+          "required": true,
+          "description": "SPF Verification (Alibaba DM)"
+        },
+        {
+          "type": "TXT",
+          "name": "aliyun-eu-central-1._domainkey.mail",
+          "value": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCn0Z7sxZiq8ukJQyyZTei5FxOMBeOqC4yH/HjRVaTzJ71a1ceOmQTZBX5n1keEZbTtRmZ/Wz48j5APnKgKZfuPFKsbGdSt4+ia7UyRQg5l2WkDYOaCmQcLVw2MaHL3pxAX6ddWBM3YEoCBRAWNYQn9wZV8W6rWLCh2QLcNmUF1/QIDAQAB",
+          "required": true,
+          "description": "DKIM Verification (Alibaba DM)"
+        },
+        {
+          "type": "MX",
+          "name": "mail",
+          "value": "mxdm-eu-central-1.aliyun.com",
+          "required": true,
+          "description": "MX Record for receiving emails (Alibaba DM)"
+        }
+      ],
+      "mismatched": [],
+      "details": {
+        "mail.mail.rcdm.li": {
+          "error": "queryMx ENOTFOUND mail.mail.rcdm.li"
+        },
+        "aliyun-eu-central-1._domainkey.mail.mail.rcdm.li": {
+          "error": "queryTxt ENOTFOUND aliyun-eu-central-1._domainkey.mail.mail.rcdm.li"
+        },
+        "_dmarc.mail.mail.rcdm.li": {
+          "error": "queryTxt ENOTFOUND _dmarc.mail.mail.rcdm.li"
+        }
+      },
+      "alibabaStatus": {
+        "domainId": 5174,
+        "domainStatus": "4",
+        "authStatus": {
+          "allVerified": true,
+          "details": {
+            "spf": 0,
+            "mx": 0,
+            "dkim": 0,
+            "dmarc": 0,
+            "cname": 1
+          }
+        },
+        "dnsValues": {
+          "dnsSpf": "mail.rcdm.li",
+          "dnsMx": "mxdm-eu-central-1.aliyun.com",
+          "dnsDmarc": "v=DMARC1;p=none;rua=mailto:dmarc_report@service.aliyun.com"
+        }
+      }
+    }
+  }
+]

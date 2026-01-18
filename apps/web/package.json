@@ -9,6 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@alicloud/credentials": "^2.4.4",
+    "@alicloud/dm20151123": "^1.8.2",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/tea-typescript": "^1.8.0",
+    "@alicloud/tea-util": "^1.4.11",
     "next": "16.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0"

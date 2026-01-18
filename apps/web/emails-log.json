@@ -1,0 +1,63 @@
+[
+  {
+    "to": "latioms@gmail.com",
+    "subject": "Test Email",
+    "htmlBody": "<h1>Hello!</h1><p>This is a test email from Alibaba Cloud.</p>",
+    "fromAlias": "ReachDem Notifications",
+    "accountName": "notifications@mail.rcdm.ink",
+    "addressType": 1,
+    "replyToAddress": true,
+    "status": "sent",
+    "deliveryStatus": "pending",
+    "alibabaResponse": {
+      "headers": {
+        "date": "Sat, 17 Jan 2026 16:05:18 GMT",
+        "content-type": "application/json;charset=utf-8",
+        "content-length": "74",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=25",
+        "access-control-allow-origin": "*",
+        "access-control-expose-headers": "*",
+        "x-acs-request-id": "EA492D92-C5D5-3A5F-8D58-7525998B5BEA",
+        "x-acs-trace-id": "8abbca6b382f29e0b038c27b00f906f8",
+        "etag": "7onyrq+7hfHDxfZOKvByGvw4"
+      },
+      "statusCode": 200,
+      "body": {
+        "envId": "23825434319",
+        "requestId": "EA492D92-C5D5-3A5F-8D58-7525998B5BEA"
+      }
+    },
+    "id": "email_1768665917498_688meqgoh",
+    "sentAt": "2026-01-17T16:05:17.498Z",
+    "updatedAt": "2026-01-17T16:05:17.498Z"
+  },
+  {
+    "to": "latioms@gmail.com",
+    "subject": "Test Email",
+    "htmlBody": "<h1>Hello!</h1><p>This is a test email from Alibaba Cloud.</p>",
+    "fromAlias": "ReachDem Notifications",
+    "accountName": "notifications@mail.rcdm.ink",
+    "addressType": 1,
+    "replyToAddress": true,
+    "status": "failed",
+    "error": "InvalidMailAddress.NotFound: code: 404, The specified mail address is not found. request id: 485DA331-FD81-5290-A56A-7D748ADF600B",
+    "id": "email_1768665292744_jokpvm33q",
+    "sentAt": "2026-01-17T15:54:52.744Z",
+    "updatedAt": "2026-01-17T15:54:52.744Z"
+  },
+  {
+    "to": "latioms@gmail.com",
+    "subject": "Test Email",
+    "htmlBody": "<h1>Hello!</h1><p>This is a test email from Alibaba Cloud.</p>",
+    "fromAlias": "Test Sender",
+    "accountName": "notifications@mail.rcdm.ink",
+    "addressType": 1,
+    "replyToAddress": true,
+    "status": "failed",
+    "error": "InvalidMailAddress.NotFound: code: 404, The specified mail address is not found. request id: 751DAA37-978F-5BC6-ACE2-8C3100A9A417",
+    "id": "email_1768664990637_610ypj9ni",
+    "sentAt": "2026-01-17T15:49:50.637Z",
+    "updatedAt": "2026-01-17T15:49:50.638Z"
+  }
+]
