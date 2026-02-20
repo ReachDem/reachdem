@@ -1,0 +1,20 @@
+{
+    "name": "@reachdem/auth",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./client": "./src/auth-client.ts",
+        "./permissions": "./src/permissions.ts"
+    },
+    "dependencies": {
+        "@reachdem/database": "workspace:*",
+        "better-auth": "^1.4.3",
+        "next": "^14.0.0 || ^15.0.0 || ^16.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20",
+        "typescript": "^5"
+    }
+}
