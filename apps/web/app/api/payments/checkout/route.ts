@@ -29,6 +29,12 @@ export async function POST(request: Request) {
       hasClientSecret: Boolean(
         process.env.FLUTTERWAVE_V4_CLIENT_SECRET || process.env.FLW_V4_CLIENT_SECRET
       ),
+      publicKeyPrefix: (
+        process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY ||
+        process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY ||
+        process.env.FLUTTERWAVE_PUB_KEY_V3 ||
+        ""
+      ).slice(0, 12),
       baseUrl:
         process.env.FLUTTERWAVE_V4_BASE_URL ||
         process.env.FLW_V4_BASE_URL ||

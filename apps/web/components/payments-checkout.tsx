@@ -82,15 +82,27 @@ export function PaymentsCheckout() {
         tx_ref: json.checkoutConfig.tx_ref,
         amount: json.checkoutConfig.amount,
         currency: json.checkoutConfig.currency,
+        country: "CM",
+        payment_options: "card",
         redirect_url: json.checkoutConfig.redirect_url,
         customer: {
           email: "test@reachdem.app",
           name: "ReachDem Test",
           phone_number: "670000000",
         },
+        meta: {
+          checkout_session_id: json.sessionId || null,
+          product_type: productType,
+        },
         customizations: {
           title: "ReachDem",
           description: `${json.checkoutConfig.amount} ${json.checkoutConfig.currency}`,
+        },
+        callback: (data: unknown) => {
+          console.log("[Payments UI] Flutterwave callback", data)
+        },
+        onclose: (incomplete: unknown) => {
+          console.log("[Payments UI] Flutterwave modal closed", { incomplete })
         },
       })
     } catch (err) {

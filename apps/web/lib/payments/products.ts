@@ -22,7 +22,7 @@ export const checkoutProducts: Record<ProductBillingType, CheckoutProduct> = {
     id: "recurring",
     label: "Produit recurrent",
     description: "Produit abonnement (simulation checkout recurrent).",
-    amount: 200,
+    amount: 650,
     currency: "XAF",
     frequencyLabel: "Mensuel",
   },
