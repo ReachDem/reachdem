@@ -47,12 +47,14 @@ export const auth = betterAuth({
 
     advanced: {
         generateId: () => crypto.randomUUID(),
-        cookiePrefix: "reachdem",
-        crossSubDomainCookies: {
-            enabled: process.env.NODE_ENV === "production" || !!process.env.AUTH_COOKIE_DOMAIN,
-            domain: process.env.AUTH_COOKIE_DOMAIN || (process.env.NODE_ENV === "production" ? ".reachdem.cc" : undefined),
-        },
-        useSecureCookies: process.env.NODE_ENV === "production",
+        ...(process.env.NODE_ENV === "production" ? {
+            cookiePrefix: "reachdem",
+            crossSubDomainCookies: {
+                enabled: true,
+                domain: process.env.AUTH_COOKIE_DOMAIN || ".reachdem.cc",
+            },
+            useSecureCookies: true,
+        } : {}),
     },
 
     plugins: [
