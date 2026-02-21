@@ -1,8 +1,26 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { organization } from "better-auth/plugins";
+import { organization, emailOTP } from "better-auth/plugins";
 import { prisma } from "@reachdem/database";
 import { ac, owner, admin, member } from "./permissions";
+import { render } from "@react-email/render";
+import { VerificationEmail } from "@reachdem/transactional";
+import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
+
+const smtpOptions: SMTPTransport.Options = {
+    host: process.env.SMTP_HOST as string,
+    port: parseInt(process.env.SMTP_PORT || "465"),
+    secure: true,
+    auth: {
+        user: process.env.SMTP_USER as string,
+        pass: process.env.SMTP_PASSWORD as string,
+    },
+    // Alibaba Cloud SMTP requires LOGIN auth mechanism
+    authMethod: "LOGIN",
+};
+const transporter = nodemailer.createTransport(smtpOptions);
+
 
 /**
  * Central Better Auth configuration shared by all apps (ReachDem + Links).
@@ -78,45 +96,30 @@ export const auth = betterAuth({
                 console.log(`  Role: ${data.role}`);
             },
         }),
+        emailOTP({
+            async sendVerificationOTP({ email, otp, type }, request) {
+                console.log(`[EmailOTP] Sending ${type} OTP to ${email}: ${otp}`);
+
+                const html = await render(
+                    VerificationEmail({ otp, name: "User" }),
+                );
+
+                try {
+                    await transporter.sendMail({
+                        from: `ReachDem <${process.env.SMTP_USER}>`,
+                        to: email,
+                        subject: "Verify your email address",
+                        html,
+                    });
+                    console.log(`[EmailOTP] Successfully sent OTP to ${email}`);
+                } catch (err) {
+                    console.error("[EmailOTP] Failed to send OTP email:", err);
+                }
+            },
+        }),
     ],
 
     databaseHooks: {
-        user: {
-            create: {
-                after: async (user) => {
-                    // Auto-create a "Personal Workspace" for every new user
-                    try {
-                        const org = await prisma.organization.create({
-                            data: {
-                                id: crypto.randomUUID(),
-                                name: `${user.name}'s Workspace`,
-                                slug: `personal-${user.id.slice(0, 8)}`,
-                                createdAt: new Date(),
-                            },
-                        });
-
-                        await prisma.member.create({
-                            data: {
-                                id: crypto.randomUUID(),
-                                organizationId: org.id,
-                                userId: user.id,
-                                role: "owner",
-                                createdAt: new Date(),
-                            },
-                        });
-
-                        console.log(
-                            `[Auth] Created personal workspace "${org.name}" for user ${user.email}`,
-                        );
-                    } catch (error) {
-                        console.error(
-                            "[Auth] Failed to create personal workspace:",
-                            error,
-                        );
-                    }
-                },
-            },
-        },
         session: {
             create: {
                 before: async (session) => {

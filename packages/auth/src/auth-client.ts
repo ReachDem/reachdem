@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import { organizationClient } from "better-auth/client/plugins";
+import { organizationClient, emailOTPClient } from "better-auth/client/plugins";
 import { ac, owner, admin, member } from "./permissions";
 
 /**
@@ -15,6 +15,7 @@ export const authClient = createAuthClient({
             ac,
             roles: { owner, admin, member },
         }),
+        emailOTPClient(),
     ],
 });
 

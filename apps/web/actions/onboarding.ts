@@ -1,0 +1,69 @@
+"use server";
+
+import { auth } from "@reachdem/auth";
+import { prisma } from "@reachdem/database";
+import { generateUniqueOrganizationSlug } from "../lib/slugify";
+import { headers } from "next/headers";
+import { z } from "zod";
+import { redirect } from "next/navigation";
+
+const workspaceSchema = z.object({
+    workspaceName: z.string().min(2),
+    role: z.string().min(1),
+});
+
+export type WorkspacePayload = z.infer<typeof workspaceSchema>;
+
+export async function bootstrapWorkspace(payload: WorkspacePayload) {
+    try {
+        const validatedData = workspaceSchema.parse(payload);
+        
+        // 1. Get the authenticated user (created by the client-side signUp)
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
+
+        if (!session?.user?.id) {
+            return { error: "No authenticated user found. Please ensure you are signed up." };
+        }
+
+        const userId = session.user.id;
+        
+        // 2. Transact: Create Organization, Membership, Update User
+        const slug = await generateUniqueOrganizationSlug(validatedData.workspaceName);
+        const orgId = crypto.randomUUID();
+        const memberId = crypto.randomUUID();
+
+        await prisma.$transaction([
+            prisma.organization.create({
+                data: {
+                    id: orgId,
+                    name: validatedData.workspaceName,
+                    slug,
+                },
+            }),
+            prisma.member.create({
+                data: {
+                    id: memberId,
+                    organizationId: orgId,
+                    userId: userId,
+                    role: "owner",
+                },
+            }),
+            prisma.user.update({
+                where: { id: userId },
+                data: {
+                    role: validatedData.role,
+                    defaultOrganizationId: orgId,
+                },
+            }),
+        ]);
+        
+        // Return success, the client will then redirect
+        return { success: true };
+
+    } catch (error: Error | unknown) {
+        console.error("Workspace setup failed:", error);
+        return { error: error instanceof Error ? error.message : "An unexpected error occurred during workspace setup." };
+    }
+}
