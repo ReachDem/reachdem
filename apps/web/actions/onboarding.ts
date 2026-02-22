@@ -27,8 +27,18 @@ export async function bootstrapWorkspace(payload: WorkspacePayload) {
         }
 
         const userId = session.user.id;
-        
-        // 2. Transact: Create Organization, Membership, Update User
+
+        // 2. Idempotency guard – prevent duplicate orgs / DoS via repeated calls
+        const existingUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { defaultOrganizationId: true },
+        });
+
+        if (existingUser?.defaultOrganizationId) {
+            return { success: true }; // already onboarded, treat as no-op
+        }
+
+        // 3. Transact: Create Organization, Membership, Update User
         const slug = await generateUniqueOrganizationSlug(validatedData.workspaceName);
         const orgId = crypto.randomUUID();
         const memberId = crypto.randomUUID();
