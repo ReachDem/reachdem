@@ -8,13 +8,23 @@ import { VerificationEmail } from "@reachdem/transactional";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
+const smtpHost = process.env.SMTP_HOST;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASSWORD;
+const smtpPort = parseInt(process.env.SMTP_PORT || "465");
+
+if (!smtpHost || !smtpUser || !smtpPass || isNaN(smtpPort)) {
+    // In a real app, you'd want to throw an error to fail fast during startup.
+    console.error("SMTP environment variables are not configured correctly. Please check SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_PORT.");
+}
+
 const smtpOptions: SMTPTransport.Options = {
-    host: process.env.SMTP_HOST as string,
-    port: parseInt(process.env.SMTP_PORT || "465"),
+    host: smtpHost!,
+    port: smtpPort,
     secure: true,
     auth: {
-        user: process.env.SMTP_USER as string,
-        pass: process.env.SMTP_PASSWORD as string,
+        user: smtpUser!,
+        pass: smtpPass!,
     },
     // Alibaba Cloud SMTP requires LOGIN auth mechanism
     authMethod: "LOGIN",
@@ -97,6 +107,12 @@ export const auth = betterAuth({
             },
         }),
         emailOTP({
+            // Cap OTP sends: max 3 requests per email per 10-minute window.
+            // Better Auth enforces this server-side and returns 429 when exceeded.
+            rateLimit: {
+                window: 60 * 10, // 10 minutes
+                max: 3,
+            },
             async sendVerificationOTP({ email, otp, type }, request) {
                 console.log(`[EmailOTP] Sending ${type} OTP`);
 

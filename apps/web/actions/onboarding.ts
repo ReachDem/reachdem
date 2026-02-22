@@ -8,7 +8,15 @@ import { z } from "zod";
 
 const workspaceSchema = z.object({
     workspaceName: z.string().min(2),
-    role: z.string().min(1),
+    role: z.enum([
+        "Software Engineer",
+        "Product Manager",
+        "Designer",
+        "Founder",
+        "Sales",
+        "Marketing",
+        "Other",
+    ]),
 });
 
 export type WorkspacePayload = z.infer<typeof workspaceSchema>;
