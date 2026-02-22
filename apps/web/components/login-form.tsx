@@ -13,22 +13,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "@reachdem/auth/client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
       await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard", // Redirection après login
+        callbackURL: "/dashboard",
       });
     } catch (error) {
       console.error("Erreur login Google:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailPasswordLogin = async (
+    e: React.FormEvent<HTMLFormElement>,
+  ) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const result = await signIn.email({
+        email,
+        password,
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? "Invalid email or password.");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      console.error("Erreur login email:", err);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -49,6 +81,7 @@ export function LoginForm({
                 className="w-full"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
+                type="button"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -68,7 +101,7 @@ export function LoginForm({
                 Or continue with
               </span>
             </div>
-            <div className="grid gap-6">
+            <form onSubmit={handleEmailPasswordLogin} className="grid gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -76,6 +109,9 @@ export function LoginForm({
                   type="email"
                   placeholder="m@example.com"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -88,15 +124,25 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
               </div>
-              <Button type="submit" className="w-full">
-                Login
+              {error && (
+                <p className="text-sm text-destructive text-center">{error}</p>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Connecting..." : "Login"}
               </Button>
-            </div>
+            </form>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
-              <a href="#" className="underline underline-offset-4">
+              <a href="/signup" className="underline underline-offset-4">
                 Sign up
               </a>
             </div>
