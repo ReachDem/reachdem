@@ -98,7 +98,7 @@ export const auth = betterAuth({
         }),
         emailOTP({
             async sendVerificationOTP({ email, otp, type }, request) {
-                console.log(`[EmailOTP] Sending ${type} OTP to ${email}: ${otp}`);
+                console.log(`[EmailOTP] Sending ${type} OTP`);
 
                 const html = await render(
                     VerificationEmail({ otp, name: "User" }),
@@ -111,7 +111,7 @@ export const auth = betterAuth({
                         subject: "Verify your email address",
                         html,
                     });
-                    console.log(`[EmailOTP] Successfully sent OTP to ${email}`);
+                    console.log(`[EmailOTP] Successfully sent OTP`);
                 } catch (err) {
                     console.error("[EmailOTP] Failed to send OTP email:", err);
                 }

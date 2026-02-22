@@ -5,7 +5,6 @@ import { prisma } from "@reachdem/database";
 import { generateUniqueOrganizationSlug } from "../lib/slugify";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { redirect } from "next/navigation";
 
 const workspaceSchema = z.object({
     workspaceName: z.string().min(2),
@@ -64,6 +63,6 @@ export async function bootstrapWorkspace(payload: WorkspacePayload) {
 
     } catch (error: Error | unknown) {
         console.error("Workspace setup failed:", error);
-        return { error: error instanceof Error ? error.message : "An unexpected error occurred during workspace setup." };
+        return { error: "An unexpected error occurred during workspace setup." };
     }
 }

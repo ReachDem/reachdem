@@ -20,10 +20,7 @@
   },
   "registries": {
     "@shadcnblocks": {
-      "url": "https://shadcnblocks.com/r/{name}",
-      "headers": {
-        "Authorization": "Bearer sk_live_x1TmCS6qYFdVZqSWQFReiRy4nxZknVsF"
-      }
+      "url": "https://shadcnblocks.com/r/{name}"
     }
   }
 }
