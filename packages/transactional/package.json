@@ -1,0 +1,23 @@
+{
+  "name": "@reachdem/transactional",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "dev": "email dev"
+  },
+  "devDependencies": {
+    "@react-email/preview-server": "5.2.8",
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.14",
+    "react-email": "^5.2.8"
+  },
+  "dependencies": {
+    "@react-email/components": "^1.0.8",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}

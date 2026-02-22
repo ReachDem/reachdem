@@ -18,6 +18,8 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  role          String?   // Added for new onboarding flow
+  defaultOrganizationId String? // Added for new onboarding flow
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
