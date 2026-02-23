@@ -5,6 +5,7 @@ import { updateContactSchema } from "@/lib/validations/contacts";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { validateCustomFields, MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
     req: NextRequest,
@@ -100,7 +101,7 @@ export async function PATCH(
                 where: { organizationId },
             });
 
-            const validation = validateCustomFields(validatedData.customFields as Record<string, any>, definitions);
+            const validation = validateCustomFields(validatedData.customFields as Record<string, unknown>, definitions);
             if (!validation.isValid) {
                 return NextResponse.json({ error: validation.error }, { status: 400 });
             }
@@ -110,16 +111,16 @@ export async function PATCH(
             where: { id },
             data: {
                 ...validatedData,
-                customFields: validatedData.customFields === undefined ? undefined : ((validatedData.customFields as any) || null),
+                customFields: validatedData.customFields === undefined ? undefined : (validatedData.customFields ? (validatedData.customFields as Prisma.InputJsonValue) : Prisma.DbNull),
             },
         });
 
         return NextResponse.json({ data: updatedContact });
     } catch (error) {
-        console.error("[Contacts_PATCH]", error);
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
         }
+        console.error("[Contacts_PATCH]", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

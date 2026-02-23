@@ -49,9 +49,9 @@ describe("Contacts API (Phase 1)", () => {
         vi.clearAllMocks();
 
         // Default authorized session
-        (auth.api.getSession as any).mockResolvedValue({
-            user: { id: "user-1", name: "Test User" },
-            session: { activeOrganizationId: "org-1" }
+        vi.mocked(auth.api.getSession).mockResolvedValue({
+            user: { id: "Zah7YnL0PgyMNKnBFPniAg5nHCAOD0Qn", email: "reachdemltd@gmail.com" } as any,
+            session: { activeOrganizationId: "b534c5b6-39fb-4629-be92-f8dd33bf9ac2" } as any
         });
     });
 

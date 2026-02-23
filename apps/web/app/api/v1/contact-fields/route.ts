@@ -5,8 +5,9 @@ import { z } from "zod";
 import { createContactFieldSchema } from "@/lib/validations/contact-fields";
 import { headers } from "next/headers";
 import { MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
+import { Prisma } from "@prisma/client";
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
@@ -87,16 +88,16 @@ export async function POST(req: NextRequest) {
                 ...validatedData,
                 organizationId,
                 // Prisma Json needs to handle undefined vs null properly
-                options: (validatedData.options as any) || null,
+                options: validatedData.options ? (validatedData.options as Prisma.InputJsonValue) : Prisma.JsonNull,
             },
         });
 
         return NextResponse.json({ data: field }, { status: 201 });
     } catch (error) {
-        console.error("[ContactFields_POST]", error);
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
         }
+        console.error("[ContactFields_POST]", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

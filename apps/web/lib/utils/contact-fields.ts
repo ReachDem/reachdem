@@ -3,7 +3,7 @@ import { ContactFieldDefinition } from "@prisma/client";
 export const MAX_CUSTOM_FIELDS_PER_ORG = 5;
 
 export function validateCustomFields(
-    customFields: Record<string, any>,
+    customFields: Record<string, unknown>,
     definitions: ContactFieldDefinition[]
 ): { isValid: boolean; error?: string } {
     const defMap = new Map(definitions.map((def) => [def.key, def]));

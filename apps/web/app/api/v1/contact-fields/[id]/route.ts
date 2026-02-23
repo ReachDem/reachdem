@@ -4,6 +4,7 @@ import { auth } from "@reachdem/auth";
 import { z } from "zod";
 import { updateContactFieldSchema } from "@/lib/validations/contact-fields";
 import { headers } from "next/headers";
+import { Prisma } from "@prisma/client";
 
 export async function PATCH(
     req: NextRequest,
@@ -40,7 +41,7 @@ export async function PATCH(
             where: { id },
             data: {
                 ...validatedData,
-                options: validatedData.options === undefined ? undefined : ((validatedData.options as any) || null),
+                options: validatedData.options === undefined ? undefined : (validatedData.options ? (validatedData.options as Prisma.InputJsonValue) : Prisma.DbNull),
             },
         });
 
@@ -48,7 +49,7 @@ export async function PATCH(
     } catch (error) {
         console.error("[ContactFields_PATCH]", error);
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: (error as any).errors }, { status: 400 });
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

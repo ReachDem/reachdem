@@ -21,7 +21,7 @@ export const createContactSchema = baseContactSchema.refine(data => {
     path: ["phoneE164", "email"]
 });
 
-export const updateContactSchema = baseContactSchema.partial().refine(data => {
+export const updateContactSchema = baseContactSchema.partial().refine(() => {
     // Note: The rule "either phone or email must exist" requires knowing the current DB state.
     // If the user tries to nullify the phone/email during an update, the API route must verify 
     // that they aren't deleting the *last* remaining contact method.

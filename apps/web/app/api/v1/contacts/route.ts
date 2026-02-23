@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
             });
 
             // 3. Validate each field
-            const validation = validateCustomFields(validatedData.customFields as Record<string, any>, definitions);
+            const validation = validateCustomFields(validatedData.customFields as Record<string, unknown>, definitions);
             if (!validation.isValid) {
                 return NextResponse.json({ error: validation.error }, { status: 400 });
             }
@@ -111,16 +111,16 @@ export async function POST(req: NextRequest) {
             data: {
                 ...validatedData,
                 organizationId,
-                customFields: (validatedData.customFields as any) || null, // Prisma expects JSON to handle null
+                customFields: validatedData.customFields ? (validatedData.customFields as Prisma.InputJsonValue) : Prisma.JsonNull,
             },
         });
 
         return NextResponse.json({ data: contact }, { status: 201 });
     } catch (error) {
-        console.error("[Contacts_POST]", error);
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
         }
+        console.error("[Contacts_POST]", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
