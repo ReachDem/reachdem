@@ -4,6 +4,7 @@ import { auth } from "@reachdem/auth";
 import { z } from "zod";
 import { createContactFieldSchema } from "@/lib/validations/contact-fields";
 import { headers } from "next/headers";
+import { MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
 
 export async function GET(req: NextRequest) {
     const session = await auth.api.getSession({
@@ -52,14 +53,14 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const validatedData = createContactFieldSchema.parse(body);
 
-        // Check limit of 5 fields per organization
+        // Check limit of fields per organization
         const count = await prisma.contactFieldDefinition.count({
             where: { organizationId },
         });
 
-        if (count >= 5) {
+        if (count >= MAX_CUSTOM_FIELDS_PER_ORG) {
             return NextResponse.json(
-                { error: "Maximum number of custom fields (5) reached for this workspace" },
+                { error: `Maximum number of custom fields (${MAX_CUSTOM_FIELDS_PER_ORG}) reached for this workspace` },
                 { status: 400 }
             );
         }
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
         console.error("[ContactFields_POST]", error);
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: (error as any).errors }, { status: 400 });
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

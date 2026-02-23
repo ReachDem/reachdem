@@ -3,6 +3,8 @@ import { prisma } from "@reachdem/database";
 import { auth } from "@reachdem/auth";
 import { updateContactSchema } from "@/lib/validations/contacts";
 import { headers } from "next/headers";
+import { z } from "zod";
+import { validateCustomFields, MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
 
 export async function GET(
     req: NextRequest,
@@ -87,9 +89,9 @@ export async function PATCH(
 
         // Validate custom fields if updated
         if (validatedData.customFields !== undefined && validatedData.customFields !== null) {
-            if (Object.keys(validatedData.customFields).length > 5) {
+            if (Object.keys(validatedData.customFields).length > MAX_CUSTOM_FIELDS_PER_ORG) {
                 return NextResponse.json(
-                    { error: "Maximum 5 custom fields allowed per contact" },
+                    { error: `Maximum ${MAX_CUSTOM_FIELDS_PER_ORG} custom fields allowed per contact` },
                     { status: 400 }
                 );
             }
@@ -97,45 +99,10 @@ export async function PATCH(
             const definitions = await prisma.contactFieldDefinition.findMany({
                 where: { organizationId },
             });
-            const defMap = new Map(definitions.map((def) => [def.key, def]));
 
-            for (const [key, value] of Object.entries(validatedData.customFields)) {
-                const def = defMap.get(key);
-                if (!def) {
-                    return NextResponse.json(
-                        { error: `Custom field key '${key}' is not defined for this workspace` },
-                        { status: 400 }
-                    );
-                }
-
-                // Validate types
-                let isValid = false;
-                switch (def.type) {
-                    case "TEXT":
-                        isValid = typeof value === "string"; break;
-                    case "NUMBER":
-                        isValid = typeof value === "number" && !isNaN(value); break;
-                    case "BOOLEAN":
-                        isValid = typeof value === "boolean"; break;
-                    case "URL":
-                        if (typeof value === "string") {
-                            try { new URL(value); isValid = true; } catch { }
-                        } break;
-                    case "DATE":
-                        if (typeof value === "string") {
-                            isValid = !isNaN(new Date(value).getTime());
-                        } break;
-                    case "SELECT":
-                        const allowedOptions = def.options as string[] || [];
-                        isValid = typeof value === "string" && allowedOptions.includes(value); break;
-                }
-
-                if (!isValid) {
-                    return NextResponse.json(
-                        { error: `Invalid value for custom field '${key}'. Expected type: ${def.type}` },
-                        { status: 400 }
-                    );
-                }
+            const validation = validateCustomFields(validatedData.customFields as Record<string, any>, definitions);
+            if (!validation.isValid) {
+                return NextResponse.json({ error: validation.error }, { status: 400 });
             }
         }
 
@@ -150,8 +117,8 @@ export async function PATCH(
         return NextResponse.json({ data: updatedContact });
     } catch (error) {
         console.error("[Contacts_PATCH]", error);
-        if (error && (error as any).name === "ZodError") {
-            return NextResponse.json({ error: (error as any).issues || (error as any).errors }, { status: 400 });
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

@@ -3,6 +3,9 @@ import { prisma } from "@reachdem/database";
 import { auth } from "@reachdem/auth";
 import { createContactSchema } from "@/lib/validations/contacts";
 import { headers } from "next/headers";
+import { Prisma } from "@prisma/client";
+import { validateCustomFields, MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
+import { z } from "zod";
 
 export async function GET(req: NextRequest) {
     const session = await auth.api.getSession({
@@ -22,11 +25,11 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const q = searchParams.get("q");
-        const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "20");
+        const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
         const skip = (page - 1) * limit;
 
-        const whereClause: any = {
+        const whereClause: Prisma.ContactWhereInput = {
             organizationId,
             deletedAt: null, // Soft delete filter
         };
@@ -84,10 +87,10 @@ export async function POST(req: NextRequest) {
 
         // Validate Custom Fields
         if (validatedData.customFields && Object.keys(validatedData.customFields).length > 0) {
-            // 1. Check max 5 keys in payload
-            if (Object.keys(validatedData.customFields).length > 5) {
+            // 1. Check max keys in payload
+            if (Object.keys(validatedData.customFields).length > MAX_CUSTOM_FIELDS_PER_ORG) {
                 return NextResponse.json(
-                    { error: "Maximum 5 custom fields allowed per contact" },
+                    { error: `Maximum ${MAX_CUSTOM_FIELDS_PER_ORG} custom fields allowed per contact` },
                     { status: 400 }
                 );
             }
@@ -97,59 +100,10 @@ export async function POST(req: NextRequest) {
                 where: { organizationId },
             });
 
-            const defMap = new Map(definitions.map((def) => [def.key, def]));
-
             // 3. Validate each field
-            for (const [key, value] of Object.entries(validatedData.customFields)) {
-                const def = defMap.get(key);
-                if (!def) {
-                    return NextResponse.json(
-                        { error: `Custom field key '${key}' is not defined for this workspace` },
-                        { status: 400 }
-                    );
-                }
-
-                // Validate types
-                let isValid = false;
-                switch (def.type) {
-                    case "TEXT":
-                        isValid = typeof value === "string";
-                        break;
-                    case "NUMBER":
-                        isValid = typeof value === "number" && !isNaN(value);
-                        break;
-                    case "BOOLEAN":
-                        isValid = typeof value === "boolean";
-                        break;
-                    case "URL":
-                        if (typeof value === "string") {
-                            try {
-                                new URL(value);
-                                isValid = true;
-                            } catch {
-                                /* invalid url */
-                            }
-                        }
-                        break;
-                    case "DATE":
-                        // Check if string is a valid ISO date
-                        if (typeof value === "string") {
-                            const d = new Date(value);
-                            isValid = !isNaN(d.getTime());
-                        }
-                        break;
-                    case "SELECT":
-                        const allowedOptions = def.options as string[] || [];
-                        isValid = typeof value === "string" && allowedOptions.includes(value);
-                        break;
-                }
-
-                if (!isValid) {
-                    return NextResponse.json(
-                        { error: `Invalid value for custom field '${key}'. Expected type: ${def.type}` },
-                        { status: 400 }
-                    );
-                }
+            const validation = validateCustomFields(validatedData.customFields as Record<string, any>, definitions);
+            if (!validation.isValid) {
+                return NextResponse.json({ error: validation.error }, { status: 400 });
             }
         }
 
@@ -164,8 +118,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ data: contact }, { status: 201 });
     } catch (error) {
         console.error("[Contacts_POST]", error);
-        if (error && (error as any).name === "ZodError") {
-            return NextResponse.json({ error: (error as any).issues || (error as any).errors }, { status: 400 });
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
