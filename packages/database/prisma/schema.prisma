@@ -10,6 +10,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender {
+  UNKNOWN
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContactFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  URL
+  SELECT
+}
+
 // ─── Better Auth Core Models ──────────────────────────────────────────────────
 
 model User {
@@ -18,6 +36,8 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  role          String?   // Added for new onboarding flow
+  defaultOrganizationId String? // Added for new onboarding flow
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -93,6 +113,8 @@ model Organization {
   members     Member[]
   invitations Invitation[]
   sessions    Session[]
+  contacts    Contact[]
+  contactFields ContactFieldDefinition[]
 
   @@map("organization")
 }
@@ -128,4 +150,47 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+// ─── ReachDem App Models ──────────────────────────────────────────────────────
+
+model ContactFieldDefinition {
+  id             String           @id @default(uuid())
+  organizationId String
+  key            String
+  label          String
+  type           ContactFieldType
+  options        Json?            // Array of strings if type is SELECT
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("contact_field_definition")
+}
+
+model Contact {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  phoneE164      String?
+  email          String?
+  gender         Gender?   @default(UNKNOWN)
+  birthdate      DateTime? @db.Date // Only store date component
+  address        String?
+  work           String?
+  enterprise     String?
+  customFields   Json?     // Map of key to value
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // Soft delete
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([phoneE164])
+  @@index([email])
+  @@map("contact")
 }

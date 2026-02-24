@@ -21,6 +21,9 @@
   "license": "ISC",
   "packageManager": "pnpm@10.23.0",
   "devDependencies": {
-    "dotenv-cli": "^7.4.4"
+    "@vitest/coverage-v8": "^4.0.18",
+    "dotenv-cli": "^7.4.4",
+    "magicast": "^0.5.2",
+    "vitest": "^4.0.18"
   }
 }
