@@ -7,7 +7,7 @@ import { headers } from "next/headers";
 import { MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
 import { Prisma } from "@prisma/client";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
     const session = await auth.api.getSession({
         headers: await headers(),
     });

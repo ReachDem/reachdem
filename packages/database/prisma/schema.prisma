@@ -10,24 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
-enum Gender {
-  UNKNOWN
-  MALE
-  FEMALE
-  OTHER
-}
-
-enum ContactFieldType {
-  TEXT
-  NUMBER
-  DATE
-  BOOLEAN
-  URL
-  SELECT
-}
-
 // ─── Better Auth Core Models ──────────────────────────────────────────────────
 
 model User {
@@ -115,6 +97,7 @@ model Organization {
   sessions    Session[]
   contacts    Contact[]
   contactFields ContactFieldDefinition[]
+  groups      Group[]
 
   @@map("organization")
 }
@@ -150,6 +133,24 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender {
+  UNKNOWN
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContactFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  URL
+  SELECT
 }
 
 // ─── ReachDem App Models ──────────────────────────────────────────────────────
@@ -188,9 +189,39 @@ model Contact {
   deletedAt      DateTime? // Soft delete
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  GroupMember[]
 
   @@index([organizationId])
   @@index([phoneE164])
   @@index([email])
   @@map("contact")
+}
+
+model Group {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members        GroupMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("group")
+}
+
+model GroupMember {
+  groupId   String
+  contactId String
+  addedAt   DateTime @default(now())
+
+  group     Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, contactId])
+  @@index([contactId])
+  @@map("group_member")
 }
