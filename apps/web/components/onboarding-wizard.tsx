@@ -204,7 +204,14 @@ export function OnboardingWizard() {
       // 2. Bootstrap workspace securely via server action now that session is verified
       const result = await bootstrapWorkspace({
         workspaceName: watch("workspaceName"),
-        role: watch("role"),
+        role: watch("role") as
+          | "Software Engineer"
+          | "Product Manager"
+          | "Designer"
+          | "Founder"
+          | "Sales"
+          | "Marketing"
+          | "Other",
       });
 
       if (result?.error) {

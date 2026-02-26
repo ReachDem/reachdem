@@ -107,8 +107,7 @@ export const auth = betterAuth({
             },
         }),
         emailOTP({
-            // Cap OTP sends: max 3 requests per email per 10-minute window.
-            // Better Auth enforces this server-side and returns 429 when exceeded.
+
             async sendVerificationOTP({ email, otp, type }, request) {
                 console.log(`[EmailOTP] Sending ${type} OTP`);
 
