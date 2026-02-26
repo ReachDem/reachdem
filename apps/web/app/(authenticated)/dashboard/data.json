@@ -1,0 +1,227 @@
+[
+  {
+    "id": 1,
+    "header": "Welcome Campaign",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "1,234",
+    "limit": "1,500",
+    "reviewer": "Marketing Team"
+  },
+  {
+    "id": 2,
+    "header": "Product Launch Announcement",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "5,678",
+    "limit": "6,000",
+    "reviewer": "Sales Team"
+  },
+  {
+    "id": 3,
+    "header": "Weekly Newsletter",
+    "type": "Email",
+    "status": "Scheduled",
+    "target": "3,456",
+    "limit": "4,000",
+    "reviewer": "Content Team"
+  },
+  {
+    "id": 4,
+    "header": "Flash Sale Alert",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "2,890",
+    "limit": "3,000",
+    "reviewer": "E-commerce Team"
+  },
+  {
+    "id": 5,
+    "header": "Customer Feedback Request",
+    "type": "Email",
+    "status": "In Progress",
+    "target": "1,200",
+    "limit": "1,500",
+    "reviewer": "Support Team"
+  },
+  {
+    "id": 6,
+    "header": "Appointment Reminder",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "456",
+    "limit": "500",
+    "reviewer": "Operations"
+  },
+  {
+    "id": 7,
+    "header": "Beta Feature Announcement",
+    "type": "WhatsApp",
+    "status": "Draft",
+    "target": "890",
+    "limit": "1,000",
+    "reviewer": "Product Team"
+  },
+  {
+    "id": 8,
+    "header": "Monthly Report",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "234",
+    "limit": "300",
+    "reviewer": "Analytics Team"
+  },
+  {
+    "id": 9,
+    "header": "Event Invitation",
+    "type": "Email",
+    "status": "Scheduled",
+    "target": "1,890",
+    "limit": "2,000",
+    "reviewer": "Events Team"
+  },
+  {
+    "id": 10,
+    "header": "Order Confirmation",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "3,456",
+    "limit": "4,000",
+    "reviewer": "E-commerce Team"
+  },
+  {
+    "id": 11,
+    "header": "Password Reset Notification",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "123",
+    "limit": "200",
+    "reviewer": "Security Team"
+  },
+  {
+    "id": 12,
+    "header": "Promotional Offer",
+    "type": "SMS",
+    "status": "In Progress",
+    "target": "4,567",
+    "limit": "5,000",
+    "reviewer": "Marketing Team"
+  },
+  {
+    "id": 13,
+    "header": "Account Verification",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "789",
+    "limit": "1,000",
+    "reviewer": "Security Team"
+  },
+  {
+    "id": 14,
+    "header": "Holiday Greetings",
+    "type": "Email",
+    "status": "Draft",
+    "target": "6,789",
+    "limit": "7,000",
+    "reviewer": "Marketing Team"
+  },
+  {
+    "id": 15,
+    "header": "Service Update",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "2,345",
+    "limit": "2,500",
+    "reviewer": "Product Team"
+  },
+  {
+    "id": 16,
+    "header": "Delivery Status",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "1,678",
+    "limit": "2,000",
+    "reviewer": "Logistics Team"
+  },
+  {
+    "id": 17,
+    "header": "Subscription Renewal",
+    "type": "Email",
+    "status": "Scheduled",
+    "target": "890",
+    "limit": "1,000",
+    "reviewer": "Billing Team"
+  },
+  {
+    "id": 18,
+    "header": "New Feature Tutorial",
+    "type": "Email",
+    "status": "In Progress",
+    "target": "3,210",
+    "limit": "3,500",
+    "reviewer": "Product Team"
+  },
+  {
+    "id": 19,
+    "header": "Survey Invitation",
+    "type": "Email",
+    "status": "Draft",
+    "target": "4,321",
+    "limit": "4,500",
+    "reviewer": "Research Team"
+  },
+  {
+    "id": 20,
+    "header": "VIP Customer Offer",
+    "type": "WhatsApp",
+    "status": "Draft",
+    "target": "234",
+    "limit": "300",
+    "reviewer": "Sales Team"
+  },
+  {
+    "id": 21,
+    "header": "Abandoned Cart Reminder",
+    "type": "SMS",
+    "status": "Delivered",
+    "target": "567",
+    "limit": "600",
+    "reviewer": "E-commerce Team"
+  },
+  {
+    "id": 22,
+    "header": "Webinar Invitation",
+    "type": "Email",
+    "status": "Scheduled",
+    "target": "2,100",
+    "limit": "2,500",
+    "reviewer": "Events Team"
+  },
+  {
+    "id": 23,
+    "header": "Referral Program",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "1,456",
+    "limit": "1,500",
+    "reviewer": "Growth Team"
+  },
+  {
+    "id": 24,
+    "header": "Price Drop Alert",
+    "type": "SMS",
+    "status": "In Progress",
+    "target": "2,345",
+    "limit": "2,500",
+    "reviewer": "E-commerce Team"
+  },
+  {
+    "id": 25,
+    "header": "API Usage Report",
+    "type": "Email",
+    "status": "Delivered",
+    "target": "89",
+    "limit": "100",
+    "reviewer": "Developer Team"
+  }
+]
