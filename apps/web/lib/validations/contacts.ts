@@ -3,7 +3,7 @@ import { z } from "zod";
 export const baseContactSchema = z.object({
     name: z.string().trim().min(2, "Name must be at least 2 characters long"),
     phoneE164: z.string().trim().nullable().optional(),
-    email: z.email("Invalid email format").nullable().optional(),
+    email: z.string().email("Invalid email format").nullable().optional(),
     gender: z.enum(["UNKNOWN", "MALE", "FEMALE", "OTHER"]).nullable().optional(),
     birthdate: z.coerce.date().nullable().optional(),
     address: z.string().nullable().optional(),
