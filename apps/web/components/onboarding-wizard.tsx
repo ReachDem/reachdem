@@ -39,6 +39,18 @@ import {
 } from "@/components/onboarding1";
 import { cn } from "@/lib/utils";
 
+const workspaceRoles = [
+  "Software Engineer",
+  "Product Manager",
+  "Designer",
+  "Founder",
+  "Sales",
+  "Marketing",
+  "Other",
+] as const;
+
+type WorkspaceRole = (typeof workspaceRoles)[number];
+
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
@@ -46,7 +58,7 @@ const formSchema = z.object({
   workspaceName: z
     .string()
     .min(2, "Workspace name must be at least 2 characters."),
-  role: z.string().min(1, "Please select your role."),
+  role: z.enum(workspaceRoles),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -101,7 +113,7 @@ export function OnboardingWizard() {
       email: "",
       password: "",
       workspaceName: "",
-      role: "",
+      role: "Software Engineer",
     },
   });
 
@@ -233,17 +245,9 @@ export function OnboardingWizard() {
     }
   };
 
-  const roles = [
-    "Software Engineer",
-    "Product Manager",
-    "Designer",
-    "Founder",
-    "Sales",
-    "Marketing",
-    "Other",
-  ];
+  const roles = workspaceRoles;
 
-  const getTabsForRole = (role: string) => {
+  const getTabsForRole = (role: WorkspaceRole) => {
     switch (role) {
       case "Software Engineer":
         return [
