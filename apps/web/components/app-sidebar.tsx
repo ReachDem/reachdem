@@ -194,7 +194,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <DropdownMenuContent
                 align="start"
                 sideOffset={8}
-                className="w-(--radix-dropdown-menu-trigger-width)"
+                className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   Switch project
