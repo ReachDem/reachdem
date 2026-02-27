@@ -24,6 +24,8 @@ export function SiteHeader() {
         <span className="font-medium text-base">{currentPage}</span>
       </div>
     );
+  } else if (pathname?.startsWith("/contacts")) {
+    headerTitle = <h1 className="text-base font-medium">Contacts</h1>;
   }
 
   return (

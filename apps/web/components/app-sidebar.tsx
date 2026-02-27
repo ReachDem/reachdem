@@ -87,7 +87,7 @@ const data = {
       items: [
         {
           title: "Contacts",
-          url: "#",
+          url: "/contacts",
           icon: IconUserCircle,
         },
         {
