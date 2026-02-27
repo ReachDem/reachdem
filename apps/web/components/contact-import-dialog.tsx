@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useState, useEffect } from "react";
 import {
   IconUpload,
   IconFileSpreadsheet,
@@ -11,7 +12,11 @@ import {
   IconArrowLeft,
   IconDownload,
   IconClipboard,
+  IconLoader2,
+  IconPlus,
+  IconEdit,
 } from "@tabler/icons-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +26,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -34,6 +38,35 @@ import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AiMappingTester } from "@/components/ai-mapping-tester";
 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import {
+  parseContactFile,
+  getSampleData,
+  isValidContactFile,
+} from "@/lib/utils/parse-contacts-file";
+import { generateContactMapping, MappingResult } from "@/lib/utils/ai-mapping";
+import { STANDARD_FIELDS, applyMapping } from "@/lib/utils/ai-mapping-client";
+import { formatPhoneE164 } from "@/lib/utils/phone";
+import {
+  checkContactDuplicates,
+  importContactsBulk,
+  getDefaultCountryCode,
+} from "@/app/actions/contacts";
+
 const STEPS = [
   "Upload",
   "Preview",
@@ -43,87 +76,65 @@ const STEPS = [
 ] as const;
 type Step = (typeof STEPS)[number];
 
-const REACHDEM_FIELDS = [
-  { key: "name", label: "Name", required: true },
-  { key: "phone", label: "Phone", required: false },
-  { key: "email", label: "Email", required: false },
-  { key: "sexe", label: "Gender", required: false },
-  { key: "birthdate", label: "Birthdate", required: false },
-  { key: "address", label: "Address", required: false },
-  { key: "work", label: "Job Title", required: false },
-  { key: "enterprise", label: "Enterprise", required: false },
-  { key: "__skip", label: "Skip this column", required: false },
-];
-
-// Simulated detected columns from CSV
-const DETECTED_COLUMNS = [
-  "Nom complet",
-  "Telephone",
-  "Adresse mail",
-  "Entreprise",
-  "Poste",
-];
-
-// Simulated preview data
-const PREVIEW_DATA = [
-  {
-    "Nom complet": "Amadou Diallo",
-    Telephone: "+221771234567",
-    "Adresse mail": "amadou@tech.sn",
-    Entreprise: "TechDak",
-    Poste: "CTO",
-  },
-  {
-    "Nom complet": "Fatou Sow",
-    Telephone: "+221782345678",
-    "Adresse mail": "fatou@wave.com",
-    Entreprise: "Wave",
-    Poste: "Marketing",
-  },
-  {
-    "Nom complet": "Moussa Ndiaye",
-    Telephone: "+221763456789",
-    "Adresse mail": "",
-    Entreprise: "",
-    Poste: "",
-  },
-  {
-    "Nom complet": "Aissatou Ba",
-    Telephone: "",
-    "Adresse mail": "aissatou@free.sn",
-    Entreprise: "Free",
-    Poste: "PM",
-  },
-  {
-    "Nom complet": "Ibrahima Fall",
-    Telephone: "+221785678901",
-    "Adresse mail": "ibrahima@orange.sn",
-    Entreprise: "Orange",
-    Poste: "Engineer",
-  },
-];
-
 export function ContactImportDialog({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const [currentStep, setCurrentStep] = React.useState<Step>("Upload");
-  const [uploadedFile, setUploadedFile] = React.useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = React.useState(false);
-  const [mapping, setMapping] = React.useState<Record<string, string>>({
-    "Nom complet": "name",
-    Telephone: "phone",
-    "Adresse mail": "email",
-    Entreprise: "enterprise",
-    Poste: "work",
+  const [open, setOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<Step>("Upload");
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // File & Parsing state
+  const [file, setFile] = useState<File | null>(null);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [allParsedRows, setAllParsedRows] = useState<Record<string, string>[]>(
+    [],
+  );
+  const [sampleData, setSampleData] = useState<Record<string, string>[]>([]);
+
+  // Mapping state
+  const [isMappingLoading, setIsMappingLoading] = useState(false);
+  const [mappingResult, setMappingResult] = useState<MappingResult | null>(
+    null,
+  );
+  const [manualOverrides, setManualOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Duplicate state
+  const [duplicateStrategy, setDuplicateStrategy] = useState<
+    "skip" | "update" | "merge"
+  >("skip");
+  const [duplicateStats, setDuplicateStats] = useState({
+    emails: 0,
+    phones: 0,
+    missingRequires: 0,
   });
-  const [duplicateStrategy, setDuplicateStrategy] = React.useState("skip");
-  const [importing, setImporting] = React.useState(false);
-  const [importDone, setImportDone] = React.useState(false);
+
+  // Import state
+  const [isImporting, setIsImporting] = useState(false);
+  const [importDone, setImportDone] = useState(false);
+  const [importStats, setImportStats] = useState({ success: 0, total: 0 });
 
   const stepIndex = STEPS.indexOf(currentStep);
+
+  const handleReset = () => {
+    setCurrentStep("Upload");
+    setFile(null);
+    setColumns([]);
+    setAllParsedRows([]);
+    setSampleData([]);
+    setMappingResult(null);
+    setManualOverrides({});
+    setIsEditing(false);
+    setDuplicateStrategy("skip");
+    setIsImporting(false);
+    setImportDone(false);
+    setDuplicateStats({ emails: 0, phones: 0, missingRequires: 0 });
+    setImportStats({ success: 0, total: 0 });
+  };
 
   const goNext = () => {
     if (stepIndex < STEPS.length - 1) {
@@ -137,42 +148,273 @@ export function ContactImportDialog({
     }
   };
 
-  const handleUpload = () => {
-    setUploadedFile("contacts_export_2025.csv");
-    setTimeout(() => setCurrentStep("Preview"), 400);
+  // 1. Upload & Parsing
+  const onFileSelected = async (selectedFile?: File) => {
+    if (!selectedFile) return;
+    const validation = isValidContactFile(selectedFile);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid file");
+      return;
+    }
+
+    try {
+      const parsed = await parseContactFile(selectedFile);
+      if (parsed.totalRows > 100) {
+        toast.error("File is too large. Please upload at most 100 contacts.");
+        return;
+      }
+      if (parsed.totalRows === 0) {
+        toast.error("File is empty.");
+        return;
+      }
+
+      setFile(selectedFile);
+      setColumns(parsed.columns);
+      setAllParsedRows(parsed.rows);
+      setSampleData(getSampleData(parsed.rows, 5));
+      setCurrentStep("Preview");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to parse file.");
+    }
   };
 
-  const handleImport = () => {
-    setImporting(true);
-    setTimeout(() => {
-      setImporting(false);
+  // 2. Mapping
+  const runMapping = async () => {
+    if (!file || columns.length === 0) return;
+    setIsMappingLoading(true);
+    try {
+      const result = await generateContactMapping({
+        columns,
+        sampleData,
+        existingCustomFields: [],
+        sourceName: file.name,
+      });
+      setMappingResult(result);
+      setCurrentStep("Mapping");
+    } catch (err: any) {
+      toast.error(err.message || "Mapping failed.");
+    } finally {
+      setIsMappingLoading(false);
+    }
+  };
+
+  const displayCustomFields = React.useMemo(() => {
+    if (!mappingResult) return [];
+    const aiFields = mappingResult.suggestedCustomFields
+      .slice(0, 5)
+      .map((cf) => ({
+        key: cf.key,
+        label: cf.label,
+        originalSource: cf.sourceColumn,
+        type: cf.type,
+      }));
+
+    Object.entries(manualOverrides).forEach(([key, val]) => {
+      if (
+        key.startsWith("custom_") &&
+        val !== "__unmapped" &&
+        !aiFields.some((f) => f.key === key)
+      ) {
+        aiFields.push({ key, label: val, originalSource: val, type: "TEXT" });
+      }
+    });
+
+    return aiFields
+      .map((cf) => {
+        const override = manualOverrides[cf.key];
+        const currentSource = override || cf.originalSource;
+        return {
+          ...cf,
+          currentSource,
+          displayLabel:
+            override && override !== cf.originalSource ? override : cf.label,
+          isIgnored: currentSource === "__unmapped",
+        };
+      })
+      .filter((cf) => !cf.isIgnored);
+  }, [mappingResult, manualOverrides]);
+
+  const mappedSampleRows = React.useMemo(() => {
+    if (!mappingResult || !sampleData.length) return [];
+    return sampleData.map((sourceRow) => {
+      const row: Record<string, string> = {};
+      for (const field of STANDARD_FIELDS) {
+        const override = manualOverrides[field.key];
+        if (override) {
+          row[field.key] =
+            override === "__unmapped" ? "" : sourceRow[override] || "";
+        } else {
+          row[field.key] = applyMapping(
+            mappingResult.standardMappings[field.key],
+            sourceRow,
+          );
+        }
+      }
+      for (const cf of displayCustomFields) {
+        row[cf.key] = sourceRow[cf.currentSource] || "";
+      }
+      return row;
+    });
+  }, [mappingResult, sampleData, manualOverrides, displayCustomFields]);
+
+  const getUnusedColumns = () => {
+    if (!mappingResult) return [];
+    const usedStandard = new Set<string>();
+    for (const field of STANDARD_FIELDS) {
+      const mapping = mappingResult.standardMappings[field.key];
+      const override = manualOverrides[field.key];
+      if (override && override !== "__unmapped" && override !== "__concat") {
+        usedStandard.add(override);
+      } else if (!override && mapping.transform !== "none") {
+        mapping.sourceColumns.forEach((c) => usedStandard.add(c));
+      }
+    }
+    const usedCustom = new Set(displayCustomFields.map((f) => f.currentSource));
+    return columns.filter((c) => !usedStandard.has(c) && !usedCustom.has(c));
+  };
+
+  const addCustomColumn = (colName: string) => {
+    const aiSuggestion = mappingResult?.suggestedCustomFields.find(
+      (f) => f.sourceColumn === colName,
+    );
+    const key = aiSuggestion ? aiSuggestion.key : `custom_${colName}`;
+    setManualOverrides((prev) => ({ ...prev, [key]: colName }));
+  };
+
+  // Helper to map a full row
+  const getMappedRow = (
+    sourceRow: Record<string, string>,
+    countryCode: string,
+  ) => {
+    const row: any = { customFields: {} };
+    if (!mappingResult) return row;
+
+    for (const field of STANDARD_FIELDS) {
+      const override = manualOverrides[field.key];
+      let val = "";
+      if (override) {
+        val = override === "__unmapped" ? "" : sourceRow[override] || "";
+      } else {
+        val = applyMapping(
+          mappingResult.standardMappings[field.key],
+          sourceRow,
+        );
+      }
+      row[field.key] = val;
+    }
+
+    for (const cf of displayCustomFields) {
+      row.customFields[cf.key] = sourceRow[cf.currentSource] || "";
+    }
+
+    // Standardize
+    if (row.email) row.email = row.email.toLowerCase().trim();
+    if (row.phone) row.phoneE164 = formatPhoneE164(row.phone, countryCode);
+
+    return row;
+  };
+
+  // Provide stats before Confirmation
+  const calculateStats = async () => {
+    if (!mappingResult) return;
+
+    const countryCode = await getDefaultCountryCode();
+
+    let missing = 0;
+    const emailsToCheck: string[] = [];
+    const phonesToCheck: string[] = [];
+
+    allParsedRows.forEach((r) => {
+      const mapped = getMappedRow(r, countryCode);
+      if (!mapped.name || (!mapped.email && !mapped.phoneE164)) {
+        missing++;
+      } else {
+        if (mapped.email) emailsToCheck.push(mapped.email);
+        if (mapped.phoneE164) phonesToCheck.push(mapped.phoneE164);
+      }
+    });
+
+    try {
+      const { existingEmails, existingPhones } = await checkContactDuplicates(
+        "",
+        emailsToCheck,
+        phonesToCheck,
+      );
+      setDuplicateStats({
+        emails: existingEmails.length,
+        phones: existingPhones.length,
+        missingRequires: missing,
+      });
+      goNext();
+    } catch (err: any) {
+      toast.error("Failed to check duplicates: " + err.message);
+    }
+  };
+
+  const handleImport = async () => {
+    setIsImporting(true);
+    setImportStats({ success: 0, total: allParsedRows.length });
+
+    const toastId = toast.loading("Starting import...", { position: "bottom-right" });
+
+    try {
+      const countryCode = await getDefaultCountryCode();
+      const validRows = allParsedRows
+        .map((r) => getMappedRow(r, countryCode))
+        .filter((r) => r.name && (r.email || r.phoneE164));
+
+      let successCount = 0;
+      const chunkSize = 10;
+      
+      if (validRows.length === 0) {
+        toast.success("No valid contacts to import.", { id: toastId, position: "bottom-right" });
+        setImportDone(true);
+        setIsImporting(false);
+        return;
+      }
+
+      for (let i = 0; i < validRows.length; i += chunkSize) {
+        toast.loading(`Importing contacts... ${successCount} / ${validRows.length}`, {
+          id: toastId,
+          position: "bottom-right",
+        });
+        const chunk = validRows.slice(i, i + chunkSize);
+        const result = await importContactsBulk("", chunk, duplicateStrategy);
+        successCount += result.count;
+        setImportStats({ success: successCount, total: validRows.length });
+        
+        // Let React paint the progress bar before next chunk
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      toast.success(`Import completed successfully! ${successCount} contacts imported.`, {
+        id: toastId,
+        position: "bottom-right",
+      });
       setImportDone(true);
-    }, 2000);
+    } catch (err: any) {
+      toast.error("Import failed: " + err.message, { id: toastId, position: "bottom-right" });
+    } finally {
+      setIsImporting(false);
+    }
   };
-
-  const handleReset = () => {
-    setCurrentStep("Upload");
-    setUploadedFile(null);
-    setImporting(false);
-    setImportDone(false);
-  };
-
-  const nameIsMapped = Object.values(mapping).includes("name");
-  const hasPhoneOrEmail =
-    Object.values(mapping).includes("phone") ||
-    Object.values(mapping).includes("email");
-  const canProceedMapping = nameIsMapped && hasPhoneOrEmail;
 
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) handleReset();
+        if (!o) setTimeout(handleReset, 300);
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className={`max-h-[85vh] overflow-y-auto overflow-x-hidden transition-all duration-300 ${
+          currentStep === "Upload" || currentStep === "Duplicates" || currentStep === "Confirm"
+            ? "w-full sm:max-w-xl"
+            : "w-full sm:max-w-3xl lg:max-w-5xl xl:max-w-[1080px]"
+        }`}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <DialogTitle>Import Contacts</DialogTitle>
@@ -184,18 +426,12 @@ export function ContactImportDialog({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-1 mb-2">
+        <div className="flex items-center gap-1 mb-2 w-full min-w-0">
           {STEPS.map((step, i) => (
             <React.Fragment key={step}>
               <div className="flex items-center gap-1.5">
                 <div
-                  className={`flex items-center justify-center size-6 rounded-full text-xs font-medium transition-colors ${
-                    i < stepIndex
-                      ? "bg-foreground text-background"
-                      : i === stepIndex
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-muted-foreground"
-                  }`}
+                  className={`flex items-center justify-center size-6 rounded-full text-xs font-medium transition-colors ${i < stepIndex ? "bg-foreground text-background" : i === stepIndex ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
                 >
                   {i < stepIndex ? <IconCheck className="size-3.5" /> : i + 1}
                 </div>
@@ -213,18 +449,13 @@ export function ContactImportDialog({
             </React.Fragment>
           ))}
         </div>
-
         <Separator />
 
         {/* Step: Upload */}
         {currentStep === "Upload" && (
-          <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
             <div
-              className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors cursor-pointer ${
-                isDragOver
-                  ? "border-foreground bg-muted"
-                  : "border-border hover:border-foreground/50"
-              }`}
+              className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors cursor-pointer ${isDragOver ? "border-foreground bg-muted" : "border-border hover:border-foreground/50"}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragOver(true);
@@ -233,9 +464,9 @@ export function ContactImportDialog({
               onDrop={(e) => {
                 e.preventDefault();
                 setIsDragOver(false);
-                handleUpload();
+                if (e.dataTransfer.files?.length)
+                  onFileSelected(e.dataTransfer.files[0]);
               }}
-              onClick={handleUpload}
             >
               <div className="flex items-center justify-center size-12 rounded-full bg-muted">
                 <IconUpload className="size-5 text-muted-foreground" />
@@ -245,173 +476,332 @@ export function ContactImportDialog({
                   Drop your file here or click to browse
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Supports CSV and XLSX files up to 10MB
+                  Supports CSV and XLSX files up to 10MB, Max 100 rows
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <Separator className="flex-1" />
-            </div>
-            <Button variant="outline" className="gap-2">
-              <IconClipboard className="size-4" />
-              Paste from clipboard
-            </Button>
-            <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
-              <IconFileSpreadsheet className="size-4 text-muted-foreground shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Need a template?{" "}
-                <button className="underline underline-offset-2 text-foreground font-medium hover:no-underline">
-                  Download our CSV template
-                </button>
-              </p>
+              <input
+                type="file"
+                className="hidden"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => {
+                  if (e.target.files?.length) onFileSelected(e.target.files[0]);
+                }}
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
             </div>
           </div>
         )}
 
         {/* Step: Preview */}
-        {currentStep === "Preview" && (
-          <div className="flex flex-col gap-4 py-2">
+        {currentStep === "Preview" && file && (
+          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <IconFileSpreadsheet className="size-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{uploadedFile}</span>
+                <span className="text-sm font-medium">{file.name}</span>
                 <Badge variant="secondary" className="font-normal text-xs">
-                  247 rows
+                  {allParsedRows.length} rows
                 </Badge>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setUploadedFile(null);
-                  setCurrentStep("Upload");
-                }}
-              >
-                <IconX className="size-4" />
-                Remove
-              </Button>
             </div>
-            <div className="rounded-lg border overflow-auto max-h-64">
-              <table className="w-full text-xs">
-                <thead className="bg-muted sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                      #
-                    </th>
-                    {DETECTED_COLUMNS.map((col) => (
-                      <th
+            <div className="rounded-lg border overflow-auto max-h-64 shadow-sm">
+              <Table className="text-xs">
+                <TableHeader className="bg-muted sticky top-0">
+                  <TableRow>
+                    {columns.map((col) => (
+                      <TableHead
                         key={col}
-                        className="px-3 py-2 text-left font-medium text-muted-foreground"
+                        className="whitespace-nowrap font-medium text-foreground"
                       >
                         {col}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {PREVIEW_DATA.map((row, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {i + 1}
-                      </td>
-                      {DETECTED_COLUMNS.map((col) => (
-                        <td key={col} className="px-3 py-2">
-                          {row[col as keyof typeof row] || (
-                            <span className="text-muted-foreground">--</span>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sampleData.map((row, i) => (
+                    <TableRow key={i}>
+                      {columns.map((col) => (
+                        <TableCell
+                          key={col}
+                          className="whitespace-nowrap tabular-nums"
+                        >
+                          {row[col] || (
+                            <span className="text-muted-foreground italic opacity-50">
+                              —
+                            </span>
                           )}
-                        </td>
+                        </TableCell>
                       ))}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Showing 5 of 247 rows. {DETECTED_COLUMNS.length} columns detected.
+              Showing max 5 rows preview.
             </p>
-            <div className="flex justify-between">
+            <div className="flex justify-between mt-2">
               <Button variant="outline" size="sm" onClick={goBack}>
-                <IconArrowLeft className="size-4" />
-                Back
+                <IconArrowLeft className="size-4" /> Back
               </Button>
-              <Button size="sm" onClick={goNext}>
-                Map Fields
-                <IconArrowRight className="size-4" />
+              <Button
+                size="sm"
+                onClick={runMapping}
+                disabled={isMappingLoading}
+              >
+                {isMappingLoading ? (
+                  <IconLoader2 className="size-4 mr-2 animate-spin" />
+                ) : null}
+                {isMappingLoading ? "Analyzing Fields..." : "Map Fields"}
+                {!isMappingLoading && (
+                  <IconArrowRight className="size-4 ml-2" />
+                )}
               </Button>
             </div>
           </div>
         )}
 
         {/* Step: Mapping */}
-        {currentStep === "Mapping" && (
-          <div className="flex flex-col gap-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Match your file columns to ReachDem fields. <strong>Name</strong>{" "}
-              and at least <strong>Phone</strong> or <strong>Email</strong> are
-              required.
-            </p>
-            <div className="flex flex-col gap-3">
-              {DETECTED_COLUMNS.map((col) => {
-                const currentMapping = mapping[col] || "";
-                const field = REACHDEM_FIELDS.find(
-                  (f) => f.key === currentMapping,
-                );
-                return (
-                  <div key={col} className="flex items-center gap-3">
-                    <div className="flex-1 rounded-md bg-muted px-3 py-2 text-sm">
-                      {col}
-                    </div>
-                    <IconArrowRight className="size-4 text-muted-foreground shrink-0" />
-                    <Select
-                      value={currentMapping}
-                      onValueChange={(val) =>
-                        setMapping((prev) => ({ ...prev, [col]: val }))
-                      }
+        {currentStep === "Mapping" && mappingResult && (
+          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">
+                Match your file columns to ReachDem fields.{" "}
+                <strong>Name</strong> and at least <strong>Phone</strong> or{" "}
+                <strong>Email</strong> are required.
+              </p>
+              <div className="flex items-center gap-2">
+                {isEditing && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 border-dashed text-xs text-muted-foreground"
+                      >
+                        <IconPlus className="size-3.5 mr-1" /> Add Column
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-[200px] max-h-[300px] overflow-y-auto"
                     >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select field..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REACHDEM_FIELDS.map((f) => (
-                          <SelectItem key={f.key} value={f.key}>
-                            <span className="flex items-center gap-2">
-                              {f.label}
-                              {f.required && (
+                      {getUnusedColumns().length === 0 ? (
+                        <div className="p-2 text-xs text-muted-foreground text-center">
+                          All columns mapped
+                        </div>
+                      ) : (
+                        getUnusedColumns().map((col) => (
+                          <DropdownMenuItem
+                            key={col}
+                            onClick={() => addCustomColumn(col)}
+                            className="text-xs"
+                          >
+                            {col}
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  {isEditing ? (
+                    <>
+                      <IconCheck className="size-3.5 mr-1.5" /> Done
+                    </>
+                  ) : (
+                    <>
+                      <IconEdit className="size-3.5 mr-1.5" /> Edit Mapping
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[50vh] shadow-sm ring-1 ring-primary/10">
+              <Table className="text-sm">
+                <TableHeader className="bg-primary/5">
+                  <TableRow>
+                    {STANDARD_FIELDS.map((field) => {
+                      const mapping = mappingResult.standardMappings[field.key];
+                      const override = manualOverrides[field.key];
+                      let currentValue = "__unmapped";
+                      let isConcat = false;
+
+                      if (override) {
+                        currentValue = override;
+                      } else if (mapping.transform === "concat") {
+                        isConcat = true;
+                        currentValue = "__concat";
+                      } else if (
+                        mapping.transform !== "none" &&
+                        mapping.sourceColumns.length > 0
+                      ) {
+                        currentValue = mapping.sourceColumns[0];
+                      }
+
+                      return (
+                        <TableHead
+                          key={field.key}
+                          className="whitespace-nowrap min-w-[140px]"
+                        >
+                          <div className="flex flex-col gap-1.5 py-1.5">
+                            <span className="font-medium text-foreground">
+                              {field.label}{" "}
+                              {field.required && (
                                 <Badge
                                   variant="destructive"
-                                  className="text-[10px] px-1 py-0"
+                                  className="text-[10px] px-1 h-3.5 font-normal ml-1"
                                 >
-                                  Required
+                                  Req
                                 </Badge>
                               )}
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              })}
+                            {isEditing ? (
+                              <Select
+                                value={currentValue}
+                                onValueChange={(val) =>
+                                  setManualOverrides((prev) => ({
+                                    ...prev,
+                                    [field.key]: val,
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="h-2 text-[11px] px-2 shadow-sm border-dashed bg-background">
+                                  <SelectValue placeholder="Ignore" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem
+                                    value="__unmapped"
+                                    className="text-muted-foreground italic"
+                                  >
+                                    -- Ignore --
+                                  </SelectItem>
+                                  {isConcat && (
+                                    <SelectItem
+                                      value="__concat"
+                                      className="text-primary font-medium"
+                                      disabled
+                                    >
+                                      Auto: {mapping.sourceColumns.join(" + ")}
+                                    </SelectItem>
+                                  )}
+                                  {columns.map((c) => (
+                                    <SelectItem key={c} value={c}>
+                                      {c}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-[10px] font-mono text-muted-foreground truncate">
+                                {currentValue === "__unmapped"
+                                  ? "—"
+                                  : currentValue === "__concat"
+                                    ? mapping.sourceColumns.join(" + ")
+                                    : currentValue}
+                              </span>
+                            )}
+                          </div>
+                        </TableHead>
+                      );
+                    })}
+                    {displayCustomFields.map((f) => (
+                      <TableHead
+                        key={f.key}
+                        className="whitespace-nowrap border-l-2 border-primary/20 bg-primary/5 min-w-[140px]"
+                      >
+                        <div className="flex flex-col gap-1.5 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-primary truncate max-w-[100px]">
+                              {f.displayLabel}
+                            </span>
+                          </div>
+                          {isEditing ? (
+                            <Select
+                              value={f.currentSource}
+                              onValueChange={(val) =>
+                                setManualOverrides((prev) => ({
+                                  ...prev,
+                                  [f.key]: val,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-7 text-[11px] px-2 shadow-sm border-dashed bg-background border-primary/30 text-primary">
+                                <SelectValue placeholder="Select column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  value="__unmapped"
+                                  className="text-destructive font-medium"
+                                >
+                                  -- Remove --
+                                </SelectItem>
+                                {columns.map((c) => (
+                                  <SelectItem key={c} value={c}>
+                                    {c}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-[10px] font-mono text-muted-foreground truncate">
+                              {f.currentSource}
+                            </span>
+                          )}
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mappedSampleRows.map((row, i) => (
+                    <TableRow key={i}>
+                      {STANDARD_FIELDS.map((field) => (
+                        <TableCell
+                          key={field.key}
+                          className="whitespace-nowrap tabular-nums"
+                        >
+                          {row[field.key] || (
+                            <span className="text-muted-foreground italic opacity-40">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                      ))}
+                      {displayCustomFields.map((f) => (
+                        <TableCell
+                          key={f.key}
+                          className="whitespace-nowrap tabular-nums border-l-2 border-primary/10"
+                        >
+                          {row[f.key] || (
+                            <span className="text-muted-foreground italic opacity-40">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-            {!canProceedMapping && (
-              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                <IconAlertTriangle className="size-4 shrink-0" />
-                <span>
-                  You must map <strong>Name</strong> and at least{" "}
-                  <strong>Phone</strong> or <strong>Email</strong>.
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between">
+
+            <div className="flex justify-between mt-4">
               <Button variant="outline" size="sm" onClick={goBack}>
-                <IconArrowLeft className="size-4" />
-                Back
+                <IconArrowLeft className="size-4" /> Back
               </Button>
-              <Button size="sm" onClick={goNext} disabled={!canProceedMapping}>
-                Duplicate Rules
-                <IconArrowRight className="size-4" />
+              <Button size="sm" onClick={goNext}>
+                Duplicate Rules <IconArrowRight className="size-4 ml-1" />
               </Button>
             </div>
           </div>
@@ -419,14 +809,14 @@ export function ContactImportDialog({
 
         {/* Step: Duplicates */}
         {currentStep === "Duplicates" && (
-          <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
             <p className="text-sm text-muted-foreground">
               Choose how to handle contacts that already exist in your database
               (matched by phone or email).
             </p>
             <RadioGroup
               value={duplicateStrategy}
-              onValueChange={setDuplicateStrategy}
+              onValueChange={(val: any) => setDuplicateStrategy(val)}
               className="flex flex-col gap-3"
             >
               <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-foreground">
@@ -462,12 +852,10 @@ export function ContactImportDialog({
             </RadioGroup>
             <div className="flex justify-between">
               <Button variant="outline" size="sm" onClick={goBack}>
-                <IconArrowLeft className="size-4" />
-                Back
+                <IconArrowLeft className="size-4" /> Back
               </Button>
-              <Button size="sm" onClick={goNext}>
-                Review
-                <IconArrowRight className="size-4" />
+              <Button size="sm" onClick={calculateStats}>
+                Review <IconArrowRight className="size-4 ml-1" />
               </Button>
             </div>
           </div>
@@ -475,40 +863,48 @@ export function ContactImportDialog({
 
         {/* Step: Confirm */}
         {currentStep === "Confirm" && !importDone && (
-          <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
             <p className="text-sm text-muted-foreground">
               Review the import summary before proceeding.
             </p>
-            <div className="rounded-lg border divide-y">
+            <div className="rounded-lg border divide-y bg-card text-card-foreground">
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">File</span>
-                <span className="text-sm font-medium">{uploadedFile}</span>
+                <span className="text-sm font-medium truncate max-w-[200px]">
+                  {file?.name}
+                </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">
                   Total rows
                 </span>
-                <span className="text-sm font-medium">247</span>
+                <span className="text-sm font-medium">
+                  {allParsedRows.length}
+                </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">
-                  Valid contacts
+                  Valid contacts to parse
                 </span>
                 <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                  231
+                  {allParsedRows.length - duplicateStats.missingRequires}
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">
-                  Errors (missing required fields)
+                  Errors (missing name & contact info)
                 </span>
-                <span className="text-sm font-medium text-destructive">12</span>
+                <span className="text-sm font-medium text-destructive">
+                  {duplicateStats.missingRequires}
+                </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">
-                  Potential duplicates
+                  Potential duplicate queries hit
                 </span>
-                <span className="text-sm font-medium">4</span>
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-500">
+                  {duplicateStats.emails} Emails, {duplicateStats.phones} Phones
+                </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-muted-foreground">
@@ -518,41 +914,41 @@ export function ContactImportDialog({
                   {duplicateStrategy}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
-                  Mapped fields
-                </span>
-                <span className="text-sm font-medium">
-                  {Object.values(mapping).filter((v) => v !== "__skip").length}{" "}
-                  of {DETECTED_COLUMNS.length}
-                </span>
-              </div>
             </div>
-            {importing && (
-              <div className="flex flex-col gap-2">
+
+            {isImporting && (
+              <div className="flex flex-col gap-2 p-4 border rounded-lg bg-muted/20">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Uploading chunked data...</span>
+                  <span>
+                    {importStats.success} / {importStats.total}
+                  </span>
+                </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div
-                    className="h-full bg-foreground rounded-full animate-pulse"
-                    style={{ width: "60%" }}
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{
+                      width: `${importStats.total === 0 ? 0 : Math.round((importStats.success / importStats.total) * 100)}%`,
+                    }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Importing contacts...
-                </p>
               </div>
             )}
-            <div className="flex justify-between">
+
+            <div className="flex justify-between mt-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={goBack}
-                disabled={importing}
+                disabled={isImporting}
               >
-                <IconArrowLeft className="size-4" />
-                Back
+                <IconArrowLeft className="size-4" /> Back
               </Button>
-              <Button size="sm" onClick={handleImport} disabled={importing}>
-                {importing ? "Importing..." : "Start Import"}
+              <Button size="sm" onClick={handleImport} disabled={isImporting}>
+                {isImporting ? (
+                  <IconLoader2 className="size-4 mr-2 animate-spin" />
+                ) : null}
+                {isImporting ? "Importing..." : "Start Import"}
               </Button>
             </div>
           </div>
@@ -567,24 +963,19 @@ export function ContactImportDialog({
             <div className="text-center">
               <p className="text-base font-semibold">Import completed</p>
               <p className="text-sm text-muted-foreground mt-1">
-                231 contacts imported successfully. 12 rows had errors.
+                {importStats.success} contacts imported successfully.{" "}
+                {duplicateStats.missingRequires} rows had layout validation
+                errors and were skipped.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <IconDownload className="size-4" />
-              Download error report
-            </Button>
-            <Separator />
+            <Separator className="my-2" />
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setOpen(false)}
               >
-                View Contacts
-              </Button>
-              <Button variant="outline" size="sm">
-                Create a Segment
+                Done
               </Button>
             </div>
           </div>
