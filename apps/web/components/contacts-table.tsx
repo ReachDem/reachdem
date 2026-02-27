@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -18,7 +18,7 @@ import {
   IconEdit,
   IconTrash,
   IconCopy,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -32,11 +32,11 @@ import {
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table"
+} from "@tanstack/react-table";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -44,206 +44,288 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ContactImportDialog } from "@/components/contact-import-dialog"
-import { AddContactDrawer } from "@/components/add-contact-drawer"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ContactImportDialog } from "@/components/contact-import-dialog";
+import { AddContactDrawer } from "@/components/add-contact-drawer";
 
 export interface Contact {
-  id: number
-  name: string
-  email: string | null
-  phone: string | null
-  sexe: "male" | "female" | "other" | "unknown"
-  enterprise: string | null
-  work: string | null
-  segments: string[]
-  created_at: string
+  id: string;
+  name: string;
+  email: string | null;
+  phoneE164: string | null;
+  gender: string | null;
+  enterprise: string | null;
+  work: string | null;
+  customFields?: any;
+  createdAt: Date;
 }
 
-const columns: ColumnDef<Contact>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "name",
-    header: "Contact",
-    cell: ({ row }) => {
-      const contact = row.original
-      const initials = contact.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
+export function ContactsTable({
+  initialContacts = [],
+}: {
+  initialContacts?: Contact[];
+}) {
+  const dynamicColumns = React.useMemo<ColumnDef<Contact>[]>(() => {
+    // Determine dynamic custom fields present in the data
+    const customFieldKeys = new Set<string>();
+    initialContacts.forEach((contact) => {
+      if (contact.customFields && typeof contact.customFields === "object") {
+        Object.keys(contact.customFields).forEach((key) =>
+          customFieldKeys.add(key),
+        );
+      }
+    });
 
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="size-8">
-            <AvatarFallback className="bg-muted text-muted-foreground text-xs font-medium">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="font-medium">{contact.name}</span>
-            {contact.enterprise && (
-              <span className="text-muted-foreground text-xs">{contact.enterprise}</span>
-            )}
+    const baseCols: ColumnDef<Contact>[] = [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <div className="flex items-center justify-center -ml-2">
+            <Checkbox
+              checked={
+                table.getIsAllPageRowsSelected() ||
+                (table.getIsSomePageRowsSelected() && "indeterminate")
+              }
+              onCheckedChange={(value) =>
+                table.toggleAllPageRowsSelected(!!value)
+              }
+              aria-label="Select all"
+            />
           </div>
-        </div>
-      )
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: "email",
-    header: "Email",
-    cell: ({ row }) => {
-      const email = row.original.email
-      if (!email) return <span className="text-muted-foreground">--</span>
-      return (
-        <div className="flex items-center gap-1.5 text-sm">
-          <IconMail className="size-3.5 text-muted-foreground" />
-          <span>{email}</span>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-    cell: ({ row }) => {
-      const phone = row.original.phone
-      if (!phone) return <span className="text-muted-foreground">--</span>
-      return (
-        <div className="flex items-center gap-1.5 text-sm tabular-nums">
-          <IconPhone className="size-3.5 text-muted-foreground" />
-          <span>{phone}</span>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "segments",
-    header: "Segments",
-    cell: ({ row }) => {
-      const segments = row.original.segments
-      if (!segments.length) return <span className="text-muted-foreground">--</span>
-      return (
-        <div className="flex items-center gap-1 flex-wrap">
-          {segments.slice(0, 2).map((s) => (
-            <Badge key={s} variant="secondary" className="text-xs font-normal">
-              {s}
-            </Badge>
-          ))}
-          {segments.length > 2 && (
-            <Badge variant="outline" className="text-xs text-muted-foreground font-normal">
-              +{segments.length - 2}
-            </Badge>
-          )}
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "created_at",
-    header: "Added",
-    cell: ({ row }) => {
-      const date = new Date(row.original.created_at)
-      return (
-        <span className="text-muted-foreground text-sm tabular-nums">
-          {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-        </span>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="data-[state=open]:bg-muted text-muted-foreground flex size-8" size="icon">
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem>
-            <IconEdit className="size-4 mr-2" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <IconCopy className="size-4 mr-2" />
-            Duplicate
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">
-            <IconTrash className="size-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-]
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center justify-center -ml-2">
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label="Select row"
+            />
+          </div>
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "name",
+        header: "Contact",
+        cell: ({ row }) => {
+          const contact = row.original;
+          const initials = contact.name
+            ? contact.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)
+            : "??";
 
-// Mock data
-const mockContacts: Contact[] = [
-  { id: 1, name: "Amadou Diallo", email: "amadou@startup.sn", phone: "+221 77 123 4567", sexe: "male", enterprise: "TechDak", work: "CTO", segments: ["VIP", "Tech"], created_at: "2025-11-15" },
-  { id: 2, name: "Fatou Sow", email: "fatou.sow@gmail.com", phone: "+221 78 234 5678", sexe: "female", enterprise: "Wave Africa", work: "Marketing Lead", segments: ["Newsletter"], created_at: "2025-11-12" },
-  { id: 3, name: "Moussa Ndiaye", email: null, phone: "+221 76 345 6789", sexe: "male", enterprise: null, work: null, segments: ["SMS Only"], created_at: "2025-11-10" },
-  { id: 4, name: "Aissatou Ba", email: "aissatou@wave.com", phone: "+221 77 456 7890", sexe: "female", enterprise: "Wave", work: "Product Manager", segments: ["VIP", "Fintech"], created_at: "2025-10-28" },
-  { id: 5, name: "Ibrahima Fall", email: "ibrahima.fall@orange.sn", phone: "+221 78 567 8901", sexe: "male", enterprise: "Orange Sonatel", work: "Engineer", segments: ["Tech", "Enterprise"], created_at: "2025-10-25" },
-  { id: 6, name: "Mariama Diop", email: "mariama@reachdem.com", phone: null, sexe: "female", enterprise: "ReachDem", work: "Designer", segments: ["Internal"], created_at: "2025-10-20" },
-  { id: 7, name: "Ousmane Sarr", email: "ousmane.sarr@free.sn", phone: "+221 76 678 9012", sexe: "male", enterprise: "Free Senegal", work: "Sales Director", segments: ["Enterprise", "Telecom"], created_at: "2025-10-18" },
-  { id: 8, name: "Khady Mbaye", email: "khady.m@gmail.com", phone: "+221 77 789 0123", sexe: "female", enterprise: null, work: "Freelance", segments: ["Newsletter", "Freelancers"], created_at: "2025-10-15" },
-  { id: 9, name: "Cheikh Gueye", email: "cheikh@tpsgroup.sn", phone: "+221 78 890 1234", sexe: "male", enterprise: "TPS Group", work: "CEO", segments: ["VIP"], created_at: "2025-10-12" },
-  { id: 10, name: "Ndeye Awa Dieng", email: "ndeye@expresso.sn", phone: "+221 70 901 2345", sexe: "female", enterprise: "Expresso", work: "HR Manager", segments: ["Enterprise"], created_at: "2025-10-08" },
-  { id: 11, name: "Pape Diouf", email: null, phone: "+221 77 012 3456", sexe: "male", enterprise: null, work: null, segments: ["SMS Only", "Promo"], created_at: "2025-10-05" },
-  { id: 12, name: "Rama Thiam", email: "rama.thiam@atos.sn", phone: "+221 78 123 4567", sexe: "female", enterprise: "Atos Senegal", work: "Consultant", segments: ["Tech", "Newsletter"], created_at: "2025-09-28" },
-  { id: 13, name: "Babacar Cissé", email: "babacar@uba.sn", phone: "+221 76 234 5678", sexe: "male", enterprise: "UBA Senegal", work: "Branch Manager", segments: ["Fintech", "VIP"], created_at: "2025-09-25" },
-  { id: 14, name: "Sokhna Diaw", email: "sokhna.d@gmail.com", phone: null, sexe: "female", enterprise: null, work: "Student", segments: ["Newsletter"], created_at: "2025-09-20" },
-  { id: 15, name: "Abdoulaye Sy", email: "abdoulaye@sonatel.sn", phone: "+221 77 345 6789", sexe: "male", enterprise: "Sonatel", work: "Network Engineer", segments: ["Enterprise", "Tech", "Telecom"], created_at: "2025-09-15" },
-]
+          return (
+            <div className="flex items-center gap-3">
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-muted text-muted-foreground text-xs font-medium">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="font-medium">{contact.name || "Unknown"}</span>
+                {contact.enterprise && (
+                  <span className="text-muted-foreground text-xs">
+                    {contact.enterprise}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
+        enableHiding: false,
+      },
+      {
+        accessorKey: "email",
+        header: "Email",
+        cell: ({ row }) => {
+          const email = row.original.email;
+          if (!email) return <span className="text-muted-foreground">--</span>;
+          return (
+            <div className="flex items-center gap-1.5 text-sm">
+              <IconMail className="size-3.5 text-muted-foreground" />
+              <span>{email}</span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "phoneE164",
+        header: "Phone",
+        cell: ({ row }) => {
+          const phone = row.getValue("phoneE164") as string;
+          if (!phone) return <span className="text-muted-foreground">--</span>;
+          return (
+            <div className="flex items-center gap-1.5 text-sm tabular-nums">
+              <IconPhone className="size-3.5 text-muted-foreground" />
+              <span>{phone}</span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "gender",
+        header: "Gender",
+        cell: ({ row }) => {
+          const g = row.getValue("gender") as string;
+          if (!g || g === "UNKNOWN")
+            return <span className="text-muted-foreground">--</span>;
+          return <span className="text-sm capitalize">{g.toLowerCase()}</span>;
+        },
+      },
+      {
+        accessorKey: "work",
+        header: "Work",
+        cell: ({ row }) => {
+          const w = row.original.work;
+          if (!w) return <span className="text-muted-foreground">--</span>;
+          return <span className="text-sm">{w}</span>;
+        },
+      },
+    ];
 
-export function ContactsTable() {
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
+    // Add dynamic custom fields
+    Array.from(customFieldKeys).forEach((key) => {
+      baseCols.push({
+        id: `custom_${key}`,
+        accessorFn: (row) => (row.customFields as any)?.[key],
+        header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " "),
+        cell: ({ getValue }) => {
+          const val = getValue() as string;
+          if (!val) return <span className="text-muted-foreground">--</span>;
+          return <span className="text-sm">{val}</span>;
+        },
+      });
+    });
+
+    // Add final trailing columns
+    baseCols.push(
+      {
+        accessorKey: "createdAt",
+        header: "Added",
+        cell: ({ row }) => {
+          const date = new Date(row.getValue("createdAt") as Date);
+          return (
+            <span className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
+              {date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          );
+        },
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => (
+          <div className="flex justify-end pr-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+                  size="icon"
+                >
+                  <IconDotsVertical className="size-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem>
+                  <IconEdit className="size-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <IconCopy className="size-4 mr-2" />
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive">
+                  <IconTrash className="size-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ),
+      },
+    );
+
+    return baseCols;
+  }, [initialContacts]);
+
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>(() => {
+      // Only show up to 7 columns by default to avoid crowding
+      const defaultVisible = [
+        "select",
+        "name",
+        "email",
+        "phoneE164",
+        "createdAt",
+        "actions",
+      ];
+      const visibility: VisibilityState = {};
+
+      // Default hiding strategy for others if they exceed remaining count
+      const maxVisibleDynamic = 7 - defaultVisible.length; // usually 1 or 2 slots left
+      let visibleDynamicCount = 0;
+
+      dynamicColumns.forEach((col) => {
+        const colId = col.id || (col as any).accessorKey;
+        if (!colId) return;
+
+        if (defaultVisible.includes(colId)) {
+          visibility[colId] = true;
+        } else {
+          if (visibleDynamicCount < maxVisibleDynamic) {
+            visibility[colId] = true;
+            visibleDynamicCount++;
+          } else {
+            visibility[colId] = false;
+          }
+        }
+      });
+
+      return visibility;
+    });
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = React.useState("");
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
-  })
+  });
 
   const table = useReactTable({
-    data: mockContacts,
-    columns,
+    data: initialContacts,
+    columns: dynamicColumns,
     state: {
       sorting,
       columnVisibility,
@@ -265,9 +347,9 @@ export function ContactsTable() {
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  });
 
-  const selectedCount = table.getFilteredSelectedRowModel().rows.length
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -288,7 +370,11 @@ export function ContactsTable() {
               <Badge variant="secondary" className="font-normal">
                 {selectedCount} selected
               </Badge>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+              >
                 <IconTrash className="size-4" />
                 <span className="hidden lg:inline">Delete</span>
               </Button>
@@ -307,15 +393,20 @@ export function ContactsTable() {
             <DropdownMenuContent align="end" className="w-48">
               {table
                 .getAllColumns()
-                .filter((column) => typeof column.accessorFn !== "undefined" && column.getCanHide())
+                .filter((column) => column.getCanHide())
                 .map((column) => (
                   <DropdownMenuCheckboxItem
                     key={column.id}
-                    className="capitalize"
+                    className="capitalize text-sm"
                     checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
                   >
-                    {column.id}
+                    {column.id
+                      .replace("custom_", "")
+                      .replace(/([A-Z])/g, " $1")
+                      .trim()}
                   </DropdownMenuCheckboxItem>
                 ))}
             </DropdownMenuContent>
@@ -344,7 +435,12 @@ export function ContactsTable() {
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -353,21 +449,35 @@ export function ContactsTable() {
             <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2">
+                  <TableCell
+                    colSpan={dynamicColumns.length}
+                    className="h-44 text-center"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
                       <IconUser className="size-8 text-muted-foreground" />
-                      <p className="text-muted-foreground">No contacts found</p>
-                      <p className="text-muted-foreground text-xs">Try adjusting your search or add a new contact.</p>
+                      <p className="text-muted-foreground">
+                        It's a bit empty here
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        Start building your audience by importing contacts or
+                        adding them manually.
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -384,15 +494,24 @@ export function ContactsTable() {
         </div>
         <div className="flex w-full items-center gap-8 lg:w-fit">
           <div className="hidden items-center gap-2 lg:flex">
-            <Label htmlFor="contacts-rows-per-page" className="text-sm font-medium">
+            <Label
+              htmlFor="contacts-rows-per-page"
+              className="text-sm font-medium"
+            >
               Rows per page
             </Label>
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger size="sm" className="w-20" id="contacts-rows-per-page">
-                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              <SelectTrigger
+                size="sm"
+                className="w-20"
+                id="contacts-rows-per-page"
+              >
+                <SelectValue
+                  placeholder={table.getState().pagination.pageSize}
+                />
               </SelectTrigger>
               <SelectContent side="top">
                 {[10, 20, 30, 50].map((pageSize) => (
@@ -404,7 +523,8 @@ export function ContactsTable() {
             </Select>
           </div>
           <div className="flex w-fit items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
           </div>
           <div className="ml-auto flex items-center gap-2 lg:ml-0">
             <Button
@@ -450,5 +570,5 @@ export function ContactsTable() {
         </div>
       </div>
     </div>
-  )
+  );
 }

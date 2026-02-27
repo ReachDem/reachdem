@@ -35,6 +35,7 @@ import {
   MappingResult,
   StandardMapping,
 } from "@/lib/utils/ai-mapping";
+import { STANDARD_FIELDS, applyMapping } from "@/lib/utils/ai-mapping-client";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -52,47 +53,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-
-const STANDARD_FIELDS: {
-  key: keyof MappingResult["standardMappings"];
-  label: string;
-}[] = [
-  { key: "name", label: "Name" },
-  { key: "phoneE164", label: "Phone" },
-  { key: "email", label: "Email" },
-  { key: "gender", label: "Gender" },
-  { key: "birthdate", label: "Birthdate" },
-  { key: "address", label: "Address" },
-  { key: "work", label: "Job Title" },
-  { key: "enterprise", label: "Enterprise" },
-];
-
-function applyMapping(
-  mapping: StandardMapping,
-  sourceRow: Record<string, string>,
-): string {
-  if (mapping.transform === "none" || mapping.sourceColumns.length === 0)
-    return "";
-
-  if (mapping.transform === "concat") {
-    return mapping.sourceColumns
-      .map((col) => sourceRow[col]?.trim())
-      .filter(Boolean)
-      .join(mapping.separator || " ");
-  }
-
-  if (mapping.transform === "map_values") {
-    const raw = sourceRow[mapping.sourceColumns[0]] || "";
-    if (mapping.valueMap) {
-      const lower = raw.toLowerCase().trim();
-      return mapping.valueMap[lower] || mapping.valueMap[raw] || raw;
-    }
-    return raw;
-  }
-
-  // "direct"
-  return sourceRow[mapping.sourceColumns[0]] || "";
-}
 
 export function AiMappingTester() {
   const [open, setOpen] = useState(false);
