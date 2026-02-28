@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { NextRequest } from 'next/server';
-import { auth } from '@reachdem/auth';
+import { auth } from '@reachdem/auth/';
 import { prisma } from '@reachdem/database';
 
 let listGroups: any;
@@ -31,13 +31,19 @@ beforeAll(async () => {
 });
 
 // Use Vitest to mock the required underlying Better Auth systems
-vi.mock('@reachdem/auth', () => ({
-    auth: {
-        api: {
-            getSession: vi.fn(),
-        },
-    },
+const authMock = vi.hoisted(() => ({
+    api: {
+        getSession: vi.fn(),
+    }
 }));
+
+vi.mock('@reachdem/auth/auth', async (importOriginal) => {
+    const actual = await importOriginal<any>();
+    return {
+        ...actual,
+        auth: authMock
+    };
+});
 
 vi.mock('next/headers', () => ({
     headers: vi.fn().mockResolvedValue(new Map()),
@@ -116,7 +122,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 }),
             });
 
-            const response = await updateGroup(req, { params: Promise.resolve({ id: groupId }) });
+            const response = await updateGroup(req as any, { params: Promise.resolve({ id: groupId }) });
             expect(response.status).toBe(200);
 
             const { data } = await response.json();
@@ -126,7 +132,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
         it('should fetch a single group', async () => {
             const groupId = createdGroupIds[0];
             const getReq = new NextRequest(`http://localhost:3000/api/v1/groups/${groupId}`);
-            const getRes = await getGroup(getReq, { params: Promise.resolve({ id: groupId }) });
+            const getRes = await getGroup(getReq as any, { params: Promise.resolve({ id: groupId }) });
             expect(getRes.status).toBe(200);
 
             const { data } = await getRes.json();
@@ -135,14 +141,15 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
         });
 
         it('should reject modification of a group from another workspace', async () => {
+            const orgSeed = Date.now().toString();
             // Mocking an organization explicitly to test security
             await prisma.organization.create({
-                data: { id: "evil-org-3", name: "Evil Corp 3", slug: "evil-corp-3" }
+                data: { id: `evil-org-${orgSeed}`, name: `Evil Corp ${orgSeed}`, slug: `evil-corp-${orgSeed}` }
             }).catch(() => { });
 
-            // This group belongs to evil-org-3, so REAL_ORG_ID should not be able to touch it
+            // This group belongs to evil-org, so REAL_ORG_ID should not be able to touch it
             const foreignGroup = await prisma.group.create({
-                data: { name: "Foreign Group", organizationId: "evil-org-3" }
+                data: { name: `Foreign Group ${orgSeed}`, organizationId: `evil-org-${orgSeed}` }
             });
 
             const req = new NextRequest(`http://localhost:3000/api/v1/groups/${foreignGroup.id}`, {
@@ -150,13 +157,13 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 body: JSON.stringify({ description: 'Hacked description attempt' })
             });
 
-            const response = await updateGroup(req, { params: Promise.resolve({ id: foreignGroup.id }) });
+            const response = await updateGroup(req as any, { params: Promise.resolve({ id: foreignGroup.id }) });
 
             // Should be 404 Not Found since it's scoped out by organizationId
             expect(response.status).toBe(404);
 
             await prisma.group.delete({ where: { id: foreignGroup.id } });
-            await prisma.organization.delete({ where: { id: "evil-org-3" } }).catch(() => { });
+            await prisma.organization.delete({ where: { id: `evil-org-${orgSeed}` } }).catch(() => { });
         });
 
         it('should physically delete the group', async () => {
@@ -173,11 +180,11 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 method: 'DELETE',
             });
 
-            const response = await deleteGroup(req, { params: Promise.resolve({ id: tempId }) });
+            const response = await deleteGroup(req as any, { params: Promise.resolve({ id: tempId }) });
             expect(response.status).toBe(204);
 
             const getReq = new NextRequest(`http://localhost:3000/api/v1/groups/${tempId}`);
-            const getRes = await getGroup(getReq, { params: Promise.resolve({ id: tempId }) });
+            const getRes = await getGroup(getReq as any, { params: Promise.resolve({ id: tempId }) });
             expect(getRes.status).toBe(404); // Proves it was deleted
         });
     });
@@ -215,7 +222,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 body: JSON.stringify({ contact_ids: contactIds }),
             });
 
-            const response = await bulkAddMembers(req, { params: Promise.resolve({ id: targetGroupId }) });
+            const response = await bulkAddMembers(req as any, { params: Promise.resolve({ id: targetGroupId }) });
             expect(response.status).toBe(201);
 
             const json = await response.json();
@@ -224,7 +231,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
 
         it('should safely paginate contacts attached to the specific group', async () => {
             const req = new NextRequest(`http://localhost:3000/api/v1/groups/${targetGroupId}/contacts?limit=2`);
-            const response = await listGroupContacts(req, { params: Promise.resolve({ id: targetGroupId }) });
+            const response = await listGroupContacts(req as any, { params: Promise.resolve({ id: targetGroupId }) });
             expect(response.status).toBe(200);
 
             const { data: _ignored, items, meta } = await response.json(); // Safe DTOs are mapped to 'items'
@@ -242,7 +249,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 body: JSON.stringify({ contact_ids: removeIds })
             });
 
-            const response = await bulkRemoveMembers(req, { params: Promise.resolve({ id: targetGroupId }) });
+            const response = await bulkRemoveMembers(req as any, { params: Promise.resolve({ id: targetGroupId }) });
             expect(response.status).toBe(200);
 
             const json = await response.json();
@@ -271,7 +278,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 body: JSON.stringify({ contact_ids: [evContact.id] }), // Trying to assign foreign contact
             });
 
-            const response = await bulkAddMembers(req, { params: Promise.resolve({ id: targetGroupId }) });
+            const response = await bulkAddMembers(req as any, { params: Promise.resolve({ id: targetGroupId }) });
             expect(response.status).toBe(400); // Bad request (security            
             // Teardown evil contact and org
             await prisma.contact.delete({ where: { id: evContact.id } });
@@ -286,7 +293,7 @@ describe('Groups API - REAL DATABASE INTEGRATION', () => {
                 body: JSON.stringify({ contact_ids: massiveArray }),
             });
 
-            const response = await bulkAddMembers(req, { params: Promise.resolve({ id: targetGroupId }) });
+            const response = await bulkAddMembers(req as any, { params: Promise.resolve({ id: targetGroupId }) });
             expect(response.status).toBe(400);
             const { error } = await response.json();
             expect(JSON.stringify(error)).toContain('10,000 contacts');

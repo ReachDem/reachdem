@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@reachdem/auth";
-import { headers } from "next/headers";
+import { auth } from "./auth";
 
 export type AuthenticatedContext<TParams = Record<string, string | string[]>> = {
     req: NextRequest;
@@ -10,11 +9,11 @@ export type AuthenticatedContext<TParams = Record<string, string | string[]>> = 
 };
 
 export function withWorkspace<TParams = Record<string, string | string[]>>(
-    handler: (context: AuthenticatedContext<TParams>) => Promise<NextResponse> | NextResponse
+    handler: (context: AuthenticatedContext<TParams>) => Promise<NextResponse<any> | Response> | NextResponse<any> | Response
 ) {
     return async (req: NextRequest, context: { params: Promise<TParams> }) => {
         const session = await auth.api.getSession({
-            headers: await headers(),
+            headers: req.headers,
         });
 
         if (!session) {

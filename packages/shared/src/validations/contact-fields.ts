@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const baseObj = z.object({
     key: z.string().min(1, "Key is required").max(50, "Key is too long").regex(/^[a-zA-Z0-9_-]+$/, "Key can only contain letters, numbers, hyphens, and underscores"),
+    alias: z.string().optional(),
     label: z.string().min(1, "Label is required").max(100, "Label is too long"),
     type: z.enum(["TEXT", "NUMBER", "DATE", "BOOLEAN", "URL", "SELECT"]),
     options: z.array(z.string()).optional().nullable(),

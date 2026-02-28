@@ -1,28 +1,50 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
 }
 
-const createPrismaClient = () =>
-    new PrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-        datasources: process.env.DATABASE_URL ? {
-            db: {
-                url: process.env.DATABASE_URL
-            }
-        } : undefined
-    })
+function createClientOptions(): Prisma.PrismaClientOptions & { accelerateUrl?: string } {
+    const log: Prisma.LogLevel[] = process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
 
-const hasRequiredDelegates = (client: PrismaClient) =>
-    Boolean((client as any).group && (client as any).contact && (client as any).organization)
+    if (process.env.PRISMA_ACCELERATE_URL) {
+        return ({
+            log,
+            accelerateUrl: process.env.PRISMA_ACCELERATE_URL
+        } as Prisma.PrismaClientOptions & { accelerateUrl: string })
+    }
 
-const existingClient = globalForPrisma.prisma
+    try {
+        const { Pool } = require('pg') as { Pool: new (options: { connectionString?: string }) => unknown }
+        const { PrismaPg } = require('@prisma/adapter-pg') as { PrismaPg: new (pool: unknown) => Prisma.PrismaClientOptions['adapter'] }
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+
+        return {
+            log,
+            adapter: new PrismaPg(pool)
+        }
+    } catch {
+        // Fallback for environments that haven't installed driver adapter deps yet.
+        return { log }
+    }
+}
 
 export const prisma =
-    existingClient && hasRequiredDelegates(existingClient)
-        ? existingClient
-        : createPrismaClient()
+    globalForPrisma.prisma ??
+    new PrismaClient(createClientOptions() as Prisma.PrismaClientOptions)
+
+// const hasRequiredDelegates = (client: PrismaClient) =>
+//     Boolean((client as any).group && (client as any).contact && (client as any).organization)
+
+// const existingClient = globalForPrisma.prisma
+
+// export const prisma =
+//     existingClient && hasRequiredDelegates(existingClient)
+//         ? existingClient
+//         : createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 

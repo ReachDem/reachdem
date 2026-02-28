@@ -12,13 +12,17 @@ vi.mock("next/headers", () => ({
     headers: vi.fn().mockResolvedValue(new Map()),
 }));
 
-vi.mock("@reachdem/auth", () => {
+const authMock = vi.hoisted(() => ({
+    api: {
+        getSession: vi.fn(),
+    }
+}));
+
+vi.mock("@reachdem/auth/auth", async (importOriginal) => {
+    const actual = await importOriginal<any>();
     return {
-        auth: {
-            api: {
-                getSession: vi.fn(),
-            }
-        }
+        ...actual,
+        auth: authMock
     };
 });
 
@@ -76,7 +80,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 body: JSON.stringify(payload),
             });
 
-            const response = await createContactHandler(req);
+            const response = await createContactHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
 
             // Check HTTP status
             expect(response.status).toBe(201);
@@ -103,7 +107,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 method: "GET"
             });
 
-            const response = await getContactsHandler(req);
+            const response = await getContactsHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
             expect(response.status).toBe(200);
 
             const json = await response.json();
@@ -128,7 +132,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 body: JSON.stringify(payload)
             });
 
-            const res = await createContactHandler(req);
+            const res = await createContactHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
 
             // Should fail validation
             expect(res.status).toBe(400);
@@ -150,7 +154,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 method: "POST",
                 body: JSON.stringify(payload)
             });
-            const createRes = await createContactHandler(createReq);
+            const createRes = await createContactHandler(createReq as any, { params: Promise.resolve({} as Record<string, string>) });
             const { data } = await createRes.json();
             const contactId = data.id;
             createdContactIds.push(contactId);
@@ -169,7 +173,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             const ctx = {
                 params: Promise.resolve({ id: contactId })
             };
-            const updateRes = await updateContactHandler(updateReq, ctx);
+            const updateRes = await updateContactHandler(updateReq as any, ctx);
             expect(updateRes.status).toBe(200);
 
             // Verify in actual database
@@ -190,7 +194,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 method: "POST",
                 body: JSON.stringify(payload)
             });
-            const createRes = await createContactHandler(createReq);
+            const createRes = await createContactHandler(createReq as any, { params: Promise.resolve({} as Record<string, string>) });
             const { data } = await createRes.json();
             const contactId = data.id;
             createdContactIds.push(contactId);
@@ -210,7 +214,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             const ctx = {
                 params: Promise.resolve({ id: contactId })
             };
-            const updateRes = await updateContactHandler(updateReq, ctx);
+            const updateRes = await updateContactHandler(updateReq as any, ctx);
             expect(updateRes.status).toBe(400);
 
             const json = await updateRes.json();
@@ -227,7 +231,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 method: "POST",
                 body: JSON.stringify(payload)
             });
-            const createRes = await createContactHandler(createReq);
+            const createRes = await createContactHandler(createReq as any, { params: Promise.resolve({} as Record<string, string>) });
             const { data } = await createRes.json();
             const contactId = data.id;
             createdContactIds.push(contactId);
@@ -237,7 +241,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             });
 
             const ctx = { params: Promise.resolve({ id: contactId }) };
-            const delRes = await deleteContactHandler(delReq, ctx);
+            const delRes = await deleteContactHandler(delReq as any, ctx);
             expect(delRes.status).toBe(204);
 
             // Verify it was soft-deleted
@@ -261,7 +265,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 body: JSON.stringify(payload)
             });
 
-            const res = await createContactFieldHandler(req);
+            const res = await createContactFieldHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
             expect(res.status).toBe(201);
             const json = await res.json();
             testFieldId = json.data.id;
@@ -276,7 +280,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
 
         it("should retrieve contact fields for the workspace", async () => {
             const req = new NextRequest("http://localhost:3000/api/v1/contact-fields", { method: "GET" });
-            const res = await getContactFieldsHandler(req);
+            const res = await getContactFieldsHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
             expect(res.status).toBe(200);
 
             const json = await res.json();
@@ -296,7 +300,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             });
 
             const ctx = { params: Promise.resolve({ id: testFieldId }) };
-            const res = await updateContactFieldHandler(req, ctx);
+            const res = await updateContactFieldHandler(req as any, ctx);
             expect(res.status).toBe(200);
 
             const dbField = await prisma.contactFieldDefinition.findUnique({ where: { id: testFieldId } });
@@ -309,7 +313,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             });
 
             const ctx = { params: Promise.resolve({ id: testFieldId }) };
-            const res = await deleteContactFieldHandler(req, ctx);
+            const res = await deleteContactFieldHandler(req as any, ctx);
             expect(res.status).toBe(204);
 
             const dbField = await prisma.contactFieldDefinition.findUnique({ where: { id: testFieldId } });
@@ -342,7 +346,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
                 body: JSON.stringify(payload)
             });
 
-            const res = await createContactFieldHandler(req);
+            const res = await createContactFieldHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
 
             // Should fail because limit is 5
             expect(res.status).toBe(400);
@@ -358,7 +362,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             vi.mocked(auth.api.getSession).mockResolvedValue(null); // No session!
 
             const req = new NextRequest("http://localhost:3000/api/v1/contacts", { method: "GET" });
-            const res = await getContactsHandler(req);
+            const res = await getContactsHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
 
             expect(res.status).toBe(401);
             const json = await res.json();
@@ -373,7 +377,7 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
             });
 
             const req = new NextRequest("http://localhost:3000/api/v1/contacts", { method: "GET" });
-            const res = await getContactsHandler(req);
+            const res = await getContactsHandler(req as any, { params: Promise.resolve({} as Record<string, string>) });
 
             expect(res.status).toBe(403);
             const json = await res.json();

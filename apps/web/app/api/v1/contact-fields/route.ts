@@ -1,103 +1,37 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@reachdem/database";
-import { auth } from "@reachdem/auth";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createContactFieldSchema } from "@/lib/validations/contact-fields";
-import { headers } from "next/headers";
-import { MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
-import { Prisma } from "@prisma/client";
+import { createContactFieldSchema } from "@reachdem/shared";
+import { withWorkspace } from "@reachdem/auth/guards";
+import { ContactFieldService } from "@reachdem/core";
 
-export async function GET() {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const GET = withWorkspace(async ({ organizationId }) => {
     try {
-        const fields = await prisma.contactFieldDefinition.findMany({
-            where: { organizationId },
-            orderBy: { createdAt: "asc" },
-        });
-
+        const fields = await ContactFieldService.getContactFields(organizationId);
         return NextResponse.json({ data: fields });
     } catch (error) {
         console.error("[ContactFields_GET]", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
-}
+});
 
-export async function POST(req: NextRequest) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const POST = withWorkspace(async ({ req, organizationId }) => {
     try {
         const body = await req.json();
         const validatedData = createContactFieldSchema.parse(body);
 
-        // Check limit of fields per organization
-        const count = await prisma.contactFieldDefinition.count({
-            where: { organizationId },
-        });
-
-        if (count >= MAX_CUSTOM_FIELDS_PER_ORG) {
-            return NextResponse.json(
-                { error: `Maximum number of custom fields (${MAX_CUSTOM_FIELDS_PER_ORG}) reached for this workspace` },
-                { status: 400 }
-            );
-        }
-
-        // Check if key already exists
-        const existingKey = await prisma.contactFieldDefinition.findUnique({
-            where: {
-                organizationId_key: {
-                    organizationId,
-                    key: validatedData.key,
-                },
-            },
-        });
-
-        if (existingKey) {
-            return NextResponse.json(
-                { error: "A custom field with this key already exists" },
-                { status: 400 }
-            );
-        }
-
-        const field = await prisma.contactFieldDefinition.create({
-            data: {
-                ...validatedData,
-                organizationId,
-                // Prisma Json needs to handle undefined vs null properly
-                options: validatedData.options ? (validatedData.options as Prisma.InputJsonValue) : Prisma.JsonNull,
-            },
+        const field = await ContactFieldService.createContactField(organizationId, {
+            ...validatedData,
         });
 
         return NextResponse.json({ data: field }, { status: 201 });
-    } catch (error) {
+    } catch (error: unknown) {
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
+        }
+        if (error instanceof Error) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
         console.error("[ContactFields_POST]", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
-}
+});

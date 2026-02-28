@@ -6,7 +6,8 @@
     "exports": {
         ".": "./src/index.ts",
         "./client": "./src/auth-client.ts",
-        "./permissions": "./src/permissions.ts"
+        "./permissions": "./src/permissions.ts",
+        "./guards": "./src/guards.ts"
     },
     "dependencies": {
         "@reachdem/database": "workspace:*",

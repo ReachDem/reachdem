@@ -27,7 +27,11 @@ Créez un fichier `.env` à la racine du monorepo avec:
 
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/reachdem?schema=public"
+PRISMA_ACCELERATE_URL=""
 ```
+
+`DATABASE_URL` is used by Prisma Migrate via `prisma.config.ts`.
+At runtime, Prisma Client uses `PRISMA_ACCELERATE_URL` when set, otherwise it uses the direct Postgres adapter.
 
 ## Utilisation dans d'autres packages
 
