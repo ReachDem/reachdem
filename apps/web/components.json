@@ -21,6 +21,7 @@
   "registries": {
     "@shadcnblocks": {
       "url": "https://shadcnblocks.com/r/{name}"
-    }
+    },
+    "@magicui": "https://magicui.design/r/{name}"
   }
 }

@@ -65,6 +65,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactImportDialog } from "@/components/contact-import-dialog";
 import { AddContactDrawer } from "@/components/add-contact-drawer";
+import { NumberTicker } from "@/components/ui/number-ticker";
 
 export interface Contact {
   id: string;
@@ -365,6 +366,15 @@ export function ContactsTable({
               className="h-9 pl-8"
             />
           </div>
+          <Badge
+            variant="outline"
+            className="text-muted-foreground pointer-events-none hidden font-light sm:inline-flex"
+          >
+            <NumberTicker
+              value={table.getFilteredRowModel().rows.length}
+              className="text-foreground text-sm font-medium"
+            />
+          </Badge>
           {selectedCount > 0 && (
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-normal">
