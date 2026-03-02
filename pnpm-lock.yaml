@@ -320,6 +320,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@better-auth/core':
+        specifier: 1.4.3
+        version: 1.4.3(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.18)(better-call@1.1.0)(jose@6.1.2)(kysely@0.28.8)(nanostores@1.1.0)
       '@reachdem/database':
         specifier: workspace:*
         version: link:../database

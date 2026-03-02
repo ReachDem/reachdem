@@ -10,6 +10,7 @@
         "./guards": "./src/guards.ts"
     },
     "dependencies": {
+        "@better-auth/core": "1.4.3",
         "@reachdem/database": "workspace:*",
         "@reachdem/transactional": "workspace:*",
         "@react-email/components": "^1.0.8",
