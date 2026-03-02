@@ -1,8 +1,18 @@
-"use client"
+"use client";
 
-import { IconDots, IconMail, IconMessage, type Icon } from "@tabler/icons-react"
+import {
+  IconDots,
+  IconMail,
+  IconMessage,
+  type Icon,
+} from "@tabler/icons-react";
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -11,20 +21,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function NavDocuments({
   items,
   label = "Tools",
 }: {
   items: {
-    name: string
-    url: string
-    icon: Icon
-  }[]
-  label?: string
+    name: string;
+    url: string;
+    icon: Icon;
+  }[];
+  label?: string;
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile } = useSidebar();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -40,7 +50,10 @@ export function NavDocuments({
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuAction showOnHover className="data-[state=open]:bg-accent rounded-sm">
+                <SidebarMenuAction
+                  showOnHover
+                  className="data-[state=open]:bg-accent rounded-sm"
+                >
                   <IconDots />
                   <span className="sr-only">More</span>
                 </SidebarMenuAction>
@@ -64,5 +77,5 @@ export function NavDocuments({
         ))}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }

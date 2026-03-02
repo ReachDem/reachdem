@@ -1,32 +1,31 @@
 "use client";
 
-import dynamic from 'next/dynamic';
-import 'swagger-ui-react/swagger-ui.css';
-import { useEffect } from 'react';
-
-// Swagger UI is entirely client-side, dynamic import avoids Next.js hydration issues
-const SwaggerUI = dynamic(() => import('swagger-ui-react'), { ssr: false });
+import { useEffect, useRef } from "react";
+import "swagger-ui-dist/swagger-ui.css";
 
 export default function ApiDocs() {
-    // Suppress legacy lifecycle warnings from swagger-ui-react inside React 19 StrictMode
-    useEffect(() => {
-        const originalError = console.error;
-        console.error = (...args) => {
-            if (typeof args[0] === 'string' && args[0].includes('UNSAFE_componentWillReceiveProps')) {
-                return;
-            }
-            originalError.apply(console, args);
-        };
-        return () => {
-            console.error = originalError;
-        };
-    }, []);
+  const swaggerRef = useRef<HTMLDivElement>(null);
 
-    return (
-        <div className="bg-white min-h-screen">
-            <div className="max-w-7xl mx-auto py-8">
-                <SwaggerUI url="/openapi.yaml" />
-            </div>
-        </div>
-    );
+  useEffect(() => {
+    // dynamically load swagger-ui-dist bundle to run completely client-side
+    import("swagger-ui-dist/swagger-ui-bundle").then((swaggerUI) => {
+      const SwaggerUIBundle = swaggerUI.default || (swaggerUI as any);
+      SwaggerUIBundle({
+        url: "/openapi.yaml",
+        domNode: swaggerRef.current,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset,
+        ],
+      });
+    });
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-7xl py-8">
+        <div ref={swaggerRef} />
+      </div>
+    </div>
+  );
 }

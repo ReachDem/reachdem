@@ -36,7 +36,7 @@ At runtime, Prisma Client uses `PRISMA_ACCELERATE_URL` when set, otherwise it us
 ## Utilisation dans d'autres packages
 
 ```typescript
-import { prisma } from '@reachdem/database'
+import { prisma } from "@reachdem/database";
 
-const users = await prisma.user.findMany()
+const users = await prisma.user.findMany();
 ```

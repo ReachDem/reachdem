@@ -6,7 +6,7 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="bg-background text-foreground flex min-h-screen flex-col">
       <SettingsSidebar>{children}</SettingsSidebar>
     </div>
   );

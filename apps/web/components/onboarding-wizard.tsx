@@ -176,7 +176,7 @@ export function OnboardingWizard() {
       setIsOtpModalOpen(true);
     } catch (err: Error | unknown) {
       setError(
-        err instanceof Error ? err.message : "An unexpected error occurred.",
+        err instanceof Error ? err.message : "An unexpected error occurred."
       );
       setIsSubmitting(false);
     }
@@ -195,7 +195,7 @@ export function OnboardingWizard() {
 
       if (verifyError) {
         setOtpError(
-          verifyError.message || "Invalid or expired verification code.",
+          verifyError.message || "Invalid or expired verification code."
         );
         setOtpLoading(false);
         return;
@@ -223,7 +223,7 @@ export function OnboardingWizard() {
       }
     } catch (err: Error | unknown) {
       setOtpError(
-        err instanceof Error ? err.message : "An unexpected error occurred.",
+        err instanceof Error ? err.message : "An unexpected error occurred."
       );
       setOtpLoading(false);
     }
@@ -317,7 +317,7 @@ export function OnboardingWizard() {
                       {...register("name")}
                     />
                     {errors.name && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-destructive text-sm">
                         {errors.name.message}
                       </p>
                     )}
@@ -331,7 +331,7 @@ export function OnboardingWizard() {
                       {...register("email")}
                     />
                     {errors.email && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-destructive text-sm">
                         {errors.email.message}
                       </p>
                     )}
@@ -345,7 +345,7 @@ export function OnboardingWizard() {
                       {...register("password")}
                     />
                     {errors.password && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-destructive text-sm">
                         {errors.password.message}
                       </p>
                     )}
@@ -390,7 +390,7 @@ export function OnboardingWizard() {
                       {...register("workspaceName")}
                     />
                     {errors.workspaceName && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-destructive text-sm">
                         {errors.workspaceName.message}
                       </p>
                     )}
@@ -405,7 +405,7 @@ export function OnboardingWizard() {
                 </Button>
               </form>
             </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper className="bg-gradient-to-b from-background to-muted">
+            <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-b">
               <DashboardIllustration
                 variant="zoomed-in"
                 title={watchWorkspace || "Your Workspace"}
@@ -436,7 +436,7 @@ export function OnboardingWizard() {
                             "cursor-pointer rounded-lg border px-3 py-2 text-sm",
                             watchRole === r
                               ? "border-primary bg-primary/10"
-                              : "hover:bg-muted/50",
+                              : "hover:bg-muted/50"
                           )}
                           onClick={() =>
                             setValue("role", r, { shouldValidate: true })
@@ -447,11 +447,11 @@ export function OnboardingWizard() {
                       ))}
                     </div>
                     {errors.role && (
-                      <p className="text-sm text-destructive mt-2">
+                      <p className="text-destructive mt-2 text-sm">
                         {errors.role.message}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-4 italic">
+                    <p className="text-muted-foreground mt-4 text-xs italic">
                       We will personalize your experience based on your
                       selection.
                     </p>
@@ -488,27 +488,27 @@ export function OnboardingWizard() {
                 onSubmit={handleSubmit(onSubmit)}
                 className="space-y-6 py-4"
               >
-                <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
+                <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-muted-foreground text-sm font-medium">
                       Name
                     </p>
                     <p>{watch("name")}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-muted-foreground text-sm font-medium">
                       Email
                     </p>
                     <p>{watch("email")}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-muted-foreground text-sm font-medium">
                       Workspace Name
                     </p>
                     <p>{watchWorkspace}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-muted-foreground text-sm font-medium">
                       Role
                     </p>
                     <p>{watchRole}</p>
@@ -516,7 +516,7 @@ export function OnboardingWizard() {
                 </div>
 
                 {error && (
-                  <div className="rounded-lg border border-destructive/50 p-4 text-sm text-destructive bg-destructive/10">
+                  <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
                     <p className="font-semibold">Failed to create account</p>
                     <p>{error}</p>
                   </div>
@@ -531,7 +531,7 @@ export function OnboardingWizard() {
                 </Button>
               </form>
             </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper className="bg-gradient-to-t from-background to-muted">
+            <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-t">
               <DashboardIllustration
                 variant="zoomed-in"
                 title={watchWorkspace || "Welcome!"}
@@ -547,13 +547,13 @@ export function OnboardingWizard() {
             <DialogTitle>Check your email</DialogTitle>
             <DialogDescription>
               We sent a 6-digit verification code to{" "}
-              <span className="font-semibold text-foreground">
+              <span className="text-foreground font-semibold">
                 {watch("email")}
               </span>
               . Please enter it below.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col space-y-4 py-4 items-center justify-center">
+          <div className="flex flex-col items-center justify-center space-y-4 py-4">
             <InputOTP
               maxLength={6}
               pattern={REGEXP_ONLY_DIGITS}
@@ -577,14 +577,14 @@ export function OnboardingWizard() {
             </InputOTP>
 
             {otpLoading && (
-              <p className="text-sm text-muted-foreground animate-pulse">
+              <p className="text-muted-foreground animate-pulse text-sm">
                 Verifying code...
               </p>
             )}
 
-            {otpError && <p className="text-sm text-destructive">{otpError}</p>}
+            {otpError && <p className="text-destructive text-sm">{otpError}</p>}
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Didn&apos;t receive the code?{" "}
               {resendCooldown > 0 ? (
                 <span className="text-muted-foreground/60">
@@ -594,7 +594,7 @@ export function OnboardingWizard() {
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  className="font-semibold text-foreground underline underline-offset-4 hover:text-primary transition-colors"
+                  className="text-foreground hover:text-primary font-semibold underline underline-offset-4 transition-colors"
                 >
                   Resend code
                 </button>

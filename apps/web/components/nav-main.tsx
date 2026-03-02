@@ -48,7 +48,7 @@ export function NavMain({
             </SidebarMenuButton>
             <Button
               size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0 bg-transparent"
+              className="size-8 bg-transparent group-data-[collapsible=icon]:opacity-0"
               variant="outline"
             >
               <IconMessage />
@@ -59,20 +59,20 @@ export function NavMain({
         <SidebarMenu>
           {items.map((item) =>
             item.items ? (
-              <div key={item.title} className="flex flex-col gap-1 mb-2">
+              <div key={item.title} className="mb-2 flex flex-col gap-1">
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip={item.title}>
                     {item.icon && <item.icon />}
                     <span className="font-semibold">{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuSub className="border-l-0 pr-0 ml-4 gap-1 flex flex-col">
+                <SidebarMenuSub className="ml-4 flex flex-col gap-1 border-l-0 pr-0">
                   {item.items.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
                         <a href={subItem.url} className="h-9">
                           {subItem.icon && (
-                            <subItem.icon className="size-4 text-muted-foreground mr-1" />
+                            <subItem.icon className="text-muted-foreground mr-1 size-4" />
                           )}
                           <span>{subItem.title}</span>
                         </a>
@@ -89,14 +89,14 @@ export function NavMain({
                   {item.badge && (
                     <Badge
                       variant="secondary"
-                      className="ml-auto text-[10px] px-1.5 py-0"
+                      className="ml-auto px-1.5 py-0 text-[10px]"
                     >
                       {item.badge}
                     </Badge>
                   )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            ),
+            )
           )}
         </SidebarMenu>
       </SidebarGroupContent>

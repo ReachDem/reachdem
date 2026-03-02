@@ -14,7 +14,10 @@
     "db:generate": "pnpm --filter @reachdem/database db:generate",
     "db:push": "pnpm --filter @reachdem/database db:push",
     "db:migrate": "pnpm --filter @reachdem/database db:migrate",
-    "db:studio": "pnpm --filter @reachdem/database db:studio"
+    "db:studio": "pnpm --filter @reachdem/database db:studio",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -24,10 +27,19 @@
     "@next/env": "^15.5.12",
     "@vitest/coverage-v8": "^4.0.18",
     "dotenv-cli": "^7.4.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.1",
     "magicast": "^0.5.2",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "vitest": "^4.0.18"
   },
   "dependencies": {
     "@prisma/config": "^7.4.2"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,jsx,md,json,css}": [
+      "prettier --write"
+    ]
   }
 }

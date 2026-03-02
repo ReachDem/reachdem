@@ -70,7 +70,7 @@ export function DeleteOrganizationButton({
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
             Continue
           </AlertDialogAction>

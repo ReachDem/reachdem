@@ -89,14 +89,14 @@ export function ContactImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [allParsedRows, setAllParsedRows] = useState<Record<string, string>[]>(
-    [],
+    []
   );
   const [sampleData, setSampleData] = useState<Record<string, string>[]>([]);
 
   // Mapping state
   const [isMappingLoading, setIsMappingLoading] = useState(false);
   const [mappingResult, setMappingResult] = useState<MappingResult | null>(
-    null,
+    null
   );
   const [manualOverrides, setManualOverrides] = useState<
     Record<string, string>
@@ -246,7 +246,7 @@ export function ContactImportDialog({
         } else {
           row[field.key] = applyMapping(
             mappingResult.standardMappings[field.key],
-            sourceRow,
+            sourceRow
           );
         }
       }
@@ -275,7 +275,7 @@ export function ContactImportDialog({
 
   const addCustomColumn = (colName: string) => {
     const aiSuggestion = mappingResult?.suggestedCustomFields.find(
-      (f) => f.sourceColumn === colName,
+      (f) => f.sourceColumn === colName
     );
     const key = aiSuggestion ? aiSuggestion.key : `custom_${colName}`;
     setManualOverrides((prev) => ({ ...prev, [key]: colName }));
@@ -284,7 +284,7 @@ export function ContactImportDialog({
   // Helper to map a full row
   const getMappedRow = (
     sourceRow: Record<string, string>,
-    countryCode: string,
+    countryCode: string
   ) => {
     const row: any = { customFields: {} };
     if (!mappingResult) return row;
@@ -297,7 +297,7 @@ export function ContactImportDialog({
       } else {
         val = applyMapping(
           mappingResult.standardMappings[field.key],
-          sourceRow,
+          sourceRow
         );
       }
       row[field.key] = val;
@@ -338,7 +338,7 @@ export function ContactImportDialog({
       const { existingEmails, existingPhones } = await checkContactDuplicates(
         "",
         emailsToCheck,
-        phonesToCheck,
+        phonesToCheck
       );
       setDuplicateStats({
         emails: existingEmails.length,
@@ -355,7 +355,9 @@ export function ContactImportDialog({
     setIsImporting(true);
     setImportStats({ success: 0, total: allParsedRows.length });
 
-    const toastId = toast.loading("Starting import...", { position: "bottom-right" });
+    const toastId = toast.loading("Starting import...", {
+      position: "bottom-right",
+    });
 
     try {
       const countryCode = await getDefaultCountryCode();
@@ -365,35 +367,47 @@ export function ContactImportDialog({
 
       let successCount = 0;
       const chunkSize = 10;
-      
+
       if (validRows.length === 0) {
-        toast.success("No valid contacts to import.", { id: toastId, position: "bottom-right" });
+        toast.success("No valid contacts to import.", {
+          id: toastId,
+          position: "bottom-right",
+        });
         setImportDone(true);
         setIsImporting(false);
         return;
       }
 
       for (let i = 0; i < validRows.length; i += chunkSize) {
-        toast.loading(`Importing contacts... ${successCount} / ${validRows.length}`, {
-          id: toastId,
-          position: "bottom-right",
-        });
+        toast.loading(
+          `Importing contacts... ${successCount} / ${validRows.length}`,
+          {
+            id: toastId,
+            position: "bottom-right",
+          }
+        );
         const chunk = validRows.slice(i, i + chunkSize);
         const result = await importContactsBulk("", chunk, duplicateStrategy);
         successCount += result.count;
         setImportStats({ success: successCount, total: validRows.length });
-        
+
         // Let React paint the progress bar before next chunk
         await new Promise((r) => setTimeout(r, 150));
       }
 
-      toast.success(`Import completed successfully! ${successCount} contacts imported.`, {
+      toast.success(
+        `Import completed successfully! ${successCount} contacts imported.`,
+        {
+          id: toastId,
+          position: "bottom-right",
+        }
+      );
+      setImportDone(true);
+    } catch (err: any) {
+      toast.error("Import failed: " + err.message, {
         id: toastId,
         position: "bottom-right",
       });
-      setImportDone(true);
-    } catch (err: any) {
-      toast.error("Import failed: " + err.message, { id: toastId, position: "bottom-right" });
     } finally {
       setIsImporting(false);
     }
@@ -409,8 +423,10 @@ export function ContactImportDialog({
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
-        className={`max-h-[85vh] overflow-y-auto overflow-x-hidden transition-all duration-300 ${
-          currentStep === "Upload" || currentStep === "Duplicates" || currentStep === "Confirm"
+        className={`max-h-[85vh] overflow-x-hidden overflow-y-auto transition-all duration-300 ${
+          currentStep === "Upload" ||
+          currentStep === "Duplicates" ||
+          currentStep === "Confirm"
             ? "w-full sm:max-w-xl"
             : "w-full sm:max-w-3xl lg:max-w-5xl xl:max-w-[1080px]"
         }`}
@@ -426,24 +442,24 @@ export function ContactImportDialog({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-1 mb-2 w-full min-w-0">
+        <div className="mb-2 flex w-full min-w-0 items-center gap-1">
           {STEPS.map((step, i) => (
             <React.Fragment key={step}>
               <div className="flex items-center gap-1.5">
                 <div
-                  className={`flex items-center justify-center size-6 rounded-full text-xs font-medium transition-colors ${i < stepIndex ? "bg-foreground text-background" : i === stepIndex ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
+                  className={`flex size-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${i < stepIndex ? "bg-foreground text-background" : i === stepIndex ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
                 >
                   {i < stepIndex ? <IconCheck className="size-3.5" /> : i + 1}
                 </div>
                 <span
-                  className={`text-xs hidden sm:inline ${i === stepIndex ? "font-medium" : "text-muted-foreground"}`}
+                  className={`hidden text-xs sm:inline ${i === stepIndex ? "font-medium" : "text-muted-foreground"}`}
                 >
                   {step}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
                 <div
-                  className={`flex-1 h-px ${i < stepIndex ? "bg-foreground" : "bg-border"}`}
+                  className={`h-px flex-1 ${i < stepIndex ? "bg-foreground" : "bg-border"}`}
                 />
               )}
             </React.Fragment>
@@ -453,9 +469,9 @@ export function ContactImportDialog({
 
         {/* Step: Upload */}
         {currentStep === "Upload" && (
-          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
+          <div className="flex w-full min-w-0 flex-col gap-4 py-2">
             <div
-              className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors cursor-pointer ${isDragOver ? "border-foreground bg-muted" : "border-border hover:border-foreground/50"}`}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors ${isDragOver ? "border-foreground bg-muted" : "border-border hover:border-foreground/50"}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragOver(true);
@@ -468,14 +484,14 @@ export function ContactImportDialog({
                   onFileSelected(e.dataTransfer.files[0]);
               }}
             >
-              <div className="flex items-center justify-center size-12 rounded-full bg-muted">
-                <IconUpload className="size-5 text-muted-foreground" />
+              <div className="bg-muted flex size-12 items-center justify-center rounded-full">
+                <IconUpload className="text-muted-foreground size-5" />
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium">
                   Drop your file here or click to browse
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-muted-foreground mt-1 text-xs">
                   Supports CSV and XLSX files up to 10MB, Max 100 rows
                 </p>
               </div>
@@ -498,24 +514,24 @@ export function ContactImportDialog({
 
         {/* Step: Preview */}
         {currentStep === "Preview" && file && (
-          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
+          <div className="flex w-full min-w-0 flex-col gap-4 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <IconFileSpreadsheet className="size-4 text-muted-foreground" />
+                <IconFileSpreadsheet className="text-muted-foreground size-4" />
                 <span className="text-sm font-medium">{file.name}</span>
-                <Badge variant="secondary" className="font-normal text-xs">
+                <Badge variant="secondary" className="text-xs font-normal">
                   {allParsedRows.length} rows
                 </Badge>
               </div>
             </div>
-            <div className="rounded-lg border overflow-auto max-h-64 shadow-sm">
+            <div className="max-h-64 overflow-auto rounded-lg border shadow-sm">
               <Table className="text-xs">
                 <TableHeader className="bg-muted sticky top-0">
                   <TableRow>
                     {columns.map((col) => (
                       <TableHead
                         key={col}
-                        className="whitespace-nowrap font-medium text-foreground"
+                        className="text-foreground font-medium whitespace-nowrap"
                       >
                         {col}
                       </TableHead>
@@ -542,10 +558,10 @@ export function ContactImportDialog({
                 </TableBody>
               </Table>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Showing max 5 rows preview.
             </p>
-            <div className="flex justify-between mt-2">
+            <div className="mt-2 flex justify-between">
               <Button variant="outline" size="sm" onClick={goBack}>
                 <IconArrowLeft className="size-4" /> Back
               </Button>
@@ -555,11 +571,11 @@ export function ContactImportDialog({
                 disabled={isMappingLoading}
               >
                 {isMappingLoading ? (
-                  <IconLoader2 className="size-4 mr-2 animate-spin" />
+                  <IconLoader2 className="mr-2 size-4 animate-spin" />
                 ) : null}
                 {isMappingLoading ? "Analyzing Fields..." : "Map Fields"}
                 {!isMappingLoading && (
-                  <IconArrowRight className="size-4 ml-2" />
+                  <IconArrowRight className="ml-2 size-4" />
                 )}
               </Button>
             </div>
@@ -568,9 +584,9 @@ export function ContactImportDialog({
 
         {/* Step: Mapping */}
         {currentStep === "Mapping" && mappingResult && (
-          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">
+          <div className="flex w-full min-w-0 flex-col gap-4 py-2">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-muted-foreground text-sm">
                 Match your file columns to ReachDem fields.{" "}
                 <strong>Name</strong> and at least <strong>Phone</strong> or{" "}
                 <strong>Email</strong> are required.
@@ -582,17 +598,17 @@ export function ContactImportDialog({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 px-2 border-dashed text-xs text-muted-foreground"
+                        className="text-muted-foreground h-7 border-dashed px-2 text-xs"
                       >
-                        <IconPlus className="size-3.5 mr-1" /> Add Column
+                        <IconPlus className="mr-1 size-3.5" /> Add Column
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-[200px] max-h-[300px] overflow-y-auto"
+                      className="max-h-[300px] w-[200px] overflow-y-auto"
                     >
                       {getUnusedColumns().length === 0 ? (
-                        <div className="p-2 text-xs text-muted-foreground text-center">
+                        <div className="text-muted-foreground p-2 text-center text-xs">
                           All columns mapped
                         </div>
                       ) : (
@@ -617,17 +633,17 @@ export function ContactImportDialog({
                 >
                   {isEditing ? (
                     <>
-                      <IconCheck className="size-3.5 mr-1.5" /> Done
+                      <IconCheck className="mr-1.5 size-3.5" /> Done
                     </>
                   ) : (
                     <>
-                      <IconEdit className="size-3.5 mr-1.5" /> Edit Mapping
+                      <IconEdit className="mr-1.5 size-3.5" /> Edit Mapping
                     </>
                   )}
                 </Button>
               </div>
             </div>
-            <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[50vh] shadow-sm ring-1 ring-primary/10">
+            <div className="ring-primary/10 max-h-[50vh] overflow-x-auto overflow-y-auto rounded-md border shadow-sm ring-1">
               <Table className="text-sm">
                 <TableHeader className="bg-primary/5">
                   <TableRow>
@@ -652,15 +668,15 @@ export function ContactImportDialog({
                       return (
                         <TableHead
                           key={field.key}
-                          className="whitespace-nowrap min-w-[140px]"
+                          className="min-w-[140px] whitespace-nowrap"
                         >
                           <div className="flex flex-col gap-1.5 py-1.5">
-                            <span className="font-medium text-foreground">
+                            <span className="text-foreground font-medium">
                               {field.label}{" "}
                               {field.required && (
                                 <Badge
                                   variant="destructive"
-                                  className="text-[10px] px-1 h-3.5 font-normal ml-1"
+                                  className="ml-1 h-3.5 px-1 text-[10px] font-normal"
                                 >
                                   Req
                                 </Badge>
@@ -676,7 +692,7 @@ export function ContactImportDialog({
                                   }))
                                 }
                               >
-                                <SelectTrigger className="h-2 text-[11px] px-2 shadow-sm border-dashed bg-background">
+                                <SelectTrigger className="bg-background h-2 border-dashed px-2 text-[11px] shadow-sm">
                                   <SelectValue placeholder="Ignore" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -703,7 +719,7 @@ export function ContactImportDialog({
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <span className="text-[10px] font-mono text-muted-foreground truncate">
+                              <span className="text-muted-foreground truncate font-mono text-[10px]">
                                 {currentValue === "__unmapped"
                                   ? "—"
                                   : currentValue === "__concat"
@@ -718,11 +734,11 @@ export function ContactImportDialog({
                     {displayCustomFields.map((f) => (
                       <TableHead
                         key={f.key}
-                        className="whitespace-nowrap border-l-2 border-primary/20 bg-primary/5 min-w-[140px]"
+                        className="border-primary/20 bg-primary/5 min-w-[140px] border-l-2 whitespace-nowrap"
                       >
                         <div className="flex flex-col gap-1.5 py-1.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-primary truncate max-w-[100px]">
+                            <span className="text-primary max-w-[100px] truncate font-medium">
                               {f.displayLabel}
                             </span>
                           </div>
@@ -736,7 +752,7 @@ export function ContactImportDialog({
                                 }))
                               }
                             >
-                              <SelectTrigger className="h-7 text-[11px] px-2 shadow-sm border-dashed bg-background border-primary/30 text-primary">
+                              <SelectTrigger className="bg-background border-primary/30 text-primary h-7 border-dashed px-2 text-[11px] shadow-sm">
                                 <SelectValue placeholder="Select column" />
                               </SelectTrigger>
                               <SelectContent>
@@ -754,7 +770,7 @@ export function ContactImportDialog({
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className="text-[10px] font-mono text-muted-foreground truncate">
+                            <span className="text-muted-foreground truncate font-mono text-[10px]">
                               {f.currentSource}
                             </span>
                           )}
@@ -781,7 +797,7 @@ export function ContactImportDialog({
                       {displayCustomFields.map((f) => (
                         <TableCell
                           key={f.key}
-                          className="whitespace-nowrap tabular-nums border-l-2 border-primary/10"
+                          className="border-primary/10 border-l-2 whitespace-nowrap tabular-nums"
                         >
                           {row[f.key] || (
                             <span className="text-muted-foreground italic opacity-40">
@@ -796,12 +812,12 @@ export function ContactImportDialog({
               </Table>
             </div>
 
-            <div className="flex justify-between mt-4">
+            <div className="mt-4 flex justify-between">
               <Button variant="outline" size="sm" onClick={goBack}>
                 <IconArrowLeft className="size-4" /> Back
               </Button>
               <Button size="sm" onClick={goNext}>
-                Duplicate Rules <IconArrowRight className="size-4 ml-1" />
+                Duplicate Rules <IconArrowRight className="ml-1 size-4" />
               </Button>
             </div>
           </div>
@@ -809,8 +825,8 @@ export function ContactImportDialog({
 
         {/* Step: Duplicates */}
         {currentStep === "Duplicates" && (
-          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex w-full min-w-0 flex-col gap-4 py-2">
+            <p className="text-muted-foreground text-sm">
               Choose how to handle contacts that already exist in your database
               (matched by phone or email).
             </p>
@@ -819,31 +835,31 @@ export function ContactImportDialog({
               onValueChange={(val: any) => setDuplicateStrategy(val)}
               className="flex flex-col gap-3"
             >
-              <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-foreground">
+              <label className="hover:bg-muted/50 has-[:checked]:border-foreground flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors">
                 <RadioGroupItem value="skip" className="mt-0.5" />
                 <div>
                   <p className="text-sm font-medium">Skip duplicates</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Existing contacts will be ignored. Only new contacts are
                     imported.
                   </p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-foreground">
+              <label className="hover:bg-muted/50 has-[:checked]:border-foreground flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors">
                 <RadioGroupItem value="update" className="mt-0.5" />
                 <div>
                   <p className="text-sm font-medium">Update existing</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Existing contacts will be updated with imported data. Empty
                     fields are left unchanged.
                   </p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-foreground">
+              <label className="hover:bg-muted/50 has-[:checked]:border-foreground flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors">
                 <RadioGroupItem value="merge" className="mt-0.5" />
                 <div>
                   <p className="text-sm font-medium">Merge (import priority)</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     All fields from the import will overwrite existing data,
                     even if empty.
                   </p>
@@ -855,7 +871,7 @@ export function ContactImportDialog({
                 <IconArrowLeft className="size-4" /> Back
               </Button>
               <Button size="sm" onClick={calculateStats}>
-                Review <IconArrowRight className="size-4 ml-1" />
+                Review <IconArrowRight className="ml-1 size-4" />
               </Button>
             </div>
           </div>
@@ -863,19 +879,19 @@ export function ContactImportDialog({
 
         {/* Step: Confirm */}
         {currentStep === "Confirm" && !importDone && (
-          <div className="flex flex-col gap-4 py-2 w-full min-w-0">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex w-full min-w-0 flex-col gap-4 py-2">
+            <p className="text-muted-foreground text-sm">
               Review the import summary before proceeding.
             </p>
-            <div className="rounded-lg border divide-y bg-card text-card-foreground">
+            <div className="bg-card text-card-foreground divide-y rounded-lg border">
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">File</span>
-                <span className="text-sm font-medium truncate max-w-[200px]">
+                <span className="text-muted-foreground text-sm">File</span>
+                <span className="max-w-[200px] truncate text-sm font-medium">
                   {file?.name}
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Total rows
                 </span>
                 <span className="text-sm font-medium">
@@ -883,7 +899,7 @@ export function ContactImportDialog({
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Valid contacts to parse
                 </span>
                 <span className="text-sm font-medium text-green-600 dark:text-green-400">
@@ -891,15 +907,15 @@ export function ContactImportDialog({
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Errors (missing name & contact info)
                 </span>
-                <span className="text-sm font-medium text-destructive">
+                <span className="text-destructive text-sm font-medium">
                   {duplicateStats.missingRequires}
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Potential duplicate queries hit
                 </span>
                 <span className="text-sm font-medium text-amber-600 dark:text-amber-500">
@@ -907,7 +923,7 @@ export function ContactImportDialog({
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Duplicate strategy
                 </span>
                 <Badge variant="secondary" className="font-normal capitalize">
@@ -917,16 +933,16 @@ export function ContactImportDialog({
             </div>
 
             {isImporting && (
-              <div className="flex flex-col gap-2 p-4 border rounded-lg bg-muted/20">
-                <div className="flex justify-between text-xs mb-1">
+              <div className="bg-muted/20 flex flex-col gap-2 rounded-lg border p-4">
+                <div className="mb-1 flex justify-between text-xs">
                   <span>Uploading chunked data...</span>
                   <span>
                     {importStats.success} / {importStats.total}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div className="bg-muted h-2 overflow-hidden rounded-full">
                   <div
-                    className="h-full bg-primary transition-all duration-300"
+                    className="bg-primary h-full transition-all duration-300"
                     style={{
                       width: `${importStats.total === 0 ? 0 : Math.round((importStats.success / importStats.total) * 100)}%`,
                     }}
@@ -935,7 +951,7 @@ export function ContactImportDialog({
               </div>
             )}
 
-            <div className="flex justify-between mt-2">
+            <div className="mt-2 flex justify-between">
               <Button
                 variant="outline"
                 size="sm"
@@ -946,7 +962,7 @@ export function ContactImportDialog({
               </Button>
               <Button size="sm" onClick={handleImport} disabled={isImporting}>
                 {isImporting ? (
-                  <IconLoader2 className="size-4 mr-2 animate-spin" />
+                  <IconLoader2 className="mr-2 size-4 animate-spin" />
                 ) : null}
                 {isImporting ? "Importing..." : "Start Import"}
               </Button>
@@ -957,12 +973,12 @@ export function ContactImportDialog({
         {/* Step: Done */}
         {currentStep === "Confirm" && importDone && (
           <div className="flex flex-col items-center gap-4 py-6">
-            <div className="flex items-center justify-center size-12 rounded-full bg-green-100 dark:bg-green-900/30">
+            <div className="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
               <IconCheck className="size-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="text-center">
               <p className="text-base font-semibold">Import completed</p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {importStats.success} contacts imported successfully.{" "}
                 {duplicateStats.missingRequires} rows had layout validation
                 errors and were skipped.

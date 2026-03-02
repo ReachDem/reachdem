@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function ProfilePage() {
   return (
-    <div className="max-w-4xl mx-auto w-full">
+    <div className="mx-auto w-full max-w-4xl">
       <ProfileForm />
     </div>
   );

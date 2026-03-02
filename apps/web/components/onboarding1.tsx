@@ -78,7 +78,7 @@ const OnboardingStepHeader = ({
         </Button>
       )}
       <div>
-        <p className="text-sm font-medium text-muted-foreground">
+        <p className="text-muted-foreground text-sm font-medium">
           {stepIndex + 1}/{totalSteps}
         </p>
         <h3 className="text-2xl font-semibold tracking-tight md:whitespace-nowrap">
@@ -144,7 +144,7 @@ const OnboardingStepRightWrapper = ({
     <div
       className={cn(
         "hidden flex-1/2 overflow-hidden sm:pt-10 md:pt-20 lg:block",
-        className,
+        className
       )}
     >
       {children}
@@ -179,7 +179,7 @@ const FileInput = ({
     <div className="flex items-center gap-4">
       <div
         onClick={handleUploadFile}
-        className="flex size-18 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border bg-muted"
+        className="bg-muted flex size-18 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border"
       >
         {value ? (
           <img
@@ -220,7 +220,7 @@ const FileInput = ({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-muted-foreground text-xs">{description}</p>
       </div>
     </div>
   );
@@ -260,17 +260,17 @@ const DashboardIllustration = ({
       }}
       className={cn(
         "flex h-full w-5xl overflow-hidden rounded-xl border",
-        className,
+        className
       )}
     >
-      <div className="h-full flex-2/7 shrink-0 overflow-hidden bg-muted flex flex-col">
+      <div className="bg-muted flex h-full flex-2/7 shrink-0 flex-col overflow-hidden">
         {!userProfile && (
           <div className="flex items-center justify-between gap-2 border-b p-4">
             <div className="flex items-center gap-2 overflow-hidden">
               <div
                 className={cn(
                   "size-8 shrink-0 overflow-hidden rounded-md",
-                  !image && "bg-blue-500",
+                  !image && "bg-blue-500"
                 )}
               >
                 {image && (
@@ -291,7 +291,7 @@ const DashboardIllustration = ({
             ? tabs.map((tab, index) => (
                 <li
                   key={`sidebar-tab-${index}`}
-                  className="flex items-center h-9 px-3 rounded-lg border bg-background/50 hover:shadow-md text-xs font-semibold text-muted-foreground"
+                  className="bg-background/50 text-muted-foreground flex h-9 items-center rounded-lg border px-3 text-xs font-semibold hover:shadow-md"
                 >
                   {tab}
                 </li>
@@ -299,13 +299,13 @@ const DashboardIllustration = ({
             : Array.from({ length: 10 }).map((_, index) => (
                 <li
                   key={`sidebar-tab-${index}`}
-                  className="h-9 rounded-lg border bg-background/50 hover:shadow-md"
+                  className="bg-background/50 h-9 rounded-lg border hover:shadow-md"
                 />
               ))}
         </ul>
         {userProfile && (
-          <div className="mt-auto border-t p-4 flex items-center gap-3 bg-muted/80">
-            <div className="size-8 shrink-0 overflow-hidden rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs">
+          <div className="bg-muted/80 mt-auto flex items-center gap-3 border-t p-4">
+            <div className="bg-primary/20 text-primary flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold">
               {userProfile.image ? (
                 <img
                   src={userProfile.image}
@@ -317,10 +317,10 @@ const DashboardIllustration = ({
               )}
             </div>
             <div className="overflow-hidden">
-              <p className="truncate text-sm font-semibold text-foreground/80">
+              <p className="text-foreground/80 truncate text-sm font-semibold">
                 {userProfile.name || "Your Name"}
               </p>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="text-muted-foreground truncate text-xs">
                 {userProfile.email || "you@example.com"}
               </p>
             </div>
@@ -331,8 +331,8 @@ const DashboardIllustration = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="size-9 rounded-lg border bg-muted/50" />
-              <div className="h-9 w-64 rounded-lg border bg-muted/50" />
+              <div className="bg-muted/50 size-9 rounded-lg border" />
+              <div className="bg-muted/50 h-9 w-64 rounded-lg border" />
               <div className="flex items-center gap-2">
                 {Array.from({ length: 2 }).map((_, index) => (
                   <div
@@ -343,7 +343,7 @@ const DashboardIllustration = ({
               </div>
             </div>
             <Button variant="outline">
-              <span className="block h-5 w-20 rounded-md bg-muted/50" />
+              <span className="bg-muted/50 block h-5 w-20 rounded-md" />
               <Plus />
             </Button>
           </div>
@@ -384,7 +384,7 @@ const DashboardIllustration = ({
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={`icon-btn-${index}`}
-              className="size-9 rounded-lg border bg-muted/50"
+              className="bg-muted/50 size-9 rounded-lg border"
             />
           ))}
         </div>
@@ -694,7 +694,7 @@ const StepTwoComponent = ({
           </Button>
         </form>
       </OnboardingStepLeftWrapper>
-      <OnboardingStepRightWrapper className="bg-gradient-to-b from-background to-muted">
+      <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-b">
         <DashboardIllustration
           variant="zoomed-in"
           image={profilePicture}
@@ -776,7 +776,7 @@ const StepThreeComponent = ({
                     "flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-4 text-xs",
                     m.value === mode
                       ? "border-primary bg-primary/5"
-                      : "hover:bg-muted/50",
+                      : "hover:bg-muted/50"
                   )}
                 >
                   <img
@@ -817,7 +817,7 @@ const StepThreeComponent = ({
             />
           </div>
 
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-center text-xs">
             Your data is secure and will never be shared with third parties.
           </p>
         </div>
@@ -894,7 +894,7 @@ const StepFourComponent = ({
                         "cursor-pointer rounded-lg border px-2 py-1 text-xs",
                         usecase === u
                           ? "border-primary bg-primary/5"
-                          : "hover:bg-muted/50",
+                          : "hover:bg-muted/50"
                       )}
                       onClick={() => toggleUsecase(u)}
                     >
@@ -993,7 +993,7 @@ const StepFiveComponent = ({
             </form>
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             By continuing you agree to our Terms of Service and Privacy Policy.
             Invited members will receive an email with instructions to join your
             workspace.
@@ -1082,7 +1082,7 @@ const Onboarding1 = ({
           goBack={handleGoBack}
         />
 
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-4 text-xs">
           <p>{copyright}</p>
           {footerLinks.map((link) => (
             <a key={link.label} href={link.href} className="underline">

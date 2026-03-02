@@ -6,8 +6,8 @@ export const STANDARD_FIELDS: {
   required?: boolean;
 }[] = [
   { key: "name", label: "Name", required: true },
-  { key: "phoneE164", label: "Phone"},
-  { key: "email", label: "Email"},
+  { key: "phoneE164", label: "Phone" },
+  { key: "email", label: "Email" },
   { key: "gender", label: "Gender" },
   { key: "birthdate", label: "Birthdate" },
   { key: "address", label: "Address" },
@@ -17,7 +17,7 @@ export const STANDARD_FIELDS: {
 
 export function applyMapping(
   mapping: StandardMapping,
-  sourceRow: Record<string, string>,
+  sourceRow: Record<string, string>
 ): string {
   if (mapping.transform === "none" || mapping.sourceColumns.length === 0)
     return "";

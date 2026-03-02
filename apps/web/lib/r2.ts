@@ -3,7 +3,11 @@
  * Uses AWS S3-compatible SDK to interact with R2 buckets
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
 
@@ -19,20 +23,22 @@ const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
 let _r2Client: S3Client | null = null;
 export function getR2Client(): S3Client {
-    if (!_r2Client) {
-        if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-            console.warn("R2 storage credentials are not properly configured in the environment variables.");
-        }
-        _r2Client = new S3Client({
-            region: "auto",
-            endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-            credentials: {
-                accessKeyId: R2_ACCESS_KEY_ID,
-                secretAccessKey: R2_SECRET_ACCESS_KEY,
-            },
-        });
+  if (!_r2Client) {
+    if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+      console.warn(
+        "R2 storage credentials are not properly configured in the environment variables."
+      );
     }
-    return _r2Client;
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+  return _r2Client;
 }
 
 // ============================================
@@ -47,20 +53,20 @@ export function getR2Client(): S3Client {
  * @returns Public URL of the uploaded file
  */
 export async function uploadToR2(
-    key: string,
-    body: Buffer,
-    contentType: string
+  key: string,
+  body: Buffer,
+  contentType: string
 ): Promise<string> {
-    await getR2Client().send(
-        new PutObjectCommand({
-            Bucket: R2_BUCKET_NAME,
-            Key: key,
-            Body: body,
-            ContentType: contentType,
-        })
-    );
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
 
-    return getR2PublicUrl(key);
+  return getR2PublicUrl(key);
 }
 
 /**
@@ -71,17 +77,17 @@ export async function uploadToR2(
  * @returns Presigned upload URL
  */
 export async function getUploadPresignedUrl(
-    key: string,
-    contentType: string,
-    expiresIn = 3600
+  key: string,
+  contentType: string,
+  expiresIn = 3600
 ): Promise<string> {
-    const command = new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: key,
-        ContentType: contentType,
-    });
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  });
 
-    return getSignedUrl(getR2Client(), command, { expiresIn });
+  return getSignedUrl(getR2Client(), command, { expiresIn });
 }
 
 /**
@@ -89,12 +95,12 @@ export async function getUploadPresignedUrl(
  * @param key - The storage key/path to delete
  */
 export async function deleteFromR2(key: string): Promise<void> {
-    await getR2Client().send(
-        new DeleteObjectCommand({
-            Bucket: R2_BUCKET_NAME,
-            Key: key,
-        })
-    );
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+    })
+  );
 }
 
 // ============================================
@@ -107,7 +113,7 @@ export async function deleteFromR2(key: string): Promise<void> {
  * @returns Unique key like "profiles/profile-abc123xyz.jpg"
  */
 export function generateProfilePhotoKey(extension: string): string {
-    return `profiles/profile-${nanoid(12)}.${extension}`;
+  return `profiles/profile-${nanoid(12)}.${extension}`;
 }
 
 /**
@@ -116,9 +122,8 @@ export function generateProfilePhotoKey(extension: string): string {
  * @returns Unique key like "orgs/avatar-abc123xyz.jpg"
  */
 export function generateOrgAvatarKey(extension: string): string {
-    return `orgs/avatar-${nanoid(12)}.${extension}`;
+  return `orgs/avatar-${nanoid(12)}.${extension}`;
 }
-
 
 /**
  * Get the public URL for a stored file
@@ -126,7 +131,7 @@ export function generateOrgAvatarKey(extension: string): string {
  * @returns Full public URL
  */
 export function getR2PublicUrl(key: string): string {
-    return `${R2_PUBLIC_URL}/${key}`;
+  return `${R2_PUBLIC_URL}/${key}`;
 }
 
 /**
@@ -135,17 +140,17 @@ export function getR2PublicUrl(key: string): string {
  * @returns The storage key or null if not a valid R2 URL
  */
 export function getR2KeyFromUrl(url: string): string | null {
-    if (!url.startsWith(R2_PUBLIC_URL)) return null;
-    return url.replace(`${R2_PUBLIC_URL}/`, "");
+  if (!url.startsWith(R2_PUBLIC_URL)) return null;
+  return url.replace(`${R2_PUBLIC_URL}/`, "");
 }
 
 // Allowed MIME types for parcel photos
 export const ALLOWED_IMAGE_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ];
 
 // Max file size: 5MB
@@ -157,12 +162,15 @@ export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
  * @param size - File size in bytes
  * @returns Error message or null if valid
  */
-export function validateImageFile(contentType: string, size: number): string | null {
-    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
-        return "Type de fichier non supporté. Utilisez JPG, PNG ou WebP.";
-    }
-    if (size > MAX_IMAGE_SIZE) {
-        return "L'image ne doit pas dépasser 5 Mo.";
-    }
-    return null;
+export function validateImageFile(
+  contentType: string,
+  size: number
+): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+    return "Type de fichier non supporté. Utilisez JPG, PNG ou WebP.";
+  }
+  if (size > MAX_IMAGE_SIZE) {
+    return "L'image ne doit pas dépasser 5 Mo.";
+  }
+  return null;
 }

@@ -1,13 +1,19 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { IconPlus } from "@tabler/icons-react"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+import * as React from "react";
+import { IconPlus } from "@tabler/icons-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Drawer,
   DrawerClose,
@@ -17,10 +23,10 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer"
+} from "@/components/ui/drawer";
 
 export function AddContactDrawer({ children }: { children: React.ReactNode }) {
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile();
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
@@ -29,7 +35,8 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
         <DrawerHeader className="gap-1">
           <DrawerTitle>Add Contact</DrawerTitle>
           <DrawerDescription>
-            Add a new contact to your workspace. Name and at least phone or email are required.
+            Add a new contact to your workspace. Name and at least phone or
+            email are required.
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-4">
@@ -43,19 +50,31 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="contact-phone">Phone</Label>
-              <Input id="contact-phone" type="tel" placeholder="+221 7X XXX XX XX" />
-              <p className="text-[11px] text-muted-foreground">E.164 format recommended. At least phone or email is required.</p>
+              <Input
+                id="contact-phone"
+                type="tel"
+                placeholder="+221 7X XXX XX XX"
+              />
+              <p className="text-muted-foreground text-[11px]">
+                E.164 format recommended. At least phone or email is required.
+              </p>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="contact-email">Email</Label>
-              <Input id="contact-email" type="email" placeholder="contact@example.com" />
+              <Input
+                id="contact-email"
+                type="email"
+                placeholder="contact@example.com"
+              />
             </div>
           </div>
 
           <Separator />
 
           {/* Optional fields */}
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Optional Information</p>
+          <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+            Optional Information
+          </p>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="contact-gender">Gender</Label>
@@ -102,5 +121,5 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  )
+  );
 }

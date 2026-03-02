@@ -23,23 +23,34 @@ export function MemberList({ members }: MemberListProps) {
   // If we don't have user info properly populated for preview, we can render dummy data
   // But we try to map the real members list.
   return (
-    <div className="rounded-md border border-foreground/30 bg-card">
+    <div className="border-foreground/30 bg-card rounded-md border">
       <div className="flex flex-col">
         {members.map((member, index) => (
-          <div 
-            key={member.id} 
+          <div
+            key={member.id}
             className={`flex items-center justify-between p-4 ${
-              index !== members.length - 1 ? "border-b border-foreground/30" : ""
+              index !== members.length - 1
+                ? "border-foreground/30 border-b"
+                : ""
             }`}
           >
             <div className="flex items-center gap-4">
-              <Avatar className="h-10 w-10 border border-foreground/20">
-                <AvatarImage src={member.user?.image || ""} alt={member.user?.name || member.user?.email || "User avatar"} />
-                <AvatarFallback className="bg-transparent">{member.user?.name?.charAt(0) || member.user?.email?.charAt(0) || "U"}</AvatarFallback>
+              <Avatar className="border-foreground/20 h-10 w-10 border">
+                <AvatarImage
+                  src={member.user?.image || ""}
+                  alt={member.user?.name || member.user?.email || "User avatar"}
+                />
+                <AvatarFallback className="bg-transparent">
+                  {member.user?.name?.charAt(0) ||
+                    member.user?.email?.charAt(0) ||
+                    "U"}
+                </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium">{member.user?.email || member.user?.name || "Unknown User"}</span>
+              <span className="text-sm font-medium">
+                {member.user?.email || member.user?.name || "Unknown User"}
+              </span>
             </div>
-            <span className="px-3 py-1 text-xs font-medium border border-foreground/30 rounded-full capitalize">
+            <span className="border-foreground/30 rounded-full border px-3 py-1 text-xs font-medium capitalize">
               {member.role === "owner" ? "Owner" : member.role}
             </span>
           </div>
@@ -48,25 +59,29 @@ export function MemberList({ members }: MemberListProps) {
         {/* Developer Fallback for empty list / preview to match wireframe exactly */}
         {members.length === 0 && (
           <>
-            <div className="flex items-center justify-between p-4 border-b border-foreground/30">
+            <div className="border-foreground/30 flex items-center justify-between border-b p-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-10 w-10 border border-foreground/20">
+                <Avatar className="border-foreground/20 h-10 w-10 border">
                   <AvatarFallback className="bg-transparent" />
                 </Avatar>
-                <span className="text-sm font-medium text-foreground">latoioms@gmail.com</span>
+                <span className="text-foreground text-sm font-medium">
+                  latoioms@gmail.com
+                </span>
               </div>
-              <span className="px-3 py-1 text-xs font-medium border border-foreground/30 rounded-full">
+              <span className="border-foreground/30 rounded-full border px-3 py-1 text-xs font-medium">
                 Owner
               </span>
             </div>
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-10 w-10 border border-foreground/20">
+                <Avatar className="border-foreground/20 h-10 w-10 border">
                   <AvatarFallback className="bg-transparent" />
                 </Avatar>
-                <span className="text-sm font-medium text-foreground">latoioms@proton.com</span>
+                <span className="text-foreground text-sm font-medium">
+                  latoioms@proton.com
+                </span>
               </div>
-              <span className="px-3 py-1 text-xs font-medium border border-foreground/30 rounded-full">
+              <span className="border-foreground/30 rounded-full border px-3 py-1 text-xs font-medium">
                 member
               </span>
             </div>

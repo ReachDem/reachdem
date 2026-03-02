@@ -21,11 +21,13 @@ Le package database avec Prisma a été configuré avec succès ! 🎉
 Créez un fichier `.env` à la racine du projet avec votre URL de base de données:
 
 **Pour PostgreSQL (recommandé):**
+
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/reachdem?schema=public"
 ```
 
 **Pour SQLite (développement local):**
+
 ```env
 DATABASE_URL="file:./dev.db"
 ```
@@ -38,6 +40,7 @@ pnpm db:push
 ```
 
 Ou pour créer une migration (production):
+
 ```bash
 pnpm db:migrate
 ```
@@ -60,18 +63,18 @@ Cela ouvrira Prisma Studio dans votre navigateur pour visualiser et éditer vos 
 ## 📦 Utilisation dans votre code
 
 ```typescript
-import { prisma } from '@reachdem/database'
+import { prisma } from "@reachdem/database";
 
 // Exemple: récupérer tous les utilisateurs
-const users = await prisma.user.findMany()
+const users = await prisma.user.findMany();
 
 // Exemple: créer un utilisateur
 const newUser = await prisma.user.create({
   data: {
-    email: 'user@example.com',
-    name: 'John Doe'
-  }
-})
+    email: "user@example.com",
+    name: "John Doe",
+  },
+});
 ```
 
 ## 🔐 Prochaine étape: Better-Auth

@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     resolveAlias: {
       "@better-auth/telemetry": "./lib/stubs/better-auth-telemetry.mjs",
+      "@prisma/client/default": "@prisma/client/default.js",
     },
   },
   // Webpack alias (used by `next build`)
