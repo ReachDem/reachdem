@@ -21,6 +21,7 @@ import {
   IconPlus,
   IconChevronDown,
   IconFilter,
+  IconLayoutList,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -89,6 +90,11 @@ const data = {
           title: "Contacts",
           url: "/contacts",
           icon: IconUserCircle,
+        },
+        {
+          title: "Groups",
+          url: "/contacts/groups",
+          icon: IconLayoutList,
         },
         {
           title: "Segments",
