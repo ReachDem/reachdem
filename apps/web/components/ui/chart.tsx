@@ -136,11 +136,10 @@ function ChartTooltipContent({
     const [item] = payload;
     const key = `${labelKey || item?.dataKey || item?.name || "value"}`;
     const itemConfig = getPayloadConfigFromPayload(config, item, key);
-    // <CHANGE> Added safer label access with explicit undefined check
     const value =
       !labelKey && typeof label === "string"
-        ? (config[label as keyof typeof config]?.label ?? label)
-        : (itemConfig?.label ?? null);
+        ? config[label as keyof typeof config]?.label || label
+        : itemConfig?.label;
 
     if (labelFormatter) {
       return (
@@ -180,13 +179,12 @@ function ChartTooltipContent({
     >
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
-        {/* <CHANGE> Added filter to exclude items with type "none" */}
         {payload
           .filter((item) => item.type !== "none")
           .map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload?.fill || item.color;
+            const indicatorColor = color || item.payload.fill || item.color;
 
             return (
               <div
@@ -279,7 +277,6 @@ function ChartLegendContent({
         className
       )}
     >
-      {/* <CHANGE> Added filter to exclude items with type "none" */}
       {payload
         .filter((item) => item.type !== "none")
         .map((item) => {
@@ -289,9 +286,9 @@ function ChartLegendContent({
           return (
             <div
               key={item.value}
-              className={
+              className={cn(
                 "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3"
-              }
+              )}
             >
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
@@ -303,8 +300,7 @@ function ChartLegendContent({
                   }}
                 />
               )}
-              {/* <CHANGE> Added fallback for missing label */}
-              {itemConfig?.label ?? item.value}
+              {itemConfig?.label}
             </div>
           );
         })}
@@ -346,14 +342,9 @@ function getPayloadConfigFromPayload(
     ] as string;
   }
 
-  // <CHANGE> Added explicit check for key existence before returning
-  if (configLabelKey in config) {
-    return config[configLabelKey];
-  }
-  if (key in config) {
-    return config[key as keyof typeof config];
-  }
-  return undefined;
+  return configLabelKey in config
+    ? config[configLabelKey]
+    : config[key as keyof typeof config];
 }
 
 export {

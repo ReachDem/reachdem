@@ -366,16 +366,8 @@ export function ContactsTable({
               className="h-9 pl-8"
             />
           </div>
-          <Badge
-            variant="outline"
-            className="text-muted-foreground pointer-events-none hidden font-light sm:inline-flex"
-          >
-            <NumberTicker
-              value={table.getFilteredRowModel().rows.length}
-              className="text-foreground text-sm font-medium"
-            />
-          </Badge>
-          {selectedCount > 0 && (
+
+          {selectedCount > 0 ? (
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-normal">
                 {selectedCount} selected
@@ -389,6 +381,16 @@ export function ContactsTable({
                 <span className="hidden lg:inline">Delete</span>
               </Button>
             </div>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground pointer-events-none hidden font-light sm:inline-flex"
+            >
+              <NumberTicker
+                value={table.getFilteredRowModel().rows.length}
+                className="text-foreground text-sm font-light"
+              />
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { prisma, Prisma } from "@reachdem/database";
 import { MAX_CUSTOM_FIELDS_PER_ORG } from "../utils/contact-fields";
+import { ContactFieldError } from "../types/contacts";
 
 export class ContactFieldService {
   /**
@@ -31,7 +32,8 @@ export class ContactFieldService {
     });
 
     if (count >= MAX_CUSTOM_FIELDS_PER_ORG) {
-      throw new Error(
+      throw new ContactFieldError(
+        "QUOTA_EXCEEDED",
         `Maximum number of custom fields (${MAX_CUSTOM_FIELDS_PER_ORG}) reached for this workspace`
       );
     }
@@ -47,7 +49,10 @@ export class ContactFieldService {
     });
 
     if (existingKey) {
-      throw new Error("A custom field with this key already exists");
+      throw new ContactFieldError(
+        "DUPLICATE_KEY",
+        "A custom field with this key already exists"
+      );
     }
 
     return prisma.contactFieldDefinition.create({
@@ -72,7 +77,7 @@ export class ContactFieldService {
     });
 
     if (!field || field.organizationId !== organizationId) {
-      throw new Error("Field not found");
+      throw new ContactFieldError("NOT_FOUND", "Field not found");
     }
 
     return field;
@@ -120,3 +125,6 @@ export class ContactFieldService {
     return true;
   }
 }
+
+export { ContactFieldError } from "../types/contacts";
+export type { ContactFieldErrorCode } from "../types/contacts";

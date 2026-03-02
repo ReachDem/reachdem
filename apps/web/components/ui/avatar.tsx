@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import * as AvatarPrimitive from "@radix-ui/react-avatar";
+import { Avatar as AvatarPrimitive } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
@@ -75,7 +75,7 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="avatar-group"
       className={cn(
-        "*:data-[slot=avatar]:ring-background group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2",
+        "group/avatar-group *:data-[slot=avatar]:ring-background flex -space-x-2 *:data-[slot=avatar]:ring-2",
         className
       )}
       {...props}

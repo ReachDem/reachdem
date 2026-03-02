@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,6 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-// <CHANGE> Added CardAction component
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
