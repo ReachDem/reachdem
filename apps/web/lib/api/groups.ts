@@ -46,7 +46,18 @@ export async function listGroups(params?: {
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`Failed to list groups: ${res.status}`);
-  return res.json();
+
+  // The groups API returns { data: [...], meta: {...} }
+  // Normalise to { items, meta } for consistency
+  const json = await res.json();
+  return {
+    items: json.data ?? [],
+    meta: {
+      total: json.meta?.total ?? 0,
+      limit: json.meta?.limit ?? 50,
+      nextCursor: json.meta?.nextCursor ?? null,
+    },
+  };
 }
 
 export async function createGroup(data: {

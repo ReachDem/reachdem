@@ -8,7 +8,7 @@ export default async function GroupsPage() {
   const groups = await getGroups();
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <Suspense fallback={null}>
         <GroupsClient initialGroups={groups as any} />
       </Suspense>
