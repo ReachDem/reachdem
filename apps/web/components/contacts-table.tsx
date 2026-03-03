@@ -65,6 +65,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactImportDialog } from "@/components/contact-import-dialog";
 import { AddContactDrawer } from "@/components/add-contact-drawer";
+import { NumberTicker } from "@/components/ui/number-ticker";
 
 export interface Contact {
   id: string;
@@ -89,7 +90,7 @@ export function ContactsTable({
     initialContacts.forEach((contact) => {
       if (contact.customFields && typeof contact.customFields === "object") {
         Object.keys(contact.customFields).forEach((key) =>
-          customFieldKeys.add(key),
+          customFieldKeys.add(key)
         );
       }
     });
@@ -98,7 +99,7 @@ export function ContactsTable({
       {
         id: "select",
         header: ({ table }) => (
-          <div className="flex items-center justify-center -ml-2">
+          <div className="-ml-2 flex items-center justify-center">
             <Checkbox
               checked={
                 table.getIsAllPageRowsSelected() ||
@@ -112,7 +113,7 @@ export function ContactsTable({
           </div>
         ),
         cell: ({ row }) => (
-          <div className="flex items-center justify-center -ml-2">
+          <div className="-ml-2 flex items-center justify-center">
             <Checkbox
               checked={row.getIsSelected()}
               onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -165,7 +166,7 @@ export function ContactsTable({
           if (!email) return <span className="text-muted-foreground">--</span>;
           return (
             <div className="flex items-center gap-1.5 text-sm">
-              <IconMail className="size-3.5 text-muted-foreground" />
+              <IconMail className="text-muted-foreground size-3.5" />
               <span>{email}</span>
             </div>
           );
@@ -179,7 +180,7 @@ export function ContactsTable({
           if (!phone) return <span className="text-muted-foreground">--</span>;
           return (
             <div className="flex items-center gap-1.5 text-sm tabular-nums">
-              <IconPhone className="size-3.5 text-muted-foreground" />
+              <IconPhone className="text-muted-foreground size-3.5" />
               <span>{phone}</span>
             </div>
           );
@@ -228,7 +229,7 @@ export function ContactsTable({
         cell: ({ row }) => {
           const date = new Date(row.getValue("createdAt") as Date);
           return (
-            <span className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
+            <span className="text-muted-foreground text-xs whitespace-nowrap tabular-nums">
               {date.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -255,23 +256,23 @@ export function ContactsTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem>
-                  <IconEdit className="size-4 mr-2" />
+                  <IconEdit className="mr-2 size-4" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <IconCopy className="size-4 mr-2" />
+                  <IconCopy className="mr-2 size-4" />
                   Duplicate
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive">
-                  <IconTrash className="size-4 mr-2" />
+                  <IconTrash className="mr-2 size-4" />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         ),
-      },
+      }
     );
 
     return baseCols;
@@ -314,7 +315,7 @@ export function ContactsTable({
       return visibility;
     });
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
+    []
   );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
@@ -357,15 +358,16 @@ export function ContactsTable({
       <div className="flex items-center justify-between gap-4 px-4 lg:px-6">
         <div className="flex flex-1 items-center gap-2">
           <div className="relative max-w-sm flex-1">
-            <IconSearch className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
             <Input
               placeholder="Search contacts..."
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="pl-8 h-9"
+              className="h-9 pl-8"
             />
           </div>
-          {selectedCount > 0 && (
+
+          {selectedCount > 0 ? (
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-normal">
                 {selectedCount} selected
@@ -379,6 +381,16 @@ export function ContactsTable({
                 <span className="hidden lg:inline">Delete</span>
               </Button>
             </div>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground pointer-events-none hidden font-light sm:inline-flex"
+            >
+              <NumberTicker
+                value={table.getFilteredRowModel().rows.length}
+                className="text-foreground text-sm font-light"
+              />
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -397,7 +409,7 @@ export function ContactsTable({
                 .map((column) => (
                   <DropdownMenuCheckboxItem
                     key={column.id}
-                    className="capitalize text-sm"
+                    className="text-sm capitalize"
                     checked={column.getIsVisible()}
                     onCheckedChange={(value) =>
                       column.toggleVisibility(!!value)
@@ -439,7 +451,7 @@ export function ContactsTable({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                     </TableHead>
                   ))}
@@ -457,7 +469,7 @@ export function ContactsTable({
                       <TableCell key={cell.id}>
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext(),
+                          cell.getContext()
                         )}
                       </TableCell>
                     ))}
@@ -470,7 +482,7 @@ export function ContactsTable({
                     className="h-44 text-center"
                   >
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <IconUser className="size-8 text-muted-foreground" />
+                      <IconUser className="text-muted-foreground size-8" />
                       <p className="text-muted-foreground">
                         It's a bit empty here
                       </p>
@@ -529,7 +541,7 @@ export function ContactsTable({
           <div className="ml-auto flex items-center gap-2 lg:ml-0">
             <Button
               variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex bg-transparent"
+              className="hidden h-8 w-8 bg-transparent p-0 lg:flex"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
@@ -558,7 +570,7 @@ export function ContactsTable({
             </Button>
             <Button
               variant="outline"
-              className="hidden size-8 lg:flex bg-transparent"
+              className="hidden size-8 bg-transparent lg:flex"
               size="icon"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}

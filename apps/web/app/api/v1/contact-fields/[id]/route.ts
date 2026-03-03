@@ -1,95 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@reachdem/database";
-import { auth } from "@reachdem/auth";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { updateContactFieldSchema } from "@/lib/validations/contact-fields";
-import { headers } from "next/headers";
-import { Prisma } from "@prisma/client";
+import { updateContactFieldSchema } from "@reachdem/shared";
+import { withWorkspace } from "@reachdem/auth/guards";
+import { ContactFieldService } from "@reachdem/core";
 
-export async function PATCH(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const PATCH = withWorkspace<{ id: string }>(
+  async ({ req, params, organizationId }) => {
     try {
-        const { id } = await params;
-        const body = await req.json();
-        const validatedData = updateContactFieldSchema.parse(body);
+      const { id } = params;
+      const body = await req.json();
+      const validatedData = updateContactFieldSchema.parse(body);
 
-        const existingField = await prisma.contactFieldDefinition.findUnique({
-            where: { id },
-        });
+      const updatedField = await ContactFieldService.updateContactField(
+        id,
+        organizationId,
+        validatedData
+      );
 
-        if (!existingField || existingField.organizationId !== organizationId) {
-            return NextResponse.json({ error: "Field not found" }, { status: 404 });
-        }
-
-        const updatedField = await prisma.contactFieldDefinition.update({
-            where: { id },
-            data: {
-                ...validatedData,
-                options: validatedData.options === undefined ? undefined : (validatedData.options ? (validatedData.options as Prisma.InputJsonValue) : Prisma.DbNull),
-            },
-        });
-
-        return NextResponse.json({ data: updatedField });
+      return NextResponse.json({ data: updatedField });
     } catch (error) {
-        console.error("[ContactFields_PATCH]", error);
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.issues }, { status: 400 });
-        }
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      console.error("[ContactFields_PATCH]", error);
+      if (error instanceof z.ZodError) {
+        return NextResponse.json({ error: error.issues }, { status: 400 });
+      }
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-}
+  }
+);
 
-export async function DELETE(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const DELETE = withWorkspace<{ id: string }>(
+  async ({ params, organizationId }) => {
     try {
-        const { id } = await params;
-        const existingField = await prisma.contactFieldDefinition.findUnique({
-            where: { id },
-        });
+      const { id } = params;
 
-        if (!existingField || existingField.organizationId !== organizationId) {
-            return NextResponse.json({ error: "Field not found" }, { status: 404 });
-        }
+      await ContactFieldService.deleteContactField(id, organizationId);
 
-        await prisma.contactFieldDefinition.delete({
-            where: { id },
-        });
-
-        return new NextResponse(null, { status: 204 });
+      return new NextResponse(null, { status: 204 });
     } catch (error) {
-        console.error("[ContactFields_DELETE]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      console.error("[ContactFields_DELETE]", error);
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-}
+  }
+);

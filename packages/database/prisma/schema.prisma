@@ -7,21 +7,20 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Better Auth Core Models ──────────────────────────────────────────────────
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          String?   // Added for new onboarding flow
+  id                    String   @id
+  name                  String
+  email                 String   @unique
+  emailVerified         Boolean  @default(false)
+  image                 String?
+  role                  String? // Added for new onboarding flow
   defaultOrganizationId String? // Added for new onboarding flow
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   accounts    Account[]
   sessions    Session[]
@@ -32,15 +31,15 @@ model User {
 }
 
 model Session {
-  id                     String   @id
-  token                  String   @unique
-  userId                 String
-  expiresAt              DateTime
-  ipAddress              String?
-  userAgent              String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  activeOrganizationId   String?
+  id                   String   @id
+  token                String   @unique
+  userId               String
+  expiresAt            DateTime
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  activeOrganizationId String?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
@@ -92,12 +91,13 @@ model Organization {
   metadata  String?
   createdAt DateTime @default(now())
 
-  members     Member[]
-  invitations Invitation[]
-  sessions    Session[]
-  contacts    Contact[]
+  members       Member[]
+  invitations   Invitation[]
+  sessions      Session[]
+  contacts      Contact[]
   contactFields ContactFieldDefinition[]
-  groups      Group[]
+  groups        Group[]
+  segments      Segment[]
 
   @@map("organization")
 }
@@ -161,7 +161,7 @@ model ContactFieldDefinition {
   key            String
   label          String
   type           ContactFieldType
-  options        Json?            // Array of strings if type is SELECT
+  options        Json? // Array of strings if type is SELECT
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -183,12 +183,12 @@ model Contact {
   address        String?
   work           String?
   enterprise     String?
-  customFields   Json?     // Map of key to value
+  customFields   Json? // Map of key to value
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime? // Soft delete
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships  GroupMember[]
 
   @@index([organizationId])
@@ -198,15 +198,15 @@ model Contact {
 }
 
 model Group {
-  id             String        @id @default(uuid())
+  id             String   @id @default(uuid())
   organizationId String
   name           String
   description    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  members        GroupMember[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      GroupMember[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -218,10 +218,25 @@ model GroupMember {
   contactId String
   addedAt   DateTime @default(now())
 
-  group     Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@id([groupId, contactId])
   @@index([contactId])
   @@map("group_member")
+}
+
+model Segment {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  definition     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("segment")
 }

@@ -18,10 +18,10 @@ export function SiteHeader() {
     const isProfile = pathname.includes("/profile");
     const currentPage = isProfile ? "Profile" : "Workspace";
     headerTitle = (
-      <div className="flex items-center gap-2 text-sm text-foreground">
+      <div className="text-foreground flex items-center gap-2 text-sm">
         <span className="text-muted-foreground font-normal">Settings</span>
-        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        <span className="font-medium text-base">{currentPage}</span>
+        <ChevronRight className="text-muted-foreground h-4 w-4" />
+        <span className="text-base font-medium">{currentPage}</span>
       </div>
     );
   } else if (pathname?.startsWith("/contacts")) {

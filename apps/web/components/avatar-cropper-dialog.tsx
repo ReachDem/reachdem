@@ -36,7 +36,7 @@ export function AvatarCropperDialog({
     (croppedArea: any, croppedAreaPx: any) => {
       setCroppedAreaPixels(croppedAreaPx);
     },
-    [],
+    []
   );
 
   const handleSave = async () => {
@@ -68,7 +68,7 @@ export function AvatarCropperDialog({
 
         {imageSrc ? (
           <div className="space-y-6">
-            <div className="relative h-64 w-full bg-black/10 rounded-lg overflow-hidden shrink-0">
+            <div className="relative h-64 w-full shrink-0 overflow-hidden rounded-lg bg-black/10">
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -82,7 +82,7 @@ export function AvatarCropperDialog({
             </div>
 
             <div className="flex items-center gap-4 px-2">
-              <span className="text-xs text-muted-foreground">Zoom</span>
+              <span className="text-muted-foreground text-xs">Zoom</span>
               <Slider
                 value={[zoom]}
                 min={1}
@@ -116,7 +116,7 @@ export function AvatarCropperDialog({
 // Helper function to create canvas and perform cropping
 async function getCroppedImg(
   imageSrc: string,
-  pixelCrop: any,
+  pixelCrop: any
 ): Promise<Blob | null> {
   const image = await createImage(imageSrc);
   const canvas = document.createElement("canvas");
@@ -137,7 +137,7 @@ async function getCroppedImg(
     0,
     0,
     pixelCrop.width,
-    pixelCrop.height,
+    pixelCrop.height
   );
 
   return new Promise((resolve, reject) => {

@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 export async function checkContactDuplicates(
   organizationId: string,
   emails: string[],
-  phones: string[],
+  phones: string[]
 ) {
   if (emails.length === 0 && phones.length === 0) {
     return { existingEmails: [], existingPhones: [] };
@@ -54,7 +54,7 @@ export async function checkContactDuplicates(
 export async function getDefaultCountryCode() {
   const headersList = await headers();
   // Vercel populates this header with the 2-letter ISO country code (e.g. "SN", "FR", "US")
-  return headersList.get("x-vercel-ip-country") || "CM"; 
+  return headersList.get("x-vercel-ip-country") || "CM";
 }
 
 export async function importContactsBulk(
@@ -62,10 +62,10 @@ export async function importContactsBulk(
   contacts: any[] // We will receive the fully formatted contacts
 ) {
   if (!contacts || contacts.length === 0) return { count: 0 };
-  
+
   // To avoid exhausting connections or long-running queries, we use createMany
   // The caller is expected to chunk these (e.g., 10 at a time) and handle deduplication strategy.
-  
+
   const result = await prisma.contact.createMany({
     data: contacts.map((c) => ({
       organizationId,

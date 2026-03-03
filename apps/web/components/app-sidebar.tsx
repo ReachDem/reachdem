@@ -21,6 +21,7 @@ import {
   IconPlus,
   IconChevronDown,
   IconFilter,
+  IconLayoutList,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -89,6 +90,11 @@ const data = {
           title: "Contacts",
           url: "/contacts",
           icon: IconUserCircle,
+        },
+        {
+          title: "Groups",
+          url: "/contacts/groups",
+          icon: IconLayoutList,
         },
         {
           title: "Segments",
@@ -173,14 +179,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem className="mb-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="data-[slot=sidebar-menu-button]:!p-1.5 w-full">
-                  <div className="flex items-center gap-2 flex-1">
+                <SidebarMenuButton className="w-full data-[slot=sidebar-menu-button]:!p-1.5">
+                  <div className="flex flex-1 items-center gap-2">
                     <Avatar className="size-8 rounded-md bg-white shadow">
                       <AvatarImage
                         src={currentWorkspaceLogo || ""}
                         alt={currentWorkspaceName}
                       />
-                      <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 text-white font-bold">
+                      <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 font-bold text-white">
                         {orgInitial}
                       </AvatarFallback>
                     </Avatar>
@@ -188,7 +194,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       {currentWorkspaceName}
                     </span>
                   </div>
-                  <IconChevronDown className="size-4 text-muted-foreground" />
+                  <IconChevronDown className="text-muted-foreground size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -196,7 +202,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 sideOffset={8}
                 className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
                   Switch project
                 </div>
                 {workspaces.map((workspace: any) => {
@@ -213,7 +219,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           src={workspace.logo || ""}
                           alt={workspace.name || ""}
                         />
-                        <AvatarFallback className="rounded bg-gradient-to-br from-blue-500 to-cyan-400 text-white font-bold text-xs">
+                        <AvatarFallback className="rounded bg-gradient-to-br from-blue-500 to-cyan-400 text-xs font-bold text-white">
                           {wsInitial}
                         </AvatarFallback>
                       </Avatar>
@@ -223,7 +229,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 })}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer">
-                  <IconPlus className="size-4 mr-2" />
+                  <IconPlus className="mr-2 size-4" />
                   Create a new project
                 </DropdownMenuItem>
               </DropdownMenuContent>

@@ -62,7 +62,7 @@ export function AiMappingTester() {
   const [result, setResult] = useState<MappingResult | null>(null);
   const [sampleData, setSampleData] = useState<Record<string, string>[]>([]);
   const [allParsedRows, setAllParsedRows] = useState<Record<string, string>[]>(
-    [],
+    []
   );
   const [columns, setColumns] = useState<string[]>([]);
   const [manualOverrides, setManualOverrides] = useState<
@@ -106,7 +106,7 @@ export function AiMappingTester() {
       });
       console.log(
         "[AI Mapping Result]",
-        JSON.stringify(mappingResult, null, 2),
+        JSON.stringify(mappingResult, null, 2)
       );
       setResult(mappingResult);
     } catch (err: any) {
@@ -178,7 +178,7 @@ export function AiMappingTester() {
         } else {
           row[field.key] = applyMapping(
             result.standardMappings[field.key],
-            sourceRow,
+            sourceRow
           );
         }
       }
@@ -191,7 +191,7 @@ export function AiMappingTester() {
 
   const addCustomColumn = (colName: string) => {
     const aiSuggestion = result?.suggestedCustomFields.find(
-      (f) => f.sourceColumn === colName,
+      (f) => f.sourceColumn === colName
     );
     const key = aiSuggestion ? aiSuggestion.key : `custom_${colName}`;
 
@@ -242,7 +242,7 @@ export function AiMappingTester() {
         } else {
           row[field.key] = applyMapping(
             result.standardMappings[field.key],
-            sourceRow,
+            sourceRow
           );
         }
       }
@@ -274,7 +274,7 @@ export function AiMappingTester() {
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 border-dashed border-primary/50 text-primary hover:text-primary"
+          className="border-primary/50 text-primary hover:text-primary gap-2 border-dashed"
           aria-label="Open AI mapping tester"
         >
           <IconWand className="size-4" aria-hidden="true" />
@@ -282,16 +282,16 @@ export function AiMappingTester() {
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="max-w-5xl lg:max-w-6xl xl:max-w-[1400px] w-[95vw] flex flex-col p-0"
+        className="flex w-[95vw] max-w-5xl flex-col p-0 lg:max-w-6xl xl:max-w-[1400px]"
         style={{ maxHeight: "90vh" }}
       >
-        <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+        <DialogHeader className="shrink-0 border-b p-6 pb-2">
           <DialogTitle>AI Field Mapping — Powered by Gemini</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-6 flex flex-col gap-6">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6">
           {/* Controls */}
-          <div className="flex items-end gap-4 shrink-0 mt-2">
+          <div className="mt-2 flex shrink-0 items-end gap-4">
             <div className="flex-1 space-y-2">
               <label htmlFor="file-upload" className="text-sm font-medium">
                 Load a CSV or Excel file to preview data mapping
@@ -301,14 +301,14 @@ export function AiMappingTester() {
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleFileChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="border-input bg-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               />
             </div>
             <Button onClick={runMapping} disabled={!file || loading}>
               {loading ? (
-                <IconLoader2 className="size-4 mr-2 animate-spin" />
+                <IconLoader2 className="mr-2 size-4 animate-spin" />
               ) : (
-                <IconWand className="size-4 mr-2" />
+                <IconWand className="mr-2 size-4" />
               )}
               {loading ? "Gemini is mapping…" : "Map with Gemini"}
             </Button>
@@ -316,10 +316,10 @@ export function AiMappingTester() {
 
           {error && (
             <div
-              className="rounded-md bg-destructive/15 p-3 flex items-start gap-2 text-destructive text-sm"
+              className="bg-destructive/15 text-destructive flex items-start gap-2 rounded-md p-3 text-sm"
               role="alert"
             >
-              <IconAlertCircle className="size-4 mt-0.5" />
+              <IconAlertCircle className="mt-0.5 size-4" />
               <p>{error}</p>
             </div>
           )}
@@ -329,24 +329,24 @@ export function AiMappingTester() {
               {/* Table 1: Source Data */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-base">
+                  <h3 className="text-base font-semibold">
                     Original Source Data
                   </h3>
                   <Badge
                     variant="secondary"
-                    className="font-normal font-mono tabular-nums"
+                    className="font-mono font-normal tabular-nums"
                   >
                     {sampleData.length} records
                   </Badge>
                 </div>
-                <div className="rounded-md border overflow-x-auto shadow-sm">
+                <div className="overflow-x-auto rounded-md border shadow-sm">
                   <Table className="text-sm">
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         {columns.map((col) => (
                           <TableHead
                             key={col}
-                            className="whitespace-nowrap font-medium text-foreground"
+                            className="text-foreground font-medium whitespace-nowrap"
                           >
                             {col}
                           </TableHead>
@@ -376,19 +376,19 @@ export function AiMappingTester() {
               </div>
 
               {/* Arrow */}
-              <div className="flex justify-center shrink-0">
-                <div className="bg-muted p-2 rounded-full ring-4 ring-background">
-                  <IconArrowDown className="size-5 text-muted-foreground" />
+              <div className="flex shrink-0 justify-center">
+                <div className="bg-muted ring-background rounded-full p-2 ring-4">
+                  <IconArrowDown className="text-muted-foreground size-5" />
                 </div>
               </div>
 
               {/* Warnings */}
               {result.warnings.length > 0 && (
-                <div className="rounded-md bg-amber-500/10 p-3 flex items-start gap-2 text-amber-700 dark:text-amber-400 text-sm">
-                  <IconAlertCircle className="size-4 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                  <IconAlertCircle className="mt-0.5 size-4 shrink-0" />
                   <div className="flex flex-col gap-1">
                     <span className="font-semibold">Warnings</span>
-                    <ul className="list-disc pl-4 space-y-0.5 opacity-90">
+                    <ul className="list-disc space-y-0.5 pl-4 opacity-90">
                       {result.warnings.map((w, i) => (
                         <li key={i}>{w}</li>
                       ))}
@@ -399,15 +399,15 @@ export function AiMappingTester() {
 
               {/* Row validation summary */}
               {result.rowValidation.invalidRows > 0 && (
-                <div className="rounded-md bg-destructive/10 p-3 flex items-start gap-2 text-destructive text-sm">
-                  <IconAlertCircle className="size-4 mt-0.5 shrink-0" />
+                <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md p-3 text-sm">
+                  <IconAlertCircle className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <span className="font-semibold">
                       {result.rowValidation.invalidRows} /{" "}
                       {result.rowValidation.totalRows} rows would fail import
                     </span>
                     {result.rowValidation.invalidReasons.length > 0 && (
-                      <ul className="list-disc pl-4 mt-1 space-y-0.5 opacity-90">
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 opacity-90">
                         {result.rowValidation.invalidReasons.map((r, i) => (
                           <li key={i}>{r}</li>
                         ))}
@@ -420,7 +420,7 @@ export function AiMappingTester() {
               {/* Table 2: Mapped ReachDem Data */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-base text-primary">
+                  <h3 className="text-primary text-base font-semibold">
                     Mapped ReachDem Contacts
                   </h3>
                   <div className="flex items-center gap-2">
@@ -434,7 +434,7 @@ export function AiMappingTester() {
                     )}
                     <Badge
                       variant="secondary"
-                      className="tabular-nums font-mono"
+                      className="font-mono tabular-nums"
                     >
                       {result.rowValidation.validRows}/
                       {result.rowValidation.totalRows} valid
@@ -446,17 +446,17 @@ export function AiMappingTester() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="ml-2 h-7 px-2 border-dashed text-xs text-muted-foreground"
+                            className="text-muted-foreground ml-2 h-7 border-dashed px-2 text-xs"
                           >
-                            <IconPlus className="size-3.5 mr-1" /> Add Column
+                            <IconPlus className="mr-1 size-3.5" /> Add Column
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="w-[200px] max-h-[300px] overflow-y-auto"
+                          className="max-h-[300px] w-[200px] overflow-y-auto"
                         >
                           {getUnusedColumns().length === 0 ? (
-                            <div className="p-2 text-xs text-muted-foreground text-center">
+                            <div className="text-muted-foreground p-2 text-center text-xs">
                               All columns mapped
                             </div>
                           ) : (
@@ -482,17 +482,17 @@ export function AiMappingTester() {
                     >
                       {isEditing ? (
                         <>
-                          <IconCheck className="size-3.5 mr-1.5" /> Done
+                          <IconCheck className="mr-1.5 size-3.5" /> Done
                         </>
                       ) : (
                         <>
-                          <IconEdit className="size-3.5 mr-1.5" /> Edit Mapping
+                          <IconEdit className="mr-1.5 size-3.5" /> Edit Mapping
                         </>
                       )}
                     </Button>
                   </div>
                 </div>
-                <div className="rounded-md border overflow-x-auto shadow-sm ring-1 ring-primary/10">
+                <div className="ring-primary/10 overflow-x-auto rounded-md border shadow-sm ring-1">
                   <Table className="text-sm">
                     <TableHeader className="bg-primary/5">
                       <TableRow>
@@ -518,10 +518,10 @@ export function AiMappingTester() {
                           return (
                             <TableHead
                               key={field.key}
-                              className="whitespace-nowrap min-w-[140px]"
+                              className="min-w-[140px] whitespace-nowrap"
                             >
                               <div className="flex flex-col gap-1.5 py-1.5">
-                                <span className="font-medium text-foreground">
+                                <span className="text-foreground font-medium">
                                   {field.label}
                                 </span>
                                 {isEditing ? (
@@ -534,7 +534,7 @@ export function AiMappingTester() {
                                       }))
                                     }
                                   >
-                                    <SelectTrigger className="h-7 text-[11px] px-2 shadow-sm border-dashed bg-background hover:bg-muted/50 transition-colors">
+                                    <SelectTrigger className="bg-background hover:bg-muted/50 h-7 border-dashed px-2 text-[11px] shadow-sm transition-colors">
                                       <SelectValue placeholder="Ignore" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -562,7 +562,7 @@ export function AiMappingTester() {
                                     </SelectContent>
                                   </Select>
                                 ) : (
-                                  <span className="text-[10px] font-mono text-muted-foreground">
+                                  <span className="text-muted-foreground font-mono text-[10px]">
                                     {currentValue === "__unmapped"
                                       ? "—"
                                       : currentValue === "__concat"
@@ -577,18 +577,18 @@ export function AiMappingTester() {
                         {displayCustomFields.map((f) => (
                           <TableHead
                             key={f.key}
-                            className="whitespace-nowrap border-l-2 border-primary/20 bg-primary/5 min-w-[140px]"
+                            className="border-primary/20 bg-primary/5 min-w-[140px] border-l-2 whitespace-nowrap"
                           >
                             <div className="flex flex-col gap-1.5 py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <span
-                                  className="font-medium text-primary truncate max-w-[100px]"
+                                  className="text-primary max-w-[100px] truncate font-medium"
                                   title={f.displayLabel}
                                 >
                                   {f.displayLabel}
                                 </span>
                                 {!isEditing && (
-                                  <span className="text-[9px] uppercase tracking-wider font-semibold text-primary/60 shrink-0">
+                                  <span className="text-primary/60 shrink-0 text-[9px] font-semibold tracking-wider uppercase">
                                     {f.type}
                                   </span>
                                 )}
@@ -603,13 +603,13 @@ export function AiMappingTester() {
                                     }))
                                   }
                                 >
-                                  <SelectTrigger className="h-7 text-[11px] px-2 shadow-sm border-dashed bg-background border-primary/30 text-primary hover:bg-primary/10 hover:text-primary transition-colors">
+                                  <SelectTrigger className="bg-background border-primary/30 text-primary hover:bg-primary/10 hover:text-primary h-7 border-dashed px-2 text-[11px] shadow-sm transition-colors">
                                     <SelectValue placeholder="Select column" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem
                                       value="__unmapped"
-                                      className="text-destructive font-medium focus:bg-destructive/10 focus:text-destructive"
+                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive font-medium"
                                     >
                                       -- Remove Column --
                                     </SelectItem>
@@ -622,7 +622,7 @@ export function AiMappingTester() {
                                 </Select>
                               ) : (
                                 <span
-                                  className="text-[10px] font-mono text-muted-foreground truncate"
+                                  className="text-muted-foreground truncate font-mono text-[10px]"
                                   title={f.currentSource}
                                 >
                                   {f.currentSource}
@@ -651,7 +651,7 @@ export function AiMappingTester() {
                           {displayCustomFields.map((f) => (
                             <TableCell
                               key={f.key}
-                              className="whitespace-nowrap tabular-nums border-l-2 border-primary/10"
+                              className="border-primary/10 border-l-2 whitespace-nowrap tabular-nums"
                             >
                               {row[f.key] || (
                                 <span className="text-muted-foreground italic opacity-40">
@@ -665,7 +665,7 @@ export function AiMappingTester() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="flex justify-end mt-4">
+                <div className="mt-4 flex justify-end">
                   <Button onClick={handleDownloadJSON} className="gap-2">
                     <IconDownload className="size-4" />
                     Download JSON ({allParsedRows.length} rows)

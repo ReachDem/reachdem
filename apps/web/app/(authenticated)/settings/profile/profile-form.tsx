@@ -40,8 +40,8 @@ export function ProfileForm() {
 
   if (isSessionLoading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -168,15 +168,15 @@ export function ProfileForm() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="flex items-center gap-6 pt-6">
-          <Avatar className="w-20 h-20 shadow-sm border">
+          <Avatar className="h-20 w-20 border shadow-sm">
             <AvatarImage src={user?.image || ""} alt={user?.name || ""} />
-            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-400 text-white font-semibold text-2xl">
+            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-400 text-2xl font-semibold text-white">
               {userInitial}
             </AvatarFallback>
           </Avatar>
           <div className="space-y-2">
             <h4 className="font-medium">Télécharger un nouvel avatar</h4>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Une image carrée est recommandée (max 5 Mo).
             </p>
             <Input
@@ -193,9 +193,9 @@ export function ProfileForm() {
               disabled={isUploadingAvatar}
             >
               {isUploadingAvatar ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Camera className="w-4 h-4 mr-2" />
+                <Camera className="mr-2 h-4 w-4" />
               )}
               Sélectionner une image
             </Button>
@@ -241,7 +241,7 @@ export function ProfileForm() {
             onClick={handleSaveName}
             disabled={isSavingName || name === user?.name || !name.trim()}
           >
-            {isSavingName && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {isSavingName && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Enregistrer
           </Button>
         </SettingsCardFooter>
@@ -258,11 +258,11 @@ export function ProfileForm() {
         <SettingsCardContent className="pt-6">
           <div className="max-w-md space-y-4">
             <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Mail className="text-muted-foreground absolute top-3 left-3 h-4 w-4" />
               <Input
                 value={user?.email || ""}
                 disabled
-                className="pl-9 bg-muted/50"
+                className="bg-muted/50 pl-9"
               />
             </div>
             <div className="text-sm">
@@ -333,7 +333,7 @@ export function ProfileForm() {
             }
           >
             {isSavingPassword && (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Mettre à jour
           </Button>

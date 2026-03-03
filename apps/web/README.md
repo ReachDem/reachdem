@@ -42,13 +42,16 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 This project includes a robust Contacts CRUD API built for multi-tenant (workspace) environments.
 
 ### Base Path
+
 All API endpoints are prefixed with `/api/v1/`.
 The API strictly scopes all requests to the authenticated user's active organization (`activeOrganizationId`).
 
 ### Endpoints
 
 #### Custom Fields API (`/contact-fields`)
+
 Organizations can define up to 5 custom fields per workspace.
+
 - `GET /v1/contact-fields`: Lists all field definitions.
 - `POST /v1/contact-fields`: Creates a new field definition.
   - Body: `{ key: string, label: string, type: "TEXT"|"NUMBER"|"BOOLEAN"|"DATE"|"URL"|"SELECT", options?: string[] }`
@@ -56,6 +59,7 @@ Organizations can define up to 5 custom fields per workspace.
 - `DELETE /v1/contact-fields/[id]`: Deletes a field definition.
 
 #### Contacts API (`/contacts`)
+
 - `GET /v1/contacts`: Lists contacts (supports soft deletes, pagination via `page`/`limit`, and searching via `q`).
 - `POST /v1/contacts`: Creates a new contact.
   - **Rules**: Must provide `name`. Must provide either `phoneE164` OR `email`.

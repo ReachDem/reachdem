@@ -1,167 +1,93 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@reachdem/database";
-import { auth } from "@reachdem/auth";
-import { updateContactSchema } from "@/lib/validations/contacts";
-import { headers } from "next/headers";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { validateCustomFields, MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
-import { Prisma } from "@prisma/client";
+import { updateContactSchema } from "@reachdem/shared";
+import { withWorkspace } from "@reachdem/auth/guards";
+import { ContactService } from "@reachdem/core";
 
-export async function GET(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const GET = withWorkspace<{ id: string }>(
+  async ({ params, organizationId }) => {
     try {
-        const { id } = await params;
-        const contact = await prisma.contact.findUnique({
-            where: { id },
-        });
+      const { id } = params;
+      const contact = await ContactService.getContactById(id, organizationId);
 
-        if (!contact || contact.organizationId !== organizationId || contact.deletedAt) {
-            return NextResponse.json({ error: "Contact not found" }, { status: 404 });
-        }
-
-        return NextResponse.json({ data: contact });
-    } catch (error) {
-        console.error("[Contacts_GET_SINGLE]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      return NextResponse.json({ data: contact });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === "Contact not found") {
+        return NextResponse.json(
+          { error: "Contact not found" },
+          { status: 404 }
+        );
+      }
+      console.error("[Contacts_GET]", error);
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-}
+  }
+);
 
-export async function PATCH(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const PATCH = withWorkspace<{ id: string }>(
+  async ({ req, params, organizationId }) => {
     try {
-        const { id } = await params;
-        const body = await req.json();
-        const validatedData = updateContactSchema.parse(body);
+      const { id } = params;
+      const body = await req.json();
+      const validatedData = updateContactSchema.parse(body);
 
-        const existingContact = await prisma.contact.findUnique({
-            where: { id },
-        });
+      const updatedContact = await ContactService.updateContact(
+        id,
+        organizationId,
+        validatedData
+      );
 
-        if (!existingContact || existingContact.organizationId !== organizationId || existingContact.deletedAt) {
-            return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+      return NextResponse.json({ data: updatedContact });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.message === "Contact not found")
+          return NextResponse.json(
+            { error: "Contact not found" },
+            { status: 404 }
+          );
+        if (
+          error.message.includes("Maximum") ||
+          error.message.includes("Custom field") ||
+          error.message.includes("Invalid value") ||
+          error.message.includes("at least an email")
+        ) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
         }
-
-        // Logic-side validation: ensure the update does not leave the contact without both a phone and an email
-        // undefined means it wasn't provided in the payload (so it stays the same)
-        const resultingPhone = validatedData.phoneE164 !== undefined ? validatedData.phoneE164 : existingContact.phoneE164;
-        const resultingEmail = validatedData.email !== undefined ? validatedData.email : existingContact.email;
-
-        const hasResultingPhone = resultingPhone && resultingPhone.length > 0;
-        const hasResultingEmail = resultingEmail && resultingEmail.length > 0;
-
-        if (!hasResultingPhone && !hasResultingEmail) {
-            return NextResponse.json(
-                { error: [{ message: "A contact must have at least an email or a phone number. You cannot remove both." }] },
-                { status: 400 }
-            );
-        }
-
-        // Validate custom fields if updated
-        if (validatedData.customFields !== undefined && validatedData.customFields !== null) {
-            if (Object.keys(validatedData.customFields).length > MAX_CUSTOM_FIELDS_PER_ORG) {
-                return NextResponse.json(
-                    { error: `Maximum ${MAX_CUSTOM_FIELDS_PER_ORG} custom fields allowed per contact` },
-                    { status: 400 }
-                );
-            }
-
-            const definitions = await prisma.contactFieldDefinition.findMany({
-                where: { organizationId },
-            });
-
-            const validation = validateCustomFields(validatedData.customFields as Record<string, unknown>, definitions);
-            if (!validation.isValid) {
-                return NextResponse.json({ error: validation.error }, { status: 400 });
-            }
-        }
-
-        const updatedContact = await prisma.contact.update({
-            where: { id },
-            data: {
-                ...validatedData,
-                customFields: validatedData.customFields === undefined ? undefined : (validatedData.customFields ? (validatedData.customFields as Prisma.InputJsonValue) : Prisma.DbNull),
-            },
-        });
-
-        return NextResponse.json({ data: updatedContact });
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.issues }, { status: 400 });
-        }
-        console.error("[Contacts_PATCH]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      }
+      if (error instanceof z.ZodError) {
+        return NextResponse.json({ error: error.issues }, { status: 400 });
+      }
+      console.error("[Contacts_PATCH]", error);
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-}
+  }
+);
 
-export async function DELETE(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
+export const DELETE = withWorkspace<{ id: string }>(
+  async ({ params, organizationId }) => {
     try {
-        const { id } = await params;
-        const existingContact = await prisma.contact.findUnique({
-            where: { id },
-        });
+      const { id } = params;
+      await ContactService.deleteContact(id, organizationId);
 
-        if (!existingContact || existingContact.organizationId !== organizationId || existingContact.deletedAt) {
-            return NextResponse.json({ error: "Contact not found" }, { status: 404 });
-        }
-
-        // Soft delete
-        await prisma.contact.update({
-            where: { id },
-            data: { deletedAt: new Date() }
-        });
-
-        return new NextResponse(null, { status: 204 });
-    } catch (error) {
-        console.error("[Contacts_DELETE]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      return new NextResponse(null, { status: 204 });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === "Contact not found") {
+        return NextResponse.json(
+          { error: "Contact not found" },
+          { status: 404 }
+        );
+      }
+      console.error("[Contacts_DELETE]", error);
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-}
+  }
+);

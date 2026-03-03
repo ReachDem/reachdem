@@ -45,7 +45,7 @@ export default async function WorkspaceSettingsPage() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="space-y-8 max-w-2xl">
+          <div className="max-w-2xl space-y-8">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
               <div className="flex gap-2">
@@ -76,10 +76,10 @@ export default async function WorkspaceSettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-muted">
+            <div className="border-muted flex items-center justify-between border-t pt-4">
               <div className="space-y-1">
                 <h4 className="font-medium">Update the Logo</h4>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   The visual identity of your team.
                 </p>
               </div>
@@ -114,12 +114,12 @@ export default async function WorkspaceSettingsPage() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+          <div className="bg-muted/20 flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium leading-none">Current Plan</p>
-              <p className="text-sm text-muted-foreground">Base Tier</p>
+              <p className="text-sm leading-none font-medium">Current Plan</p>
+              <p className="text-muted-foreground text-sm">Base Tier</p>
             </div>
-            <Button className="bg-[#f58220] hover:bg-[#d6701a] text-white">
+            <Button className="bg-[#f58220] text-white hover:bg-[#d6701a]">
               Upgrade Plan
             </Button>
           </div>
@@ -135,14 +135,14 @@ export default async function WorkspaceSettingsPage() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+          <div className="bg-muted/20 flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium leading-none">Credit Balance</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm leading-none font-medium">Credit Balance</p>
+              <p className="text-muted-foreground text-sm">
                 Used for premium actions
               </p>
             </div>
-            <span className="bg-[#f58220] text-white text-sm font-medium px-4 py-1.5 rounded-full inline-flex items-center">
+            <span className="inline-flex items-center rounded-full bg-[#f58220] px-4 py-1.5 text-sm font-medium text-white">
               30,294 Credits
             </span>
           </div>
@@ -162,10 +162,10 @@ export default async function WorkspaceSettingsPage() {
         <SettingsCardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium leading-none">
+              <p className="text-sm leading-none font-medium">
                 Delete Organization
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Permanently remove your organization and all of its contents
                 from our platform. This action is not reversible.
               </p>

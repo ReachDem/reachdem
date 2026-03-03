@@ -9,7 +9,7 @@ export default async function ContactsPage() {
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-2">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <ContactStats />
+          {/* <ContactStats /> */}
           <ContactsTable initialContacts={contacts as any} />
         </div>
       </div>

@@ -3,8 +3,8 @@ import {
   IconMail,
   IconPhone,
   IconTrendingUp,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const stats = [
   {
@@ -35,7 +35,7 @@ const stats = [
     trend: "up",
     icon: IconTrendingUp,
   },
-]
+];
 
 export function ContactStats() {
   return (
@@ -43,25 +43,25 @@ export function ContactStats() {
       {stats.map((stat) => (
         <Card key={stat.title}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-muted-foreground text-sm font-medium">
               {stat.title}
             </CardTitle>
-            <stat.icon className="size-4 text-muted-foreground" />
+            <stat.icon className="text-muted-foreground size-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stat.value}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-xs">
               {stat.trend === "up" && (
-                <span className="text-green-600 dark:text-green-400">{stat.change}</span>
+                <span className="text-green-600 dark:text-green-400">
+                  {stat.change}
+                </span>
               )}
-              {stat.trend === "neutral" && (
-                <span>{stat.change}</span>
-              )}
+              {stat.trend === "neutral" && <span>{stat.change}</span>}
               {stat.trend === "up" ? " from last month" : " of total contacts"}
             </p>
           </CardContent>
         </Card>
       ))}
     </div>
-  )
+  );
 }

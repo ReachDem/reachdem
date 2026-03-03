@@ -1,103 +1,59 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@reachdem/database";
-import { auth } from "@reachdem/auth";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createContactFieldSchema } from "@/lib/validations/contact-fields";
-import { headers } from "next/headers";
-import { MAX_CUSTOM_FIELDS_PER_ORG } from "@/lib/utils/contact-fields";
-import { Prisma } from "@prisma/client";
+import { createContactFieldSchema } from "@reachdem/shared";
+import { withWorkspace } from "@reachdem/auth/guards";
+import { ContactFieldService, ContactFieldError } from "@reachdem/core";
 
-export async function GET() {
-    const session = await auth.api.getSession({
-        headers: await headers(),
+const CONTACT_FIELD_ERROR_STATUS: Record<
+  ContactFieldError["code"],
+  { status: number; message: string }
+> = {
+  DUPLICATE_KEY: {
+    status: 409,
+    message: "A custom field with this key already exists.",
+  },
+  QUOTA_EXCEEDED: {
+    status: 422,
+    message: "Maximum number of custom fields reached for this workspace.",
+  },
+  NOT_FOUND: { status: 404, message: "Field not found." },
+};
+
+export const GET = withWorkspace(async ({ organizationId }) => {
+  try {
+    const fields = await ContactFieldService.getContactFields(organizationId);
+    return NextResponse.json({ data: fields });
+  } catch (error) {
+    console.error("[ContactFields_GET]", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+});
+
+export const POST = withWorkspace(async ({ req, organizationId }) => {
+  try {
+    const body = await req.json();
+    const validatedData = createContactFieldSchema.parse(body);
+
+    const field = await ContactFieldService.createContactField(organizationId, {
+      ...validatedData,
     });
 
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ data: field }, { status: 201 });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
+    if (error instanceof ContactFieldError) {
+      const { status, message } = CONTACT_FIELD_ERROR_STATUS[error.code];
+      return NextResponse.json({ error: message }, { status });
     }
-
-    try {
-        const fields = await prisma.contactFieldDefinition.findMany({
-            where: { organizationId },
-            orderBy: { createdAt: "asc" },
-        });
-
-        return NextResponse.json({ data: fields });
-    } catch (error) {
-        console.error("[ContactFields_GET]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
-}
-
-export async function POST(req: NextRequest) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const organizationId = session.session?.activeOrganizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: "Workspace required" }, { status: 403 });
-    }
-
-    try {
-        const body = await req.json();
-        const validatedData = createContactFieldSchema.parse(body);
-
-        // Check limit of fields per organization
-        const count = await prisma.contactFieldDefinition.count({
-            where: { organizationId },
-        });
-
-        if (count >= MAX_CUSTOM_FIELDS_PER_ORG) {
-            return NextResponse.json(
-                { error: `Maximum number of custom fields (${MAX_CUSTOM_FIELDS_PER_ORG}) reached for this workspace` },
-                { status: 400 }
-            );
-        }
-
-        // Check if key already exists
-        const existingKey = await prisma.contactFieldDefinition.findUnique({
-            where: {
-                organizationId_key: {
-                    organizationId,
-                    key: validatedData.key,
-                },
-            },
-        });
-
-        if (existingKey) {
-            return NextResponse.json(
-                { error: "A custom field with this key already exists" },
-                { status: 400 }
-            );
-        }
-
-        const field = await prisma.contactFieldDefinition.create({
-            data: {
-                ...validatedData,
-                organizationId,
-                // Prisma Json needs to handle undefined vs null properly
-                options: validatedData.options ? (validatedData.options as Prisma.InputJsonValue) : Prisma.JsonNull,
-            },
-        });
-
-        return NextResponse.json({ data: field }, { status: 201 });
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.issues }, { status: 400 });
-        }
-        console.error("[ContactFields_POST]", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
-}
+    console.error("[ContactFields_POST]", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+});

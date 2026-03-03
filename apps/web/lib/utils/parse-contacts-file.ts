@@ -89,7 +89,10 @@ export function isValidContactFile(file: File): {
     .substring(file.name.lastIndexOf("."))
     .toLowerCase();
 
-  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
+  if (
+    !allowedTypes.includes(file.type) &&
+    !allowedExtensions.includes(extension)
+  ) {
     return {
       valid: false,
       error: "Format non supporté. Utilisez un fichier CSV, XLSX ou XLS.",

@@ -9,19 +9,14 @@ import { ac, owner, admin, member } from "./permissions";
  * that hosts the primary auth API (ReachDem by default).
  */
 export const authClient = createAuthClient({
-    baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-    plugins: [
-        organizationClient({
-            ac,
-            roles: { owner, admin, member },
-        }),
-        emailOTPClient(),
-    ],
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  plugins: [
+    organizationClient({
+      ac,
+      roles: { owner, admin, member },
+    }),
+    emailOTPClient(),
+  ],
 });
 
-export const {
-    signIn,
-    signUp,
-    signOut,
-    useSession,
-} = authClient;
+export const { signIn, signUp, signOut, useSession } = authClient;

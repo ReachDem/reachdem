@@ -77,7 +77,7 @@ export function LogoUpdate({ initialLogo, orgId }: LogoUpdateProps) {
       />
 
       {logo ? (
-        <Avatar className="h-10 w-10 border border-foreground/20 rounded-md">
+        <Avatar className="border-foreground/20 h-10 w-10 rounded-md border">
           <AvatarImage
             src={logo}
             alt="Organization Logo"
@@ -88,8 +88,8 @@ export function LogoUpdate({ initialLogo, orgId }: LogoUpdateProps) {
           </AvatarFallback>
         </Avatar>
       ) : (
-        <div className="h-10 w-16 border rounded-md border-foreground/30 flex items-center justify-center bg-transparent">
-          <Upload className="h-4 w-4 text-muted-foreground" />
+        <div className="border-foreground/30 flex h-10 w-16 items-center justify-center rounded-md border bg-transparent">
+          <Upload className="text-muted-foreground h-4 w-4" />
         </div>
       )}
 
@@ -98,7 +98,7 @@ export function LogoUpdate({ initialLogo, orgId }: LogoUpdateProps) {
         size="sm"
         disabled={isUploading}
         onClick={() => fileInputRef.current?.click()}
-        className="rounded-md border-foreground/30 h-8 px-4 font-normal"
+        className="border-foreground/30 h-8 rounded-md px-4 font-normal"
       >
         {isUploading ? (
           <>
