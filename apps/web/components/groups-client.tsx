@@ -14,6 +14,8 @@ import {
   IconLayoutColumns,
   IconChevronDown,
 } from "@tabler/icons-react";
+import { ContactsTableSkeleton } from "@/components/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { type ColumnDef } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -48,7 +50,6 @@ import {
 } from "@/components/contact-data-table";
 import {
   type Group,
-  listGroups,
   createGroup,
   deleteGroup,
   listGroupContacts,
@@ -60,6 +61,8 @@ import {
   DropdownMenuContent,
   DropdownMenu,
 } from "./ui/dropdown-menu";
+
+import { useGroupsStore } from "@/lib/stores/groups-store";
 
 // ─── Group Panel (right column) ───────────────────────────────────────────────
 
@@ -135,13 +138,23 @@ function GroupPanel({ group }: { group: Group }) {
     members,
     columns,
     initialVisibility,
-    10
+    10,
+    "group-members"
   );
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <IconLoader2 className="text-muted-foreground size-5 animate-spin" />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Panel header skeleton */}
+        <div className="mb-4 flex items-start justify-between gap-4 px-6">
+          <div className="min-w-0">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="mt-1.5 h-3.5 w-48" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4">
+          <ContactsTableSkeleton rows={10} compact showToolbar={true} />
+        </div>
       </div>
     );
   }
@@ -207,20 +220,6 @@ function GroupPanel({ group }: { group: Group }) {
     </div>
   );
 
-  const emptyState = (
-    <div className="flex flex-col items-center justify-center gap-2 py-8">
-      <IconUsers className="text-muted-foreground size-8 opacity-30" />
-      <p className="text-muted-foreground text-sm">No members yet.</p>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => router.push(`/contacts/groups/${group.id}`)}
-      >
-        Add contacts
-      </Button>
-    </div>
-  );
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Panel header */}
@@ -242,7 +241,7 @@ function GroupPanel({ group }: { group: Group }) {
           columnCount={columns.length}
           toolbar={toolbar}
           footer={footer}
-          emptyState={emptyState}
+          isLoading={loading}
           compact
         />
       </div>
@@ -259,18 +258,35 @@ interface GroupsClientProps {
 export function GroupsClient({ initialGroups }: GroupsClientProps) {
   const router = useRouter();
 
-  const [groups, setGroups] = React.useState<Group[]>(initialGroups);
-  const [search, setSearch] = React.useState("");
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  // ── Zustand store ──
+  const storeGroups = useGroupsStore((s) => s.groups);
+  // Use initialGroups on first render to avoid empty flash
+  const groups = storeGroups.length > 0 ? storeGroups : initialGroups;
+  const selectedGroupId = useGroupsStore((s) => s.selectedGroupId);
+  const search = useGroupsStore((s) => s.search);
+  const isLoading = useGroupsStore((s) => s.isLoading);
+  const setGroups = useGroupsStore((s) => s.setGroups);
+  const selectGroup = useGroupsStore((s) => s.selectGroup);
+  const setSearch = useGroupsStore((s) => s.setSearch);
+  const addGroup = useGroupsStore((s) => s.addGroup);
+  const removeGroup = useGroupsStore((s) => s.removeGroup);
+  const refreshGroups = useGroupsStore((s) => s.refreshGroups);
+
+  // ── Local UI state (dialogs / loading) ──
   const [createOpen, setCreateOpen] = React.useState(false);
   const [createError, setCreateError] = React.useState<string | null>(null);
   const [isPending, setIsPending] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<Group | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
+  // Hydrate store on mount to ensure global state is populated
+  React.useEffect(() => {
+    setGroups(initialGroups);
+  }, [initialGroups, setGroups]);
+
   const selectedGroup = React.useMemo(
-    () => groups.find((g) => g.id === selectedId) ?? null,
-    [groups, selectedId]
+    () => groups.find((g) => g.id === selectedGroupId) ?? null,
+    [groups, selectedGroupId]
   );
 
   const filtered = React.useMemo(() => {
@@ -290,8 +306,7 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
       const group = await createGroup(data);
       toast.success(`Group "${group.name}" created!`);
       setCreateOpen(false);
-      setGroups((prev) => [group, ...prev]);
-      setSelectedId(group.id);
+      addGroup(group);
     } catch (err: unknown) {
       setCreateError(
         err instanceof Error ? err.message : "Failed to create group"
@@ -306,8 +321,7 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
     setIsDeleting(true);
     try {
       await deleteGroup(deleteTarget.id);
-      if (selectedId === deleteTarget.id) setSelectedId(null);
-      setGroups((prev) => prev.filter((g) => g.id !== deleteTarget.id));
+      removeGroup(deleteTarget.id);
       toast.success(`Group "${deleteTarget.name}" deleted.`);
     } catch {
       toast.error("Failed to delete group. Please try again.");
@@ -315,63 +329,6 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
       setIsDeleting(false);
       setDeleteTarget(null);
     }
-  }
-
-  // Refresh on mount (safe now that listGroups normalises response)
-  React.useEffect(() => {
-    listGroups({ limit: 100 })
-      .then((r) => setGroups(r.items ?? []))
-      .catch(() => {});
-  }, []);
-
-  // ── Empty state ──
-  if (groups.length === 0 && !search) {
-    return (
-      <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-6 md:py-5">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Groups</h1>
-            <p className="text-muted-foreground mt-0.5 text-sm">
-              Organize your contacts into static lists for targeted actions.
-            </p>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <IconPlus className="size-4" />
-            <span className="hidden sm:inline">Create group</span>
-          </Button>
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-          <div className="bg-muted flex size-16 items-center justify-center rounded-2xl">
-            <IconUsers className="text-muted-foreground size-8" />
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <p className="text-lg font-semibold">No groups yet</p>
-            <p className="text-muted-foreground max-w-sm text-sm">
-              Create your first group to segment your contacts and run targeted
-              campaigns.
-            </p>
-          </div>
-          <Button
-            size="lg"
-            onClick={() => setCreateOpen(true)}
-            className="gap-2"
-          >
-            <IconPlus className="size-4" />
-            Create my first group
-          </Button>
-        </div>
-        <CreateGroupDialog
-          open={createOpen}
-          onOpenChange={(o) => {
-            setCreateOpen(o);
-            if (!o) setCreateError(null);
-          }}
-          onSubmit={handleCreate}
-          isPending={isPending}
-          error={createError}
-        />
-      </div>
-    );
   }
 
   // ── Main layout ──
@@ -411,27 +368,27 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
           {/* Scrollable group list */}
           <div className="mx-3 mb-3 h-[400px] overflow-hidden rounded-lg border md:h-[500px] lg:h-[600px]">
             <div className="h-full overflow-y-auto">
-              {filtered.length === 0 ? (
-                <p className="text-muted-foreground px-4 py-8 text-center text-sm">
-                  No groups found.
-                </p>
-              ) : (
+              {filtered.length > 0 ? (
                 filtered.map((group) => (
                   <GroupListItem
                     key={group.id}
                     group={group}
-                    isSelected={group.id === selectedId}
+                    isSelected={group.id === selectedGroupId}
                     onSelect={(id) => {
                       if (window.innerWidth < 768) {
                         router.push(`/contacts/groups/${id}`);
                       } else {
-                        setSelectedId(id);
+                        selectGroup(id);
                       }
                     }}
                     onEdit={(id) => router.push(`/contacts/groups/${id}`)}
                     onDelete={(g) => setDeleteTarget(g)}
                   />
                 ))
+              ) : (
+                <p className="text-muted-foreground px-4 py-8 text-center text-sm">
+                  No groups found.
+                </p>
               )}
             </div>
           </div>
@@ -444,7 +401,7 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
           ) : (
             <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 text-sm">
               <IconUsers className="size-8 opacity-20" />
-              <p>Select a group to preview it</p>
+              <p className="text-gray-400">Select a group to preview it</p>
             </div>
           )}
         </div>

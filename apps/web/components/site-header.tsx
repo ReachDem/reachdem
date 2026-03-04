@@ -7,25 +7,87 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
+import Link from "next/link";
+import React from "react";
+import { useGroupsStore } from "@/lib/stores/groups-store";
+import { getGroupById } from "@/app/actions/groups";
+import type { Group } from "@/lib/api/groups";
+
+function formatBreadcrumbPart(part: string, groups: Group[]) {
+  const map: Record<string, string> = {
+    settings: "Settings",
+    profile: "Profile",
+    workspace: "Workspace",
+    contacts: "Contacts",
+    groups: "Groups",
+    edit: "Edit",
+  };
+
+  if (map[part]) return map[part];
+  if (part.length >= 20) {
+    const group = groups.find((g) => g.id === part);
+    return group ? group.name : "Detail";
+  }
+  return part.charAt(0).toUpperCase() + part.slice(1);
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
+  const parts = pathname?.split("/").filter(Boolean) || [];
 
-  let headerTitle: React.ReactNode = (
-    <h1 className="text-base font-medium">Dashboard</h1>
-  );
+  const groups = useGroupsStore((s) => s.groups);
+  const addGroup = useGroupsStore((s) => s.addGroup);
 
-  if (pathname?.startsWith("/settings")) {
-    const isProfile = pathname.includes("/profile");
-    const currentPage = isProfile ? "Profile" : "Workspace";
+  // Fetch the group name if we landed directly on a detail page and the store is empty
+  React.useEffect(() => {
+    const idPart = parts.find((p) => p.length >= 20);
+    if (idPart && !groups.find((g) => g.id === idPart)) {
+      getGroupById(idPart)
+        .then((group) => {
+          if (group) {
+            addGroup({
+              ...group,
+              createdAt: group.createdAt.toISOString(),
+              updatedAt: group.updatedAt.toISOString(),
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [parts, groups, addGroup]);
+
+  let headerTitle: React.ReactNode;
+
+  if (parts.length === 0) {
+    headerTitle = <h1 className="text-base font-medium">Dashboard</h1>;
+  } else {
     headerTitle = (
       <div className="text-foreground flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground font-normal">Settings</span>
-        <ChevronRight className="text-muted-foreground h-4 w-4" />
-        <span className="text-base font-medium">{currentPage}</span>
+        {parts.map((part, index) => {
+          const isLast = index === parts.length - 1;
+          const href = "/" + parts.slice(0, index + 1).join("/");
+          const label = formatBreadcrumbPart(part, groups);
+
+          return (
+            <React.Fragment key={href}>
+              {isLast ? (
+                <span className="text-base font-medium">{label}</span>
+              ) : (
+                <>
+                  <Link
+                    href={href}
+                    className="text-muted-foreground hover:text-foreground transition-colors hover:underline"
+                  >
+                    {label}
+                  </Link>
+                  <ChevronRight className="text-muted-foreground h-4 w-4" />
+                </>
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
     );
-  } else if (pathname?.startsWith("/contacts")) {
-    headerTitle = <h1 className="text-base font-medium">Contacts</h1>;
   }
 
   return (

@@ -38,19 +38,27 @@ import {
   ContactDataTable,
   ContactTablePagination,
 } from "@/components/contact-data-table";
+import { useContactsStore } from "@/lib/stores/contacts-store";
 
 // Re-export the rich Contact type (superset of ContactRow) for backwards compat
 export type { ContactRow as Contact };
 
 export function ContactsTable({
-  initialContacts = [],
+  initialContacts,
 }: {
   initialContacts?: ContactRow[];
 }) {
+  // Read contacts and loading state from the Zustand store
+  const storeContacts = useContactsStore((s) => s.contacts);
+  const contacts =
+    storeContacts.length > 0 ? storeContacts : (initialContacts ?? []);
+  const isLoading = useContactsStore((s) => s.isLoading);
+
   // Build columns with default actions dropdown
+
   const columns = React.useMemo<ColumnDef<ContactRow>[]>(
     () =>
-      buildContactColumns(initialContacts, {
+      buildContactColumns(contacts, {
         showSelect: true,
         renderActions: () => (
           <DropdownMenu>
@@ -83,7 +91,7 @@ export function ContactsTable({
         ),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initialContacts]
+    [contacts]
   );
 
   const initialVisibility = React.useMemo(
@@ -92,10 +100,11 @@ export function ContactsTable({
   );
 
   const { table, globalFilter, setGlobalFilter } = useContactTableState(
-    initialContacts,
+    contacts,
     columns,
     initialVisibility,
-    10
+    10,
+    "contacts"
   );
 
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
@@ -187,16 +196,9 @@ export function ContactsTable({
     </div>
   );
 
-  const footer = <ContactTablePagination table={table} />;
-
-  const emptyState = (
-    <div className="flex flex-col items-center justify-center gap-2">
-      <IconUser className="text-muted-foreground size-8" />
-      <p className="text-muted-foreground">It&apos;s a bit empty here</p>
-      <p className="text-muted-foreground text-xs">
-        Start building your audience by importing contacts or adding them
-        manually.
-      </p>
+  const footer = (
+    <div className="px-2">
+      <ContactTablePagination table={table} />
     </div>
   );
 
@@ -206,7 +208,7 @@ export function ContactsTable({
       columnCount={columns.length}
       toolbar={toolbar}
       footer={footer}
-      emptyState={emptyState}
+      isLoading={isLoading}
     />
   );
 }

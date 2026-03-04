@@ -10,13 +10,13 @@ import * as React from "react";
 import {
   IconMail,
   IconPhone,
-  IconUser,
   IconDotsVertical,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
 } from "@tabler/icons-react";
+import { ContactsTableSkeleton } from "@/components/skeletons";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -51,6 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useColumnVisibilityStore } from "@/lib/stores/column-visibility-store";
 
 // ─── Shared contact row type ──────────────────────────────────────────────────
 // Superset that works for both the full contacts page and the group member panel.
@@ -277,8 +278,8 @@ export function buildContactColumns<T extends ContactRow>(
 }
 
 // ─── Default column visibility ────────────────────────────────────────────────
-export function defaultContactVisibility(
-  columns: ColumnDef<ContactRow>[],
+export function defaultContactVisibility<T extends ContactRow>(
+  columns: ColumnDef<T>[],
   maxColumns = 7
 ): VisibilityState {
   const alwaysVisible = [
@@ -322,8 +323,8 @@ interface ContactDataTableProps<T extends ContactRow> {
   toolbar?: React.ReactNode;
   /** Slot rendered below the table (pagination, counts, etc.) */
   footer?: React.ReactNode;
-  /** Custom empty state */
-  emptyState?: React.ReactNode;
+  /** Whether the table data is currently loading */
+  isLoading?: boolean;
   /** Compact mode — reduces row padding, hides pagination */
   compact?: boolean;
 }
@@ -333,9 +334,22 @@ export function ContactDataTable<T extends ContactRow>({
   columnCount,
   toolbar,
   footer,
-  emptyState,
+  isLoading = false,
   compact = false,
 }: ContactDataTableProps<T>) {
+  if (isLoading) {
+    return (
+      <div className={`flex flex-col gap-4 ${compact ? "gap-2" : ""}`}>
+        {toolbar && <div>{toolbar}</div>}
+        <ContactsTableSkeleton
+          rows={compact ? 4 : 6}
+          compact={compact}
+          showToolbar={false}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`flex flex-col gap-4 ${compact ? "gap-2" : ""}`}>
       {toolbar && <div>{toolbar}</div>}
@@ -357,35 +371,22 @@ export function ContactDataTable<T extends ContactRow>({
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className={compact ? "h-10" : ""}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columnCount} className="h-44 text-center">
-                    {emptyState ?? (
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <IconUser className="text-muted-foreground size-8" />
-                        <p className="text-muted-foreground">No contacts</p>
-                      </div>
-                    )}
-                  </TableCell>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className={compact ? "h-10" : ""}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              )}
+              ))}
             </TableBody>
           </Table>
         </div>
@@ -403,7 +404,7 @@ export function ContactTablePagination<T extends ContactRow>({
   table: ReturnType<typeof useReactTable<T>>;
 }) {
   return (
-    <div className="flex items-center justify-between px-2">
+    <div className="flex items-center justify-between px-4">
       <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
         {table.getFilteredRowModel().rows.length} contact(s) total
       </div>
@@ -487,15 +488,47 @@ export function ContactTablePagination<T extends ContactRow>({
 
 // ─── useContactTableState ─────────────────────────────────────────────────────
 // Shared table state hook so callers don't repeat boilerplate.
+// When `tableKey` is provided, column visibility is persisted to localStorage.
 export function useContactTableState<T extends ContactRow>(
   data: T[],
   columns: ColumnDef<T>[],
   initialVisibility?: VisibilityState,
-  pageSize = 10
+  pageSize = 10,
+  tableKey?: string
 ) {
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] =
+
+  // ── Persisted column visibility ──────────────────────────────────────────
+  const persistVisibility = useColumnVisibilityStore((s) => s.setVisibility);
+
+  const [columnVisibility, setColumnVisibilityRaw] =
     React.useState<VisibilityState>(initialVisibility ?? {});
+
+  React.useEffect(() => {
+    if (tableKey) {
+      const saved = useColumnVisibilityStore.getState().getVisibility(tableKey);
+      if (saved) {
+        setColumnVisibilityRaw(saved);
+      }
+    }
+  }, [tableKey]);
+
+  // Wrap setter to also persist to localStorage
+  const setColumnVisibility = React.useCallback(
+    (
+      updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)
+    ) => {
+      setColumnVisibilityRaw((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (tableKey) {
+          persistVisibility(tableKey, next);
+        }
+        return next;
+      });
+    },
+    [tableKey, persistVisibility]
+  );
+
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -521,7 +554,7 @@ export function useContactTableState<T extends ContactRow>(
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
+    onColumnVisibilityChange: setColumnVisibility as any,
     onPaginationChange: setPagination,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -530,6 +563,8 @@ export function useContactTableState<T extends ContactRow>(
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    autoResetPageIndex: false,
+    autoResetExpanded: false,
   });
 
   return { table, globalFilter, setGlobalFilter };
