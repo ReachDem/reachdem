@@ -9,20 +9,15 @@ import {
   IconLoader2,
   IconCheck,
   IconUsers,
+  IconPencil,
 } from "@tabler/icons-react";
+import { type ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,110 +28,59 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  type ContactRow,
+  buildContactColumns,
+  defaultContactVisibility,
+  useContactTableState,
+  ContactDataTable,
+  ContactTablePagination,
+} from "@/components/contact-data-table";
 
 import {
   type Contact,
-  listGroupContacts,
-  addGroupMembers,
   removeGroupMembers,
-  listContacts,
+  addGroupMembers,
 } from "@/lib/api/groups";
 
-interface GroupDetailClientProps {
-  groupId: string;
-  initialMembers: Contact[];
-  initialContacts: Contact[];
-  totalMembers: number;
-  totalContacts: number;
-}
+import { useGroupDetailStore } from "@/lib/stores/group-detail-store";
 
-export function GroupDetailClient({
+// ─── Members Panel (Main Column) ──────────────────────────────────────────────
+
+function GroupMembersPanel({
   groupId,
   initialMembers,
-  initialContacts,
-  totalMembers,
-  totalContacts,
-}: GroupDetailClientProps) {
-  const [members, setMembers] = React.useState<Contact[]>(initialMembers);
-  const [memberCount, setMemberCount] = React.useState(totalMembers);
+}: {
+  groupId: string;
+  initialMembers: Contact[];
+}) {
+  const storeMembers = useGroupDetailStore((s) => s.members);
+  const members = storeMembers.length > 0 ? storeMembers : initialMembers;
+  const memberCount = useGroupDetailStore((s) => s.memberCount);
+  const isAddModalOpen = useGroupDetailStore((s) => s.isAddModalOpen);
+  const isLoadingMembers = useGroupDetailStore((s) => s.isLoadingMembers);
+  const setIsAddModalOpen = useGroupDetailStore((s) => s.setIsAddModalOpen);
+  const allContacts = useGroupDetailStore((s) => s.allContacts);
+  const setMembers = useGroupDetailStore((s) => s.setMembers);
+  const removeMembersFromStore = useGroupDetailStore((s) => s.removeMembers);
+  const refreshMembers = useGroupDetailStore((s) => s.refreshMembers);
+  const refreshContacts = useGroupDetailStore((s) => s.refreshContacts);
 
-  // All org contacts (for picker)
-  const [allContacts, setAllContacts] =
-    React.useState<Contact[]>(initialContacts);
-  const [pickerSearch, setPickerSearch] = React.useState("");
-
-  // Selection state
-  const [selectedMembers, setSelectedMembers] = React.useState<Set<string>>(
-    new Set()
-  );
-  const [selectedToAdd, setSelectedToAdd] = React.useState<Set<string>>(
-    new Set()
-  );
-
-  // Loading states
-  const [isAdding, setIsAdding] = React.useState(false);
-  const [isRemoving, setIsRemoving] = React.useState(false);
-  const [removeTarget, setRemoveTarget] = React.useState<Contact | null>(null);
-  const [memberSearch, setMemberSearch] = React.useState("");
-
-  // Compute the set of already-member ids for quick lookup
   const memberIds = React.useMemo(
     () => new Set(members.map((m) => m.id)),
     [members]
   );
 
-  // When there are members, we might want to hide the picker — show it if there are contacts not yet in group
-  const nonMemberContacts = React.useMemo(
-    () => allContacts.filter((c) => !memberIds.has(c.id)),
-    [allContacts, memberIds]
-  );
-
-  const showPicker = nonMemberContacts.length > 0 || memberCount === 0;
-
-  // Filtered lists
-  const filteredMembers = React.useMemo(() => {
-    const q = memberSearch.toLowerCase();
-    if (!q) return members;
-    return members.filter(
-      (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q) ||
-        m.phoneE164?.includes(q)
-    );
-  }, [members, memberSearch]);
-
-  const filteredContactsForPicker = React.useMemo(() => {
-    const q = pickerSearch.toLowerCase();
-    const base = allContacts;
-    if (!q) return base;
-    return base.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.phoneE164?.includes(q)
-    );
-  }, [allContacts, pickerSearch]);
-
-  // Add selected contacts to the group
-  async function handleAdd() {
-    if (selectedToAdd.size === 0) return;
-    setIsAdding(true);
-    try {
-      await addGroupMembers(groupId, [...selectedToAdd]);
-      // Re-fetch members
-      const result = await listGroupContacts(groupId, { limit: 200 });
-      setMembers(result.items);
-      setMemberCount(result.meta.total);
-      setSelectedToAdd(new Set());
-      toast.success(`Added ${selectedToAdd.size} contact(s) to the group.`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to add contacts";
-      toast.error(msg);
-    } finally {
-      setIsAdding(false);
-    }
-  }
+  const [isRemoving, setIsRemoving] = React.useState(false);
+  const [removeTarget, setRemoveTarget] = React.useState<Contact | null>(null);
 
   // Remove a single contact
   async function handleRemoveSingle(contact: Contact) {
@@ -144,11 +88,8 @@ export function GroupDetailClient({
     setIsRemoving(true);
     try {
       await removeGroupMembers(groupId, [contact.id]);
-      setMembers((prev) => prev.filter((m) => m.id !== contact.id));
-      setMemberCount((c) => c - 1);
-      // Re-fetch all contacts so picker updates
-      const res = await listContacts({ limit: 200 });
-      setAllContacts(res.items);
+      removeMembersFromStore([contact.id]);
+      refreshContacts();
       toast.success(`${contact.name} removed from the group.`);
     } catch {
       toast.error("Failed to remove contact. Please try again.");
@@ -158,16 +99,17 @@ export function GroupDetailClient({
   }
 
   // Bulk remove
-  async function handleBulkRemove() {
-    if (selectedMembers.size === 0) return;
+  async function handleBulkRemove(
+    selectedIds: Set<string>,
+    clearSelection: () => void
+  ) {
+    if (selectedIds.size === 0) return;
     setIsRemoving(true);
     try {
-      await removeGroupMembers(groupId, [...selectedMembers]);
-      const removed = selectedMembers;
-      setMembers((prev) => prev.filter((m) => !removed.has(m.id)));
-      setMemberCount((c) => c - removed.size);
-      setSelectedMembers(new Set());
-      toast.success(`Removed ${removed.size} member(s) from the group.`);
+      await removeGroupMembers(groupId, [...selectedIds]);
+      removeMembersFromStore([...selectedIds]);
+      clearSelection();
+      toast.success(`Removed ${selectedIds.size} members.`);
     } catch {
       toast.error("Failed to remove members. Please try again.");
     } finally {
@@ -175,44 +117,73 @@ export function GroupDetailClient({
     }
   }
 
-  function toggleMemberSelect(id: string) {
-    setSelectedMembers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const handleMembersAdded = React.useCallback(async () => {
+    await refreshMembers(groupId);
+    setIsAddModalOpen(false);
+  }, [groupId, refreshMembers, setIsAddModalOpen]);
 
-  function togglePickerSelect(id: string) {
-    if (memberIds.has(id)) return; // already member
-    setSelectedToAdd((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const columns = React.useMemo<ColumnDef<Contact>[]>(
+    () =>
+      buildContactColumns(members, {
+        showSelect: true,
+        renderActions: (row) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive size-7"
+            onClick={() => setRemoveTarget(row)}
+            disabled={isRemoving}
+            title="Remove from group"
+          >
+            <IconUserMinus className="size-3.5" />
+          </Button>
+        ),
+      }) as ColumnDef<Contact>[],
+    [members, isRemoving]
+  );
 
-  const MembersPanel = (
-    <div className="flex flex-col gap-3">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2">
+  const initialVisibility = React.useMemo(
+    () => defaultContactVisibility(columns),
+    [columns]
+  );
+
+  const { table, globalFilter, setGlobalFilter } = useContactTableState(
+    members,
+    columns,
+    initialVisibility,
+    10,
+    "group-detail"
+  );
+
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+
+  const toolbar = (
+    <div className="flex justify-between gap-4 pt-2">
+      <div className="flex items-center gap-2 px-1">
         <div className="relative max-w-sm flex-1">
           <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
             placeholder="Search members…"
-            value={memberSearch}
-            onChange={(e) => setMemberSearch(e.target.value)}
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
             className="h-9 pl-8"
           />
         </div>
-        {selectedMembers.size > 0 && (
+        {selectedCount > 0 && (
           <Button
             variant="outline"
             size="sm"
-            className="text-destructive hover:text-destructive gap-1.5"
-            onClick={handleBulkRemove}
+            className="text-destructive hover:text-destructive shrink-0 gap-1.5"
+            onClick={() =>
+              handleBulkRemove(
+                new Set(
+                  table
+                    .getFilteredSelectedRowModel()
+                    .rows.map((r) => r.original.id)
+                ),
+                () => table.toggleAllRowsSelected(false)
+              )
+            }
             disabled={isRemoving}
           >
             {isRemoving ? (
@@ -220,239 +191,52 @@ export function GroupDetailClient({
             ) : (
               <IconUserMinus className="size-4" />
             )}
-            Remove {selectedMembers.size} selected
+            <span className="hidden sm:inline">Remove {selectedCount}</span>
           </Button>
         )}
       </div>
-
-      {members.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
-          <IconUsers className="mx-auto mb-2 size-8 opacity-30" />
-          <p>No members yet. Add contacts from the panel on the right.</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={
-                      selectedMembers.size === members.length &&
-                      members.length > 0
-                    }
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedMembers(new Set(members.map((m) => m.id)));
-                      } else {
-                        setSelectedMembers(new Set());
-                      }
-                    }}
-                  />
-                </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden sm:table-cell">Contact</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMembers.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="text-muted-foreground py-8 text-center text-sm"
-                  >
-                    No members match your search.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedMembers.has(member.id)}
-                        onCheckedChange={() => toggleMemberSelect(member.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">{member.name}</span>
-                      {member.enterprise && (
-                        <p className="text-muted-foreground text-xs">
-                          {member.enterprise}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
-                      {member.email || member.phoneE164 || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive size-8"
-                        onClick={() => setRemoveTarget(member)}
-                        disabled={isRemoving}
-                      >
-                        <IconUserMinus className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </div>
-  );
-
-  const PickerPanel = (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search contacts…"
-            value={pickerSearch}
-            onChange={(e) => setPickerSearch(e.target.value)}
-            className="h-9 pl-8"
-          />
-        </div>
-        <Button
-          size="sm"
-          disabled={selectedToAdd.size === 0 || isAdding}
-          onClick={handleAdd}
-          className="shrink-0 gap-1.5"
-        >
-          {isAdding ? (
-            <IconLoader2 className="size-4 animate-spin" />
-          ) : (
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogTrigger asChild>
+          <Button size="sm" className="gap-1.5">
             <IconUserPlus className="size-4" />
-          )}
-          Add {selectedToAdd.size > 0 ? `(${selectedToAdd.size})` : "selected"}
-        </Button>
-      </div>
+            Add Contacts
+          </Button>
+        </DialogTrigger>
 
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10" />
-              <TableHead>Name</TableHead>
-              <TableHead className="hidden sm:table-cell">Contact</TableHead>
-              <TableHead className="w-28 text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredContactsForPicker.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="text-muted-foreground py-8 text-center text-sm"
-                >
-                  {allContacts.length === 0
-                    ? "No contacts in your workspace yet."
-                    : "No contacts match your search."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredContactsForPicker.map((contact) => {
-                const isMember = memberIds.has(contact.id);
-                return (
-                  <TableRow
-                    key={contact.id}
-                    className={isMember ? "opacity-50" : ""}
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedToAdd.has(contact.id) || isMember}
-                        onCheckedChange={() => togglePickerSelect(contact.id)}
-                        disabled={isMember}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`font-medium ${isMember ? "line-through" : ""}`}
-                      >
-                        {contact.name}
-                      </span>
-                      {contact.enterprise && (
-                        <p className="text-muted-foreground text-xs">
-                          {contact.enterprise}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
-                      {contact.email || contact.phoneE164 || "—"}
-                    </TableCell>
-                    <TableCell className="pr-4 text-right">
-                      {isMember && (
-                        <Badge
-                          variant="secondary"
-                          className="gap-1 text-xs font-normal"
-                        >
-                          <IconCheck className="size-3" />
-                          In group
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+        <DialogContent className="flex max-h-[90dvh] w-full flex-col p-4 sm:max-w-4xl lg:max-w-5xl">
+          <DialogHeader className="px-1">
+            <DialogTitle>Add Contacts to Group</DialogTitle>
+            <DialogDescription>
+              Select contacts from your workspace to add to this group.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-[300px] flex-1 overflow-auto overscroll-contain">
+            <GroupContactPicker
+              groupId={groupId}
+              allContacts={allContacts}
+              existingMemberIds={memberIds}
+              onMembersAdded={handleMembersAdded}
+              onCancel={() => setIsAddModalOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
+  const footer = <ContactTablePagination table={table} />;
 
   return (
-    <>
-      {/* Stats row */}
-      <div className="flex items-center gap-4 px-4 pb-2 md:px-6">
-        <Badge variant="outline" className="gap-1.5 text-sm font-normal">
-          <IconUsers className="size-3.5" />
-          {memberCount} member{memberCount !== 1 ? "s" : ""}
-        </Badge>
-      </div>
+    <div className="flex flex-col gap-3">
+      <ContactDataTable
+        table={table}
+        columnCount={columns.length}
+        toolbar={toolbar}
+        footer={footer}
+        isLoading={isLoadingMembers}
+        compact
+      />
 
-      {/* Desktop: 2-column layout | Mobile: Tabs */}
-      <div className="hidden px-4 pb-8 md:grid md:grid-cols-[3fr_2fr] md:gap-6 md:px-6">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">
-            Members
-          </h2>
-          {MembersPanel}
-        </div>
-        {showPicker && (
-          <div className="flex flex-col gap-2">
-            <h2 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">
-              Add contacts
-            </h2>
-            {PickerPanel}
-          </div>
-        )}
-      </div>
-
-      {/* Mobile: Tabs */}
-      <div className="px-4 pb-8 md:hidden">
-        <Tabs defaultValue="members">
-          <TabsList className="mb-4 w-full">
-            <TabsTrigger value="members" className="flex-1">
-              Members ({memberCount})
-            </TabsTrigger>
-            {showPicker && (
-              <TabsTrigger value="add" className="flex-1">
-                Add contacts
-              </TabsTrigger>
-            )}
-          </TabsList>
-          <TabsContent value="members">{MembersPanel}</TabsContent>
-          {showPicker && <TabsContent value="add">{PickerPanel}</TabsContent>}
-        </Tabs>
-      </div>
-
-      {/* Remove single confirm */}
       <AlertDialog
         open={!!removeTarget}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
@@ -476,6 +260,246 @@ export function GroupDetailClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Picker Panel (Modal Content) ──────────────────────────────────────────────
+
+interface GroupContactPickerProps {
+  groupId: string;
+  allContacts: Contact[];
+  existingMemberIds: Set<string>;
+  onMembersAdded: () => void;
+  onCancel: () => void;
+}
+
+function GroupContactPicker({
+  groupId,
+  allContacts,
+  existingMemberIds,
+  onMembersAdded,
+  onCancel,
+}: GroupContactPickerProps) {
+  const [isAdding, setIsAdding] = React.useState(false);
+  const isLoadingContacts = useGroupDetailStore((s) => s.isLoadingContacts);
+
+  // Custom columns for picker (hides actions, changes checkbox behaviour, adds status badge)
+  const columns = React.useMemo<ColumnDef<Contact>[]>(() => {
+    // Base columns (reusing the DRY builder, but we patch it below)
+    const base = buildContactColumns(allContacts, {
+      showSelect: false, // We'll build a custom select column to handle disabled states
+      renderActions: () => null, // Hide actions
+    });
+
+    // Strip actions, gender, work, added to keep it lean for the picker
+    const leanCols = base.filter(
+      (c) =>
+        c.id !== "actions" &&
+        (c as any).accessorKey !== "gender" &&
+        (c as any).accessorKey !== "work" &&
+        (c as any).accessorKey !== "createdAt"
+    );
+
+    const cols: ColumnDef<Contact>[] = [
+      {
+        id: "select",
+        header: ({ table }) => {
+          // Only count selectable rows (not already members)
+          const selectableRows = table
+            .getRowModel()
+            .rows.filter((r) => !existingMemberIds.has(r.original.id));
+          const allSelected =
+            selectableRows.length > 0 &&
+            selectableRows.every((r) => r.getIsSelected());
+          const someSelected = selectableRows.some((r) => r.getIsSelected());
+
+          return (
+            <div className="-ml-2 flex items-center justify-center">
+              <Checkbox
+                checked={allSelected || (someSelected && "indeterminate")}
+                onCheckedChange={(v) => {
+                  selectableRows.forEach((r) => r.toggleSelected(!!v));
+                }}
+                aria-label="Select all eligible"
+                disabled={selectableRows.length === 0}
+              />
+            </div>
+          );
+        },
+        cell: ({ row }) => {
+          const isMember = existingMemberIds.has(row.original.id);
+          return (
+            <div className="-ml-2 flex items-center justify-center">
+              <Checkbox
+                checked={isMember || row.getIsSelected()}
+                onCheckedChange={(v) => !isMember && row.toggleSelected(!!v)}
+                aria-label="Select row"
+                disabled={isMember}
+              />
+            </div>
+          );
+        },
+        enableSorting: false,
+        enableHiding: false,
+      },
+      ...(leanCols as ColumnDef<Contact>[]),
+      {
+        id: "status",
+        header: "",
+        cell: ({ row }) => {
+          const isMember = existingMemberIds.has(row.original.id);
+          if (!isMember) return null;
+          return (
+            <div className="flex justify-end pr-2">
+              <Badge
+                variant="secondary"
+                className="gap-1 text-xs font-normal whitespace-nowrap"
+              >
+                <IconCheck className="size-3" />
+                In Group
+              </Badge>
+            </div>
+          );
+        },
+      },
+    ];
+
+    return cols;
+  }, [allContacts, existingMemberIds]);
+
+  const initialVisibility = React.useMemo(
+    () => defaultContactVisibility(columns),
+    [columns]
+  );
+
+  const { table, globalFilter, setGlobalFilter } = useContactTableState(
+    allContacts,
+    columns,
+    initialVisibility,
+    10,
+    "group-picker"
+  );
+
+  const selectedCount = table
+    .getFilteredSelectedRowModel()
+    .rows.filter((r) => !existingMemberIds.has(r.original.id)).length;
+
+  async function handleAdd() {
+    if (selectedCount === 0) return;
+    setIsAdding(true);
+    const idsToAdd = table
+      .getFilteredSelectedRowModel()
+      .rows.filter((r) => !existingMemberIds.has(r.original.id))
+      .map((r) => r.original.id);
+
+    try {
+      await addGroupMembers(groupId, idsToAdd);
+      onMembersAdded();
+      table.toggleAllRowsSelected(false);
+      toast.success(`Added ${idsToAdd.length} contact(s) to the group.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add contacts";
+      toast.error(msg);
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
+  const toolbar = (
+    <div className="flex items-center gap-2 px-1">
+      <div className="relative flex-1">
+        <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Input
+          placeholder="Search contacts…"
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="h-9 pl-8"
+        />
+      </div>
+    </div>
+  );
+
+  const footer = <ContactTablePagination table={table} />;
+
+  const isWorkspaceEmpty = allContacts.length === 0;
+
+  return (
+    <div className="flex h-full flex-col gap-4">
+      <div className="min-h-[300px] flex-1 overflow-auto overscroll-contain">
+        <ContactDataTable
+          table={table}
+          columnCount={columns.length}
+          toolbar={toolbar}
+          footer={footer}
+          isLoading={isLoadingContacts}
+          compact
+        />
+      </div>
+      <div className="flex items-center justify-end gap-3 border-t pt-4">
+        <Button variant="outline" onClick={onCancel} disabled={isAdding}>
+          Cancel
+        </Button>
+        <Button
+          disabled={selectedCount === 0 || isAdding}
+          onClick={handleAdd}
+          className="gap-1.5"
+        >
+          {isAdding && <IconLoader2 className="size-4 animate-spin" />}
+          Validate {selectedCount > 0 ? `(${selectedCount})` : ""}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Orchestrator ────────────────────────────────────────────────────────
+
+interface GroupDetailClientProps {
+  groupId: string;
+  initialMembers: Contact[];
+  initialContacts: Contact[];
+  totalMembers: number;
+  totalContacts: number;
+}
+
+export function GroupDetailClient({
+  groupId,
+  initialMembers,
+  initialContacts,
+  totalMembers,
+}: GroupDetailClientProps) {
+  const storeMembers = useGroupDetailStore((s) => s.members);
+  const storeAllContacts = useGroupDetailStore((s) => s.allContacts);
+
+  // Use initial data on first render to avoid flash
+  const members = storeMembers.length > 0 ? storeMembers : initialMembers;
+  const allContacts =
+    storeAllContacts.length > 0 ? storeAllContacts : initialContacts;
+
+  const setMembers = useGroupDetailStore((s) => s.setMembers);
+  const setAllContacts = useGroupDetailStore((s) => s.setAllContacts);
+
+  // Hydrate the store on mount
+  React.useEffect(() => {
+    setMembers(initialMembers, totalMembers);
+    setAllContacts(initialContacts);
+  }, [
+    initialMembers,
+    initialContacts,
+    totalMembers,
+    setMembers,
+    setAllContacts,
+  ]);
+
+  return (
+    <>
+      {/* Main Layout */}
+      <div className="px-4 pb-8 md:px-6">
+        <section className="flex flex-col gap-3">
+          <GroupMembersPanel groupId={groupId} initialMembers={members} />
+        </section>
+      </div>
     </>
   );
 }

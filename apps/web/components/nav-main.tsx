@@ -61,9 +61,11 @@ export function NavMain({
             item.items ? (
               <div key={item.title} className="mb-2 flex flex-col gap-1">
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip={item.title}>
-                    {item.icon && <item.icon />}
-                    <span className="font-semibold">{item.title}</span>
+                  <SidebarMenuButton tooltip={item.title} asChild>
+                    <a href={item.url}>
+                      {item.icon && <item.icon />}
+                      <span className="font-semibold">{item.title}</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuSub className="ml-4 flex flex-col gap-1 border-l-0 pr-0">

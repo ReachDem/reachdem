@@ -82,15 +82,10 @@ const data = {
     //   badge: "Beta",
     // },
     {
-      title: "Audience",
-      url: "#",
+      title: "Contacts",
+      url: "/contacts",
       icon: IconUsersGroup,
       items: [
-        {
-          title: "Contacts",
-          url: "/contacts",
-          icon: IconUserCircle,
-        },
         {
           title: "Groups",
           url: "/contacts/groups",
