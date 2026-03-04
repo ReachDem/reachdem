@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
 import {
   getGroupById,
   getGroupContacts,
@@ -29,13 +28,6 @@ export default async function GroupDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  let group;
-  try {
-    group = await getGroupById(id);
-  } catch {
-    notFound();
-  }
 
   const [membersData, contactsData] = await Promise.all([
     getGroupContacts(id, { limit: 200 }),
