@@ -25,6 +25,7 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
     );
     return NextResponse.json(summary);
   } catch (error: any) {
+    console.error(`Error fetching provider summary:`, error);
     if (error.message === "Time window cannot exceed 30 days.") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

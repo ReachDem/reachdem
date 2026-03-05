@@ -1,6 +1,6 @@
 import { prisma, Prisma } from "@reachdem/database";
 import { randomUUID } from "crypto";
-import { truncate } from "../utils/pii-scrubber";
+import { truncate, redactMeta, maskEndpoint } from "../utils/pii-scrubber";
 import type {
   CreateEventInput,
   CreateProviderCallInput,
@@ -32,7 +32,9 @@ export class ActivityLogger {
         status: input.status,
         durationMs: input.durationMs,
         meta: input.meta
-          ? (input.meta as Prisma.InputJsonValue)
+          ? (redactMeta(
+              input.meta as Record<string, unknown>
+            ) as Prisma.InputJsonValue)
           : Prisma.JsonNull,
         expiresAt: input.expiresAt,
       },
@@ -48,13 +50,17 @@ export class ActivityLogger {
         organizationId: input.organizationId,
         activityEventId: input.activityEventId,
         provider: input.provider,
-        endpoint: input.endpoint,
+        endpoint: maskEndpoint(input.endpoint),
         method: input.method.toUpperCase(),
         requestMeta: input.requestMeta
-          ? (input.requestMeta as Prisma.InputJsonValue)
+          ? (redactMeta(
+              input.requestMeta as Record<string, unknown>
+            ) as Prisma.InputJsonValue)
           : Prisma.JsonNull,
         responseMeta: input.responseMeta
-          ? (input.responseMeta as Prisma.InputJsonValue)
+          ? (redactMeta(
+              input.responseMeta as Record<string, unknown>
+            ) as Prisma.InputJsonValue)
           : Prisma.JsonNull,
         httpStatus: input.httpStatus,
         errorCode: input.errorCode,
@@ -146,38 +152,38 @@ export class ActivityLogger {
       throw new Error("Time window cannot exceed 30 days.");
     }
 
-    const results = await prisma.activityEvent.groupBy({
-      by: ["provider"],
-      where: {
-        organizationId,
-        createdAt: { gte: from, lte: to },
-        provider: { not: null },
-      },
-      _count: { id: true },
-      _avg: { durationMs: true },
-    });
-
-    const errors = await prisma.activityEvent.groupBy({
-      by: ["provider"],
-      where: {
-        organizationId,
-        createdAt: { gte: from, lte: to },
-        provider: { not: null },
-        status: "failed",
-      },
-      _count: { id: true },
-    });
-
-    const fallbacks = await prisma.activityEvent.groupBy({
-      by: ["provider"],
-      where: {
-        organizationId,
-        createdAt: { gte: from, lte: to },
-        provider: { not: null },
-        action: "fallback",
-      },
-      _count: { id: true },
-    });
+    const [results, errors, fallbacks] = await Promise.all([
+      prisma.activityEvent.groupBy({
+        by: ["provider"],
+        where: {
+          organizationId,
+          createdAt: { gte: from, lte: to },
+          provider: { not: null },
+        },
+        _count: { id: true },
+        _avg: { durationMs: true },
+      }),
+      prisma.activityEvent.groupBy({
+        by: ["provider"],
+        where: {
+          organizationId,
+          createdAt: { gte: from, lte: to },
+          provider: { not: null },
+          status: "failed",
+        },
+        _count: { id: true },
+      }),
+      prisma.activityEvent.groupBy({
+        by: ["provider"],
+        where: {
+          organizationId,
+          createdAt: { gte: from, lte: to },
+          provider: { not: null },
+          action: "fallback",
+        },
+        _count: { id: true },
+      }),
+    ]);
 
     return results.map((r) => ({
       provider: r.provider,

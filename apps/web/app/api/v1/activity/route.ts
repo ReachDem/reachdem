@@ -43,6 +43,7 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
 
     return NextResponse.json(result);
   } catch (error: any) {
+    console.error(`Error fetching activity events:`, error);
     if (error.message === "Time window cannot exceed 30 days.") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { prisma } from "@reachdem/database";
 
@@ -152,7 +152,7 @@ describe("Activity Logs API - REAL DATABASE INTEGRATION", () => {
     expect(resp.status).toBe(404);
   });
 
-  it("should verify PII redaction: no raw phone in stored meta", async () => {
+  it("should store and retrieve event with meta field", async () => {
     const event = await prisma.activityEvent.findUnique({
       where: { id: testEventId },
     });
