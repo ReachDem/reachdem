@@ -301,6 +301,120 @@ paths:
         "200":
           description: Evaluated Segments List Response
 
+  /activity:
+    get:
+      summary: List Activity Events
+      description: Returns a paginated list of activity events for the workspace. Default window is 7 days, max 30 days.
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [success, failed, pending]
+        - in: query
+          name: provider
+          schema:
+            type: string
+            example: twilio
+        - in: query
+          name: resource_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated list of activity events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActivityEvent"
+                  nextCursor:
+                    type: string
+                    nullable: true
+        "400":
+          description: Invalid filters or time window exceeds 30 days
+
+  /activity/{id}:
+    get:
+      summary: Get Activity Event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Activity event with provider calls
+        "404":
+          description: Event not found
+
+  /activity/providers/summary:
+    get:
+      summary: Provider Usage Summary
+      description: Aggregated stats per provider (total calls, errors, avg latency, fallbacks). Both `from` and `to` are required, max window 30 days.
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Provider aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderSummary"
+        "400":
+          description: Invalid or missing date range
+
 components:
   securitySchemes:
     cookieAuth:
@@ -399,3 +513,75 @@ components:
                 operator: "eq"
                 value: "Gold"
                 type: "string"
+
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorType:
+          type: string
+          enum: [user, system, api_key]
+        category:
+          type: string
+          enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
+        action:
+          type: string
+          enum:
+            [
+              send_attempt,
+              send_success,
+              send_failed,
+              fallback,
+              provider_error,
+              rate_limit,
+              created,
+              updated,
+              deleted,
+            ]
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+          example: twilio
+        correlationId:
+          type: string
+          description: Stable across a full chain. Auto-generated if absent.
+        severity:
+          type: string
+          enum: [debug, info, warn, error]
+        status:
+          type: string
+          enum: [success, failed, pending]
+        durationMs:
+          type: integer
+          nullable: true
+        meta:
+          type: object
+          description: JSONB — redacted payload metadata, error codes, fallback info
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ProviderSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+          example: twilio
+        totalCalls:
+          type: integer
+        avgDurationMs:
+          type: number
+          nullable: true
+        errorCount:
+          type: integer
+        fallbackCount:
+          type: integer

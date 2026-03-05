@@ -1,5 +1,6 @@
 import { prisma } from "@reachdem/database";
 import { GroupService } from "./group.service";
+import type { GetGroupContactsOptions } from "@reachdem/shared";
 
 /** Helper for chunking large arrays */
 function chunkArray<T>(array: T[], size: number): T[][] {
@@ -15,7 +16,7 @@ export class GroupMemberService {
   static async getGroupContacts(
     groupId: string,
     organizationId: string,
-    options: { limit: number; cursor?: string | null }
+    options: GetGroupContactsOptions
   ) {
     // Enforce group identity and workspace bounds
     await GroupService.getGroupById(groupId, organizationId);

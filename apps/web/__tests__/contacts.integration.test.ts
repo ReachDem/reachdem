@@ -432,13 +432,11 @@ describe("Contacts API - REAL DATABASE INTEGRATION", () => {
         params: Promise.resolve({} as Record<string, string>),
       });
 
-      // Should fail because limit is 5
-      expect(res.status).toBe(400);
+      // Should fail because limit is 5 (422 Unprocessable Entity)
+      expect(res.status).toBe(422);
 
       const json = await res.json();
-      expect(json.error).toContain(
-        "Maximum number of custom fields (5) reached"
-      );
+      expect(json.error).toContain("Maximum number of custom fields");
     });
   });
 

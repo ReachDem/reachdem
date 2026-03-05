@@ -1,27 +1,18 @@
 import { prisma } from "@reachdem/database";
-import { SegmentNode } from "@reachdem/shared";
-
-type CreateSegmentInput = {
-  organizationId: string;
-  name: string;
-  description?: string;
-  definition: SegmentNode;
-};
-
-type UpdateSegmentInput = {
-  organizationId: string;
-  segmentId: string;
-  name?: string;
-  description?: string;
-  definition?: SegmentNode;
-};
+import type {
+  CreateSegmentInput,
+  UpdateSegmentInput,
+  GetSegmentsOptions,
+} from "@reachdem/shared";
 
 export class SegmentService {
   static async getSegments(
     organizationId: string,
-    limit = 50,
-    cursor?: string
+    options: GetSegmentsOptions = {}
   ) {
+    const limit = options.limit ?? 50;
+    const cursor = options.cursor;
+
     const items = await prisma.segment.findMany({
       where: { organizationId },
       take: limit,

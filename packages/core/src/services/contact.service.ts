@@ -5,26 +5,17 @@ import {
 } from "../utils/contact-fields";
 import { compileSegmentToPrismaWhere } from "../utils/segment-compiler";
 import { SegmentService } from "./segment.service";
+import type {
+  CreateContactInput,
+  UpdateContactInput,
+  GetContactsOptions,
+} from "@reachdem/shared";
 
 export class ContactService {
   /**
    * Create a new contact
    */
-  static async createContact(
-    organizationId: string,
-    data: {
-      name: string;
-      firstName?: string | null;
-      lastName?: string | null;
-      email?: string | null;
-      phoneE164?: string | null;
-      company?: string | null;
-      jobTitle?: string | null;
-      city?: string | null;
-      country?: string | null;
-      customFields?: Record<string, unknown> | null;
-    }
-  ) {
+  static async createContact(organizationId: string, data: CreateContactInput) {
     // Validation: Must have either phone or email
     if (
       (!data.phoneE164 || data.phoneE164.length === 0) &&
@@ -68,7 +59,7 @@ export class ContactService {
    */
   static async getContacts(
     organizationId: string,
-    options: { q?: string | null; page: number; limit: number }
+    options: GetContactsOptions
   ) {
     const skip = (options.page - 1) * options.limit;
     const whereClause: Prisma.ContactWhereInput = {
@@ -130,20 +121,9 @@ export class ContactService {
   static async updateContact(
     id: string,
     organizationId: string,
-    data: {
-      name?: string;
-      firstName?: string | null;
-      lastName?: string | null;
-      email?: string | null;
-      phoneE164?: string | null;
-      company?: string | null;
-      jobTitle?: string | null;
-      city?: string | null;
-      country?: string | null;
-      customFields?: Record<string, unknown> | null;
-    }
+    data: UpdateContactInput
   ) {
-    const existingContact = await this.getContactById(id, organizationId); // Also verifies ownership and existance
+    const existingContact = await this.getContactById(id, organizationId);
 
     // Logic check: ensure update doesn't leave contact without routing info
     const resultingPhone =
@@ -195,7 +175,6 @@ export class ContactService {
    * Soft Delete a Contact
    */
   static async deleteContact(id: string, organizationId: string) {
-    // Ensures ownership before delete
     await this.getContactById(id, organizationId);
 
     await prisma.contact.update({
@@ -221,7 +200,6 @@ export class ContactService {
       segmentId
     );
 
-    // Compile the dynamic AST JSON into a Prisma Where clause
     const baseWhere = compileSegmentToPrismaWhere(
       organizationId,
       segment.definition as any
@@ -254,7 +232,7 @@ export class ContactService {
           phoneE164: true,
           email: true,
           gender: true,
-        }, // Safe basic DTO
+        },
       }),
       prisma.contact.count({ where: finalWhere }),
     ]);

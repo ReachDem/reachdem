@@ -1,16 +1,15 @@
 import { prisma, Prisma } from "@reachdem/database";
+import type {
+  CreateGroupInput,
+  UpdateGroupInput,
+  GetGroupsOptions,
+} from "@reachdem/shared";
 
 export class GroupService {
   /**
    * Create a new contact group within an organization
    */
-  static async createGroup(
-    organizationId: string,
-    data: {
-      name: string;
-      description?: string | null;
-    }
-  ) {
+  static async createGroup(organizationId: string, data: CreateGroupInput) {
     // Enforce case-insensitive unique name constraint within the workspace
     const existingName = await prisma.group.findFirst({
       where: {
@@ -39,10 +38,7 @@ export class GroupService {
   /**
    * Get paginated contact groups
    */
-  static async getGroups(
-    organizationId: string,
-    options: { limit: number; cursor?: string | null }
-  ) {
+  static async getGroups(organizationId: string, options: GetGroupsOptions) {
     const limit = Math.min(options.limit, 100);
 
     const [groups, total] = await Promise.all([
@@ -104,10 +100,7 @@ export class GroupService {
   static async updateGroup(
     id: string,
     organizationId: string,
-    data: {
-      name?: string;
-      description?: string | null;
-    }
+    data: UpdateGroupInput
   ) {
     const group = await this.getGroupById(id, organizationId);
 

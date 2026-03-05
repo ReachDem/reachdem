@@ -14,9 +14,6 @@ export const groupSchema = z.object({
     .optional(),
 });
 
-export type CreateGroupInput = z.infer<typeof groupSchema>;
-export type UpdateGroupInput = z.infer<typeof groupSchema>;
-
 // Schema for bulk adding contact IDs to a group
 export const bulkGroupMembersSchema = z.object({
   contact_ids: z
