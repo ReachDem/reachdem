@@ -7,6 +7,7 @@ export * from "./services/contact-field.service";
 export * from "./services/group.service";
 export * from "./services/group-member.service";
 export * from "./services/segment.service";
+export * from "./services/segment-preview.service";
 export * from "./services/activity-logger.service";
 export * from "./services/send-sms.usecase";
 export * from "./services/composite-sms-sender";
