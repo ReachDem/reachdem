@@ -93,7 +93,7 @@ const data = {
         },
         {
           title: "Segments",
-          url: "#",
+          url: "/contacts/segments",
           icon: IconFilter,
         },
       ],

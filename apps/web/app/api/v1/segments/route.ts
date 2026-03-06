@@ -12,11 +12,10 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
 
     const limit = limitParam ? parseInt(limitParam, 10) : 50;
 
-    const result = await SegmentService.getSegments(
-      organizationId,
+    const result = await SegmentService.getSegments(organizationId, {
       limit,
-      cursor || undefined
-    );
+      cursor: cursor || undefined,
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to list segments:", error);
