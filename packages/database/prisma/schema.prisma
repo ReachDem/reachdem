@@ -99,6 +99,8 @@ model Organization {
   groups         Group[]
   segments       Segment[]
   activityEvents ActivityEvent[]
+  smsConfig      WorkspaceSmsConfig?
+  messages       Message[]
 
   @@map("organization")
 }
@@ -348,4 +350,85 @@ model ProviderCall {
   @@index([activityEventId])
   @@index([organizationId, createdAt])
   @@map("provider_call")
+}
+
+// ─── SMS Messaging Models ─────────────────────────────────────────────────────
+
+enum SmsProvider {
+  twilio
+  infobip
+  stub
+}
+
+enum MessageChannel {
+  sms
+}
+
+enum MessageStatus {
+  queued
+  sent
+  failed
+}
+
+enum AttemptStatus {
+  queued
+  sent
+  failed
+}
+
+model WorkspaceSmsConfig {
+  id                 String        @id @default(uuid())
+  organizationId     String        @unique
+  primaryProvider    SmsProvider
+  secondaryProviders SmsProvider[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_sms_config")
+}
+
+model Message {
+  id               String         @id @default(cuid())
+  organizationId   String
+  channel          MessageChannel @default(sms)
+  toHashed         String // SHA-256 of full E.164 number
+  toLast4          String // Last 4 digits for display/debug
+  from             String // Sender ID
+  text             String // Content (in clear for MVP)
+  status           MessageStatus  @default(queued)
+  providerSelected String? // Name of the winning provider
+  correlationId    String         @default(uuid())
+  idempotencyKey   String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  attempts     MessageAttempt[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("message")
+}
+
+model MessageAttempt {
+  id                String        @id @default(uuid())
+  messageId         String
+  organizationId    String
+  provider          String
+  attemptNo         Int
+  status            AttemptStatus
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String? // Truncated (max 500 chars)
+  durationMs        Int
+  createdAt         DateTime      @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([organizationId, createdAt])
+  @@map("message_attempt")
 }

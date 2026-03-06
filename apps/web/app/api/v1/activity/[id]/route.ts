@@ -8,6 +8,7 @@ export const GET = withWorkspace(async ({ organizationId, params }) => {
     const event = await ActivityLogger.getEventById(organizationId, id);
     return NextResponse.json(event);
   } catch (error: any) {
+    console.error(`Error fetching activity event by ID:`, error);
     if (error.message === "NOT_FOUND") {
       return NextResponse.json(
         { error: "Activity event not found" },
