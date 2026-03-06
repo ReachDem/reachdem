@@ -30,6 +30,3 @@ export const updateContactSchema = baseContactSchema.partial().refine(() => {
   // that they aren't deleting the *last* remaining contact method.
   return true;
 });
-
-export type CreateContactInput = z.infer<typeof createContactSchema>;
-export type UpdateContactInput = z.infer<typeof updateContactSchema>;

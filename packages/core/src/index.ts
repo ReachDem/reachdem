@@ -7,4 +7,6 @@ export * from "./services/contact-field.service";
 export * from "./services/group.service";
 export * from "./services/group-member.service";
 export * from "./services/segment.service";
+export * from "./services/activity-logger.service";
 export * from "./utils/segment-compiler";
+export * from "./utils/pii-scrubber";

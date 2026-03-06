@@ -91,13 +91,14 @@ model Organization {
   metadata  String?
   createdAt DateTime @default(now())
 
-  members       Member[]
-  invitations   Invitation[]
-  sessions      Session[]
-  contacts      Contact[]
-  contactFields ContactFieldDefinition[]
-  groups        Group[]
-  segments      Segment[]
+  members        Member[]
+  invitations    Invitation[]
+  sessions       Session[]
+  contacts       Contact[]
+  contactFields  ContactFieldDefinition[]
+  groups         Group[]
+  segments       Segment[]
+  activityEvents ActivityEvent[]
 
   @@map("organization")
 }
@@ -239,4 +240,112 @@ model Segment {
 
   @@index([organizationId])
   @@map("segment")
+}
+
+// ─── Activity Log Enums ───────────────────────────────────────────────────────
+
+enum ActorType {
+  user
+  system
+  api_key
+}
+
+enum EventCategory {
+  sms
+  email
+  whatsapp
+  contacts
+  links
+  auth
+  billing
+  system
+}
+
+enum EventAction {
+  send_attempt
+  send_success
+  send_failed
+  fallback
+  provider_error
+  rate_limit
+  created
+  updated
+  deleted
+}
+
+enum ResourceType {
+  message
+  campaign
+  segment
+  group
+  contact
+  webhook
+}
+
+enum EventSeverity {
+  debug
+  info
+  warn
+  error
+}
+
+enum EventStatus {
+  success
+  failed
+  pending
+}
+
+// ─── Activity Log Models ──────────────────────────────────────────────────────
+
+model ActivityEvent {
+  id                String        @id @default(uuid())
+  organizationId    String
+  actorType         ActorType     @default(system)
+  actorId           String? // User ID or service name
+  category          EventCategory
+  action            EventAction
+  resourceType      ResourceType?
+  resourceId        String?
+  provider          String? // e.g. twilio, infobip, sendgrid
+  providerRequestId String? // Provider-side message/request ID
+  correlationId     String // Stable across a full chain (auto-generated if absent)
+  idempotencyKey    String?
+  severity          EventSeverity @default(info)
+  status            EventStatus
+  durationMs        Int?
+  meta              Json? // JSONB: error codes, fallback info, redacted payloads
+  expiresAt         DateTime? // For future retention/archival policy
+  createdAt         DateTime      @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerCalls ProviderCall[]
+
+  @@index([organizationId])
+  @@index([correlationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, category, createdAt])
+  @@index([organizationId, provider, createdAt])
+  @@map("activity_event")
+}
+
+model ProviderCall {
+  id              String   @id @default(uuid())
+  organizationId  String
+  activityEventId String
+  provider        String // e.g. twilio, infobip
+  endpoint        String // Path only, no sensitive IDs (e.g. /2010-04-01/Accounts/***/Messages)
+  method          String // GET, POST, etc.
+  requestMeta     Json? // Redacted request details (never raw PII)
+  responseMeta    Json? // Redacted response details
+  httpStatus      Int?
+  errorCode       String?
+  errorMessage    String? // Truncated (max 500 chars)
+  durationMs      Int
+  createdAt       DateTime @default(now())
+
+  activityEvent ActivityEvent @relation(fields: [activityEventId], references: [id], onDelete: Cascade)
+
+  @@index([activityEventId])
+  @@index([organizationId, createdAt])
+  @@map("provider_call")
 }

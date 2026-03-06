@@ -1,6 +1,10 @@
 import { prisma, Prisma } from "@reachdem/database";
 import { MAX_CUSTOM_FIELDS_PER_ORG } from "../utils/contact-fields";
-import { ContactFieldError } from "../types/contacts";
+import type {
+  CreateContactFieldInput,
+  UpdateContactFieldInput,
+} from "@reachdem/shared";
+import { ContactFieldError } from "@reachdem/shared";
 
 export class ContactFieldService {
   /**
@@ -18,13 +22,7 @@ export class ContactFieldService {
    */
   static async createContactField(
     organizationId: string,
-    data: {
-      key: string;
-      label: string;
-      type: "TEXT" | "NUMBER" | "BOOLEAN" | "URL" | "DATE" | "SELECT";
-      isRequired?: boolean;
-      options?: string[] | null;
-    }
+    data: CreateContactFieldInput
   ) {
     // Enforce quota
     const count = await prisma.contactFieldDefinition.count({
@@ -89,14 +87,9 @@ export class ContactFieldService {
   static async updateContactField(
     id: string,
     organizationId: string,
-    data: {
-      label?: string;
-      isRequired?: boolean;
-      options?: string[] | null;
-      isActive?: boolean;
-    }
+    data: UpdateContactFieldInput
   ) {
-    await this.getContactFieldById(id, organizationId); // security ownership check
+    await this.getContactFieldById(id, organizationId);
 
     return prisma.contactFieldDefinition.update({
       where: { id },
@@ -116,7 +109,7 @@ export class ContactFieldService {
    * Delete a contact field definition
    */
   static async deleteContactField(id: string, organizationId: string) {
-    await this.getContactFieldById(id, organizationId); // security check
+    await this.getContactFieldById(id, organizationId);
 
     await prisma.contactFieldDefinition.delete({
       where: { id },
@@ -126,5 +119,5 @@ export class ContactFieldService {
   }
 }
 
-export { ContactFieldError } from "../types/contacts";
-export type { ContactFieldErrorCode } from "../types/contacts";
+export { ContactFieldError } from "@reachdem/shared";
+export type { ContactFieldErrorCode } from "@reachdem/shared";

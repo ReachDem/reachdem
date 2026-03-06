@@ -43,6 +43,3 @@ export const updateContactFieldSchema = baseObj
       path: ["options"],
     }
   );
-
-export type CreateContactFieldInput = z.infer<typeof createContactFieldSchema>;
-export type UpdateContactFieldInput = z.infer<typeof updateContactFieldSchema>;
