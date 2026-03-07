@@ -7,14 +7,13 @@ import {
   SettingsCard,
   SettingsCardContent,
   SettingsCardDescription,
-  SettingsCardFooter,
   SettingsCardHeader,
   SettingsCardTitle,
 } from "@/components/settings-card";
 import { DeleteOrganizationButton } from "./_components/delete-organization-button";
 
 export default async function WorkspaceSettingsPage() {
-  const { session, member } = await requireOrgMembership();
+  const { member } = await requireOrgMembership();
   const org = await getActiveOrganization();
 
   if (!org) {

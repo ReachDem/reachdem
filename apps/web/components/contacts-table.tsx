@@ -10,7 +10,6 @@ import {
   IconSearch,
   IconTrash,
   IconUpload,
-  IconUser,
   IconCopy,
 } from "@tabler/icons-react";
 import { type ColumnDef } from "@tanstack/react-table";

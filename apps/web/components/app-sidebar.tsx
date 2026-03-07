@@ -1,7 +1,6 @@
 "use client";
 
 import type * as React from "react";
-import Image from "next/image";
 import { authClient, useSession } from "@reachdem/auth/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
