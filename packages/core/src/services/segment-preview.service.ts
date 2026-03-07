@@ -7,7 +7,7 @@ export class SegmentPreviewService {
    */
   static async evaluateSegmentDefinition(
     organizationId: string,
-    definition: any,
+    definition: SegmentNode,
     limit = 50,
     cursor?: string,
     q?: string
