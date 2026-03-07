@@ -92,14 +92,25 @@ function compileCondition(
  * Compiles a Segment JSON definition into a secure Prisma Query (WhereInput).
  * Automatically scopes the query to the provided organizationId to prevent Cross-Workspace leakage.
  */
+const MAX_COMPILE_DEPTH = 10;
+
 export function compileSegmentToPrismaWhere(
   organizationId: string,
   definition: SegmentNode
 ): Prisma.ContactWhereInput {
-  const compileNode = (node: SegmentNode): Prisma.ContactWhereInput => {
+  const compileNode = (
+    node: SegmentNode,
+    depth = 0
+  ): Prisma.ContactWhereInput => {
+    if (depth > MAX_COMPILE_DEPTH) {
+      throw new Error("Segment definition exceeds maximum nesting depth");
+    }
+
     if ("op" in node) {
       // Logical Node (AND / OR)
-      const childrenWheres = node.children.map(compileNode);
+      const childrenWheres = node.children.map((child) =>
+        compileNode(child, depth + 1)
+      );
       if (node.op === "AND") {
         return { AND: childrenWheres };
       } else if (node.op === "OR") {
