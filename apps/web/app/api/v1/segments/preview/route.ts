@@ -23,7 +23,7 @@ export const POST = withWorkspace(async ({ req, organizationId }) => {
     const cursor = url.searchParams.get("cursor");
     const q = url.searchParams.get("q") || undefined;
 
-    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 50;
+    const limit = limitParam ? Math.max(1, Math.min(parseInt(limitParam, 10) || 0, 100)) : 50;
 
     const evalResult = await SegmentService.evaluateSegmentDefinition(
       organizationId,
