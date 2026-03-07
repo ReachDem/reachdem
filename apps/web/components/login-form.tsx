@@ -40,7 +40,7 @@ export function LoginForm({
   };
 
   const handleEmailPasswordLogin = async (
-    e: React.FormEvent<HTMLFormElement>,
+    e: React.FormEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
     setError(null);
@@ -96,8 +96,8 @@ export function LoginForm({
                 {loading ? "Connecting..." : "Login with Google"}
               </Button>
             </div>
-            <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-              <span className="relative z-10 bg-background px-2 text-muted-foreground">
+            <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+              <span className="bg-background text-muted-foreground relative z-10 px-2">
                 Or continue with
               </span>
             </div>
@@ -134,7 +134,7 @@ export function LoginForm({
                 />
               </div>
               {error && (
-                <p className="text-sm text-destructive text-center">{error}</p>
+                <p className="text-destructive text-center text-sm">{error}</p>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Connecting..." : "Login"}
@@ -149,7 +149,7 @@ export function LoginForm({
           </div>
         </CardContent>
       </Card>
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
+      <div className="text-muted-foreground [&_a]:hover:text-primary text-center text-xs text-balance [&_a]:underline [&_a]:underline-offset-4">
         By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
         and <a href="#">Privacy Policy</a>.
       </div>

@@ -1,0 +1,23 @@
+{
+  "name": "@reachdem/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reachdem/database": "workspace:*",
+    "@reachdem/shared": "workspace:*",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
+  }
+}

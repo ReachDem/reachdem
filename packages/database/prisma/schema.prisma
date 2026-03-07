@@ -7,21 +7,20 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Better Auth Core Models ──────────────────────────────────────────────────
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          String?   // Added for new onboarding flow
+  id                    String   @id
+  name                  String
+  email                 String   @unique
+  emailVerified         Boolean  @default(false)
+  image                 String?
+  role                  String? // Added for new onboarding flow
   defaultOrganizationId String? // Added for new onboarding flow
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   accounts    Account[]
   sessions    Session[]
@@ -32,15 +31,15 @@ model User {
 }
 
 model Session {
-  id                     String   @id
-  token                  String   @unique
-  userId                 String
-  expiresAt              DateTime
-  ipAddress              String?
-  userAgent              String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  activeOrganizationId   String?
+  id                   String   @id
+  token                String   @unique
+  userId               String
+  expiresAt            DateTime
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  activeOrganizationId String?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
@@ -92,9 +91,16 @@ model Organization {
   metadata  String?
   createdAt DateTime @default(now())
 
-  members     Member[]
-  invitations Invitation[]
-  sessions    Session[]
+  members        Member[]
+  invitations    Invitation[]
+  sessions       Session[]
+  contacts       Contact[]
+  contactFields  ContactFieldDefinition[]
+  groups         Group[]
+  segments       Segment[]
+  activityEvents ActivityEvent[]
+  smsConfig      WorkspaceSmsConfig?
+  messages       Message[]
 
   @@map("organization")
 }
@@ -130,4 +136,299 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender {
+  UNKNOWN
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContactFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  URL
+  SELECT
+}
+
+// ─── ReachDem App Models ──────────────────────────────────────────────────────
+
+model ContactFieldDefinition {
+  id             String           @id @default(uuid())
+  organizationId String
+  key            String
+  label          String
+  type           ContactFieldType
+  options        Json? // Array of strings if type is SELECT
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("contact_field_definition")
+}
+
+model Contact {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  phoneE164      String?
+  email          String?
+  gender         Gender?   @default(UNKNOWN)
+  birthdate      DateTime? @db.Date // Only store date component
+  address        String?
+  work           String?
+  enterprise     String?
+  customFields   Json? // Map of key to value
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // Soft delete
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  GroupMember[]
+
+  @@index([organizationId])
+  @@index([phoneE164])
+  @@index([email])
+  @@map("contact")
+}
+
+model Group {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      GroupMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("group")
+}
+
+model GroupMember {
+  groupId   String
+  contactId String
+  addedAt   DateTime @default(now())
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, contactId])
+  @@index([contactId])
+  @@map("group_member")
+}
+
+model Segment {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  definition     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("segment")
+}
+
+// ─── Activity Log Enums ───────────────────────────────────────────────────────
+
+enum ActorType {
+  user
+  system
+  api_key
+}
+
+enum EventCategory {
+  sms
+  email
+  whatsapp
+  contacts
+  links
+  auth
+  billing
+  system
+}
+
+enum EventAction {
+  send_attempt
+  send_success
+  send_failed
+  fallback
+  provider_error
+  rate_limit
+  created
+  updated
+  deleted
+}
+
+enum ResourceType {
+  message
+  campaign
+  segment
+  group
+  contact
+  webhook
+}
+
+enum EventSeverity {
+  debug
+  info
+  warn
+  error
+}
+
+enum EventStatus {
+  success
+  failed
+  pending
+}
+
+// ─── Activity Log Models ──────────────────────────────────────────────────────
+
+model ActivityEvent {
+  id                String        @id @default(uuid())
+  organizationId    String
+  actorType         ActorType     @default(system)
+  actorId           String? // User ID or service name
+  category          EventCategory
+  action            EventAction
+  resourceType      ResourceType?
+  resourceId        String?
+  provider          String? // e.g. twilio, infobip, sendgrid
+  providerRequestId String? // Provider-side message/request ID
+  correlationId     String // Stable across a full chain (auto-generated if absent)
+  idempotencyKey    String?
+  severity          EventSeverity @default(info)
+  status            EventStatus
+  durationMs        Int?
+  meta              Json? // JSONB: error codes, fallback info, redacted payloads
+  expiresAt         DateTime? // For future retention/archival policy
+  createdAt         DateTime      @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerCalls ProviderCall[]
+
+  @@index([organizationId])
+  @@index([correlationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, category, createdAt])
+  @@index([organizationId, provider, createdAt])
+  @@map("activity_event")
+}
+
+model ProviderCall {
+  id              String   @id @default(uuid())
+  organizationId  String
+  activityEventId String
+  provider        String // e.g. twilio, infobip
+  endpoint        String // Path only, no sensitive IDs (e.g. /2010-04-01/Accounts/***/Messages)
+  method          String // GET, POST, etc.
+  requestMeta     Json? // Redacted request details (never raw PII)
+  responseMeta    Json? // Redacted response details
+  httpStatus      Int?
+  errorCode       String?
+  errorMessage    String? // Truncated (max 500 chars)
+  durationMs      Int
+  createdAt       DateTime @default(now())
+
+  activityEvent ActivityEvent @relation(fields: [activityEventId], references: [id], onDelete: Cascade)
+
+  @@index([activityEventId])
+  @@index([organizationId, createdAt])
+  @@map("provider_call")
+}
+
+// ─── SMS Messaging Models ─────────────────────────────────────────────────────
+
+enum SmsProvider {
+  twilio
+  infobip
+  stub
+}
+
+enum MessageChannel {
+  sms
+}
+
+enum MessageStatus {
+  queued
+  sent
+  failed
+}
+
+enum AttemptStatus {
+  queued
+  sent
+  failed
+}
+
+model WorkspaceSmsConfig {
+  id                 String        @id @default(uuid())
+  organizationId     String        @unique
+  primaryProvider    SmsProvider
+  secondaryProviders SmsProvider[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_sms_config")
+}
+
+model Message {
+  id               String         @id @default(cuid())
+  organizationId   String
+  channel          MessageChannel @default(sms)
+  toHashed         String // SHA-256 of full E.164 number
+  toLast4          String // Last 4 digits for display/debug
+  from             String // Sender ID
+  text             String // Content (in clear for MVP)
+  status           MessageStatus  @default(queued)
+  providerSelected String? // Name of the winning provider
+  correlationId    String         @default(uuid())
+  idempotencyKey   String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  attempts     MessageAttempt[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("message")
+}
+
+model MessageAttempt {
+  id                String        @id @default(uuid())
+  messageId         String
+  organizationId    String
+  provider          String
+  attemptNo         Int
+  status            AttemptStatus
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String? // Truncated (max 500 chars)
+  durationMs        Int
+  createdAt         DateTime      @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([organizationId, createdAt])
+  @@map("message_attempt")
 }

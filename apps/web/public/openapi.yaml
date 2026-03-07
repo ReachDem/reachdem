@@ -1,0 +1,789 @@
+openapi: 3.1.0
+info:
+  title: ReachDem API
+  description: Monorepo Backend API Operations for Contacts, Groups, and Segments management.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+
+security:
+  - cookieAuth: []
+
+paths:
+  /contacts:
+    get:
+      summary: List all Contacts
+      description: Returns a paginated list of contacts for the active workspace.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: q
+          description: Search term (name, phone, email)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedContacts"
+
+  /contacts/{id}:
+    get:
+      summary: Get Contact by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Contact Details
+    patch:
+      summary: Update a Contact
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any sub-field from CreateContactDto
+      responses:
+        "200":
+          description: Updated Contact
+    delete:
+      summary: Soft Delete Contact
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Successfully deleted
+
+    post:
+      summary: Create a Contact
+      description: Creates a new contact in the active workspace. Requires at least an email or phone number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactDto"
+      responses:
+        "201":
+          description: Contact Created
+
+  /groups:
+    get:
+      summary: List all Groups
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Create a Group
+      description: Create a stationary static group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupDto"
+      responses:
+        "201":
+          description: Group Created
+
+  /groups/{id}:
+    get:
+      summary: Get Group Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Group Entity
+    patch:
+      summary: Update Group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupDto"
+      responses:
+        "200":
+          description: Group Updated
+    delete:
+      summary: Delete Group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Group Removed
+
+  /groups/{id}/members:
+    post:
+      summary: Add members to group
+      description: Bulk add up to 500 contacts at a time to a specified group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "201":
+          description: Members correctly added
+    delete:
+      summary: Remove members from group
+      description: Bulk remove up to 500 contacts from a group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "204":
+          description: Members properly stripped
+
+  /groups/{id}/contacts:
+    get:
+      summary: Get Paginated Members
+      description: List paginated contacts that reside exclusively inside this group definition.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Members Listed Here
+
+  /segments:
+    post:
+      summary: Create a Segment (Dynamic Audience)
+      description: Creates a Segment evaluating a recursive JSON logic tree securely.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSegmentDto"
+      responses:
+        "201":
+          description: Segment Created
+
+  /segments/{id}:
+    get:
+      summary: Get Segment Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Segment Information
+    delete:
+      summary: Delete Segment permanently
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Gone
+
+  /segments/{id}/contacts:
+    get:
+      summary: Evaluate Dynamic Audience
+      description: Evaluates the segments JSONAST locally against the Database and fetches a mapped list of compliant Contact identifiers.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: cursor
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Evaluated Segments List Response
+
+  /activity:
+    get:
+      summary: List Activity Events
+      description: Returns a paginated list of activity events for the workspace. Default window is 7 days, max 30 days.
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [success, failed, pending]
+        - in: query
+          name: provider
+          schema:
+            type: string
+            example: twilio
+        - in: query
+          name: resource_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated list of activity events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActivityEvent"
+                  nextCursor:
+                    type: string
+                    nullable: true
+        "400":
+          description: Invalid filters or time window exceeds 30 days
+
+  /activity/{id}:
+    get:
+      summary: Get Activity Event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Activity event with provider calls
+        "404":
+          description: Event not found
+
+  /activity/providers/summary:
+    get:
+      summary: Provider Usage Summary
+      description: Aggregated stats per provider (total calls, errors, avg latency, fallbacks). Both `from` and `to` are required, max window 30 days.
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Provider aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderSummary"
+        "400":
+          description: Invalid or missing date range
+
+  # ─── SMS Messaging ─────────────────────────────────────────────────────────
+
+  /sms/send:
+    post:
+      summary: Send an SMS
+      description: |
+        Sends an SMS via the workspace's configured primary provider,
+        with automatic fallback to secondary providers on retryable errors.
+        Idempotency is guaranteed per workspace using the `idempotency_key` field.
+      tags: [SMS]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSmsRequest"
+      responses:
+        "201":
+          description: SMS sent successfully (new request)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "200":
+          description: Idempotent response — message already exists for this key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "400":
+          description: Validation error (invalid E.164, empty text, etc.)
+        "422":
+          description: No SMS provider configured for this workspace
+
+  /sms/messages:
+    get:
+      summary: List Messages
+      description: Returns a paginated, workspace-scoped list of sent messages.
+      tags: [SMS]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, sent, failed]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated message list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageSummary"
+                  nextCursor:
+                    type: string
+                    nullable: true
+
+  /sms/messages/{id}:
+    get:
+      summary: Get Message Detail
+      description: Returns a single message with all its provider attempts.
+      tags: [SMS]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message detail with attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageDetail"
+        "404":
+          description: Message not found
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+  schemas:
+    # ─── SMS Schemas ──────────────────────────────────────────────────────────
+    SendSmsRequest:
+      type: object
+      required: [to, text, from, idempotency_key]
+      properties:
+        to:
+          type: string
+          description: Destination phone in E.164 format
+          example: "+2376XXXXXXXX"
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+        from:
+          type: string
+          description: Sender ID
+          example: "ReachDem"
+        idempotency_key:
+          type: string
+          maxLength: 128
+          example: "campaign_123:contact_456"
+
+    SendSmsResponse:
+      type: object
+      properties:
+        message_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, sent, failed]
+        correlation_id:
+          type: string
+          format: uuid
+        idempotent:
+          type: boolean
+          description: true if this was a duplicate idempotent request
+
+    MessageSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        channel:
+          type: string
+          enum: [sms]
+        toLast4:
+          type: string
+          example: "5678"
+        from:
+          type: string
+        status:
+          type: string
+          enum: [queued, sent, failed]
+        providerSelected:
+          type: string
+          nullable: true
+        correlationId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageAttemptSchema:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        attemptNo:
+          type: integer
+        status:
+          type: string
+          enum: [queued, sent, failed]
+        providerMessageId:
+          type: string
+          nullable: true
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageDetail:
+      allOf:
+        - $ref: "#/components/schemas/MessageSummary"
+        - type: object
+          properties:
+            attempts:
+              type: array
+              items:
+                $ref: "#/components/schemas/MessageAttemptSchema"
+
+    # ─── Existing Schemas ─────────────────────────────────────────────────────
+    PaginatedContacts:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        metadata:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+            totalPages:
+              type: integer
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phoneE164:
+          type: string
+          nullable: true
+        customFields:
+          type: object
+          additionalProperties: true
+
+    CreateContactDto:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          example: "john@example.com"
+        phoneE164:
+          type: string
+          example: "+1234567890"
+        customFields:
+          type: object
+          description: Valid JSON Hashmap corresponding to Organization Definitions
+          example: { vip_rank: "Gold" }
+
+    CreateGroupDto:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "All Stars"
+        description:
+          type: string
+          example: "The premium member tier limit."
+
+    CreateSegmentDto:
+      type: object
+      required:
+        - name
+        - definition
+      properties:
+        name:
+          type: string
+          example: "Gold Members living in Paris"
+        definition:
+          type: object
+          description: "A recursive Logical Tree representing Prisma clauses"
+          example:
+            op: "AND"
+            children:
+              - field: "city"
+                operator: "eq"
+                value: "Paris"
+                type: "string"
+              - field: "custom.vip_rank"
+                operator: "eq"
+                value: "Gold"
+                type: "string"
+
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorType:
+          type: string
+          enum: [user, system, api_key]
+        category:
+          type: string
+          enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
+        action:
+          type: string
+          enum:
+            [
+              send_attempt,
+              send_success,
+              send_failed,
+              fallback,
+              provider_error,
+              rate_limit,
+              created,
+              updated,
+              deleted,
+            ]
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+          example: twilio
+        correlationId:
+          type: string
+          description: Stable across a full chain. Auto-generated if absent.
+        severity:
+          type: string
+          enum: [debug, info, warn, error]
+        status:
+          type: string
+          enum: [success, failed, pending]
+        durationMs:
+          type: integer
+          nullable: true
+        meta:
+          type: object
+          description: JSONB — redacted payload metadata, error codes, fallback info
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ProviderSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+          example: twilio
+        totalCalls:
+          type: integer
+        avgDurationMs:
+          type: number
+          nullable: true
+        errorCount:
+          type: integer
+        fallbackCount:
+          type: integer
