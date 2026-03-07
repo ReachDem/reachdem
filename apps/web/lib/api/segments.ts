@@ -49,7 +49,7 @@ export async function listSegments(params?: {
 
   const json = await res.json();
   return {
-    items: json.data ?? [],
+    items: json.items ?? [],
     meta: {
       total: json.meta?.total ?? 0,
       limit: json.meta?.limit ?? 50,
