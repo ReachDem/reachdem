@@ -12,6 +12,10 @@ const CONTACT_FIELD_ERROR_STATUS: Record<
     status: 409,
     message: "A custom field with this key already exists.",
   },
+  INVALID_TYPE: {
+    status: 400,
+    message: "The provided field type is invalid or unsupported.",
+  },
   QUOTA_EXCEEDED: {
     status: 422,
     message: "Maximum number of custom fields reached for this workspace.",

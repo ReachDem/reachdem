@@ -60,15 +60,26 @@ export type SegmentLogicalNode = {
 
 export type SegmentNode = SegmentConditionNode | SegmentLogicalNode;
 
-export const SegmentNodeSchema: z.ZodType<SegmentNode> = z.lazy(() =>
-  z.union([
-    SegmentConditionNodeSchema,
-    z.object({
-      op: SegmentOperatorSchema,
-      children: z.array(SegmentNodeSchema).min(1),
-    }),
-  ])
-);
+export const MAX_SEGMENT_DEPTH = 10;
+
+function segmentNodeSchema(depth = 0): z.ZodType<SegmentNode> {
+  if (depth >= MAX_SEGMENT_DEPTH) {
+    // At max depth only leaf conditions are allowed
+    return SegmentConditionNodeSchema;
+  }
+
+  return z.lazy(() =>
+    z.union([
+      SegmentConditionNodeSchema,
+      z.object({
+        op: SegmentOperatorSchema,
+        children: z.array(segmentNodeSchema(depth + 1)).min(1),
+      }),
+    ])
+  );
+}
+
+export const SegmentNodeSchema: z.ZodType<SegmentNode> = segmentNodeSchema();
 
 export const createSegmentSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),

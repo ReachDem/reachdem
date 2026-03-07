@@ -18,6 +18,7 @@ let getSegment: any;
 let updateSegment: any;
 let deleteSegment: any;
 let listSegmentContacts: any;
+let previewSegment: any;
 
 beforeAll(async () => {
   const route = await import("../app/api/v1/segments/route");
@@ -32,6 +33,9 @@ beforeAll(async () => {
   const contactsRoute =
     await import("../app/api/v1/segments/[id]/contacts/route");
   listSegmentContacts = contactsRoute.GET;
+
+  const previewRoute = await import("../app/api/v1/segments/preview/route");
+  previewSegment = previewRoute.POST;
 });
 
 // Mock Auth wrapper
@@ -180,6 +184,52 @@ describe("Segments API - REAL DATABASE INTEGRATION", () => {
 
     expect(respEval.status).toBe(200);
     const data = await respEval.json();
+    const found = data.items.some((c: any) => c.id === contact.id);
+    expect(found).toBe(true);
+  });
+
+  it("should preview a segment dynamically without creating it", async () => {
+    const definition: SegmentNode = {
+      op: "AND",
+      children: [
+        {
+          field: "address",
+          operator: "eq",
+          type: "string",
+          value: "PreviewCity",
+        },
+      ],
+    };
+
+    // Insert Contact matching the preview definition
+    const contact = await prisma.contact.create({
+      data: {
+        organizationId: REAL_ORG_ID,
+        name: "Preview Tester",
+        email: "preview@tester.local",
+        address: "PreviewCity",
+      },
+    });
+    createdContactIds.push(contact.id);
+
+    // Call the preview route
+    const reqPreview = new NextRequest(
+      "http://localhost:3000/api/v1/segments/preview",
+      {
+        method: "POST",
+        body: JSON.stringify({ definition }),
+      }
+    );
+
+    const respPreview = await previewSegment(reqPreview as any, {
+      params: Promise.resolve({} as Record<string, string>),
+    });
+
+    expect(respPreview.status).toBe(200);
+
+    const data = await respPreview.json();
+    expect(data.meta.total).toBeGreaterThanOrEqual(1);
+
     const found = data.items.some((c: any) => c.id === contact.id);
     expect(found).toBe(true);
   });

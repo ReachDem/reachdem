@@ -415,6 +415,108 @@ paths:
         "400":
           description: Invalid or missing date range
 
+  # ─── SMS Messaging ─────────────────────────────────────────────────────────
+
+  /sms/send:
+    post:
+      summary: Send an SMS
+      description: |
+        Sends an SMS via the workspace's configured primary provider,
+        with automatic fallback to secondary providers on retryable errors.
+        Idempotency is guaranteed per workspace using the `idempotency_key` field.
+      tags: [SMS]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSmsRequest"
+      responses:
+        "201":
+          description: SMS sent successfully (new request)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "200":
+          description: Idempotent response — message already exists for this key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "400":
+          description: Validation error (invalid E.164, empty text, etc.)
+        "422":
+          description: No SMS provider configured for this workspace
+
+  /sms/messages:
+    get:
+      summary: List Messages
+      description: Returns a paginated, workspace-scoped list of sent messages.
+      tags: [SMS]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, sent, failed]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated message list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageSummary"
+                  nextCursor:
+                    type: string
+                    nullable: true
+
+  /sms/messages/{id}:
+    get:
+      summary: Get Message Detail
+      description: Returns a single message with all its provider attempts.
+      tags: [SMS]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message detail with attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageDetail"
+        "404":
+          description: Message not found
+
 components:
   securitySchemes:
     cookieAuth:
@@ -685,110 +787,3 @@ components:
           type: integer
         fallbackCount:
           type: integer
-
-  # ─── SMS Messaging ─────────────────────────────────────────────────────────
-
-  /sms/send:
-    post:
-      summary: Send an SMS
-      description: |
-        Sends an SMS via the workspace's configured primary provider,
-        with automatic fallback to secondary providers on retryable errors.
-        Idempotency is guaranteed per workspace using the `idempotency_key` field.
-      tags: [SMS]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SendSmsRequest"
-      responses:
-        "201":
-          description: SMS sent successfully (new request)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SendSmsResponse"
-        "200":
-          description: Idempotent response — message already exists for this key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SendSmsResponse"
-        "400":
-          description: Validation error (invalid E.164, empty text, etc.)
-        "422":
-          description: No SMS provider configured for this workspace
-
-  /sms/messages:
-    get:
-      summary: List Messages
-      description: Returns a paginated, workspace-scoped list of sent messages.
-      tags: [SMS]
-      parameters:
-        - in: query
-          name: status
-          schema:
-            type: string
-            enum: [queued, sent, failed]
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Paginated message list
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/MessageSummary"
-                  nextCursor:
-                    type: string
-                    nullable: true
-
-  /sms/messages/{id}:
-    get:
-      summary: Get Message Detail
-      description: Returns a single message with all its provider attempts.
-      tags: [SMS]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Message detail with attempts
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageDetail"
-        "404":
-          description: Message not found
-
-# ─── New schemas (added below existing components.schemas) ──────────────────
-
-# NOTE: Add these inside the existing components.schemas block in the file.
-# They are shown here for clarity; the actual insertion is at the schemas level.

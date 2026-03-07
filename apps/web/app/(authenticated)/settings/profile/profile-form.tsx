@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { authClient, useSession } from "@reachdem/auth/client";
 import { toast } from "sonner";
 import { Loader2, Camera, Mail } from "lucide-react";
@@ -19,18 +22,60 @@ import {
 } from "@/components/settings-card";
 import { AvatarCropperDialog } from "@/components/avatar-cropper-dialog";
 
+const nameFormSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Le nom est requis.")
+    .max(32, "Un maximum de 32 caractères est autorisé."),
+});
+
+const passwordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Le mot de passe actuel est requis."),
+    newPassword: z
+      .string()
+      .min(8, "Le nouveau mot de passe doit contenir au moins 8 caractères."),
+    confirmPassword: z
+      .string()
+      .min(1, "La confirmation du mot de passe est requise."),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "Les nouveaux mots de passe ne correspondent pas.",
+    path: ["confirmPassword"],
+  });
+
+type NameFormValues = z.infer<typeof nameFormSchema>;
+type PasswordFormValues = z.infer<typeof passwordFormSchema>;
+
 export function ProfileForm() {
   const { data: session, isPending: isSessionLoading } = useSession();
   const user = session?.user;
 
-  // Form states
-  const [name, setName] = useState(user?.name || "");
-  const [isSavingName, setIsSavingName] = useState(false);
+  const nameForm = useForm<NameFormValues>({
+    resolver: zodResolver(nameFormSchema),
+    defaultValues: {
+      name: "",
+    },
+  });
 
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  useEffect(() => {
+    nameForm.reset({ name: user?.name ?? "" });
+  }, [nameForm, user?.name]);
+
+  const watchedName = nameForm.watch("name");
+  const watchedCurrentPassword = passwordForm.watch("currentPassword");
+  const watchedNewPassword = passwordForm.watch("newPassword");
+  const watchedConfirmPassword = passwordForm.watch("confirmPassword");
 
   // Avatar states
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +92,7 @@ export function ProfileForm() {
   }
 
   // Handle Avatar Selection
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       const imageUrl = URL.createObjectURL(file);
@@ -92,35 +137,24 @@ export function ProfileForm() {
   };
 
   // Handle Name Update
-  const handleSaveName = async () => {
-    if (!name.trim()) return;
-
-    setIsSavingName(true);
+  const handleSaveName = nameForm.handleSubmit(async (values) => {
     try {
       await authClient.updateUser({
-        name,
+        name: values.name,
       });
       toast.success("Nom mis à jour avec succès.");
-    } catch (error) {
+      nameForm.reset({ name: values.name });
+    } catch {
       toast.error("Erreur lors de la mise à jour du nom.");
-    } finally {
-      setIsSavingName(false);
     }
-  };
+  });
 
   // Handle Password Update
-  const handleSavePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) return;
-    if (newPassword !== confirmPassword) {
-      toast.error("Les nouveaux mots de passe ne correspondent pas.");
-      return;
-    }
-
-    setIsSavingPassword(true);
+  const handleSavePassword = passwordForm.handleSubmit(async (values) => {
     try {
       const res = await authClient.changePassword({
-        newPassword,
-        currentPassword,
+        newPassword: values.newPassword,
+        currentPassword: values.currentPassword,
         revokeOtherSessions: true,
       });
 
@@ -128,16 +162,12 @@ export function ProfileForm() {
         toast.error(res.error.message || "Erreur de mot de passe");
       } else {
         toast.success("Mot de passe mis à jour avec succès.");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+        passwordForm.reset();
       }
-    } catch (error) {
+    } catch {
       toast.error("Erreur lors de la mise à jour du mot de passe.");
-    } finally {
-      setIsSavingPassword(false);
     }
-  };
+  });
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : "U";
   const formattedDate = user?.createdAt
@@ -169,7 +199,9 @@ export function ProfileForm() {
         </SettingsCardHeader>
         <SettingsCardContent className="flex items-center gap-6 pt-6">
           <Avatar className="h-20 w-20 border shadow-sm">
-            <AvatarImage src={user?.image || ""} alt={user?.name || ""} />
+            {user?.image && (
+              <AvatarImage src={user.image} alt={user?.name || ""} />
+            )}
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-400 text-2xl font-semibold text-white">
               {userInitial}
             </AvatarFallback>
@@ -226,22 +258,33 @@ export function ProfileForm() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="max-w-md">
+          <form onSubmit={handleSaveName} className="max-w-md">
             <Input
               placeholder="Votre nom complet"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...nameForm.register("name")}
               maxLength={32}
             />
-          </div>
+            {nameForm.formState.errors.name && (
+              <p className="mt-2 text-sm text-red-500">
+                {nameForm.formState.errors.name.message}
+              </p>
+            )}
+          </form>
         </SettingsCardContent>
         <SettingsCardFooter>
           <p>Un maximum de 32 caractères est autorisé.</p>
           <Button
+            type="button"
             onClick={handleSaveName}
-            disabled={isSavingName || name === user?.name || !name.trim()}
+            disabled={
+              nameForm.formState.isSubmitting ||
+              watchedName === (user?.name ?? "") ||
+              !watchedName?.trim()
+            }
           >
-            {isSavingName && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {nameForm.formState.isSubmitting && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Enregistrer
           </Button>
         </SettingsCardFooter>
@@ -288,35 +331,47 @@ export function ProfileForm() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="max-w-md space-y-4">
+          <form onSubmit={handleSavePassword} className="max-w-md space-y-4">
             <div className="space-y-2">
               <Label htmlFor="current">Mot de passe actuel</Label>
               <Input
                 id="current"
                 type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                {...passwordForm.register("currentPassword")}
               />
+              {passwordForm.formState.errors.currentPassword && (
+                <p className="text-sm text-red-500">
+                  {passwordForm.formState.errors.currentPassword.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="new">Nouveau mot de passe</Label>
               <Input
                 id="new"
                 type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                {...passwordForm.register("newPassword")}
               />
+              {passwordForm.formState.errors.newPassword && (
+                <p className="text-sm text-red-500">
+                  {passwordForm.formState.errors.newPassword.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirmer le mot de passe</Label>
               <Input
                 id="confirm"
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                {...passwordForm.register("confirmPassword")}
               />
+              {passwordForm.formState.errors.confirmPassword && (
+                <p className="text-sm text-red-500">
+                  {passwordForm.formState.errors.confirmPassword.message}
+                </p>
+              )}
             </div>
-          </div>
+          </form>
         </SettingsCardContent>
         <SettingsCardFooter>
           <p>
@@ -324,15 +379,16 @@ export function ProfileForm() {
             et des symboles.
           </p>
           <Button
+            type="button"
             onClick={handleSavePassword}
             disabled={
-              isSavingPassword ||
-              !currentPassword ||
-              !newPassword ||
-              !confirmPassword
+              passwordForm.formState.isSubmitting ||
+              !watchedCurrentPassword ||
+              !watchedNewPassword ||
+              !watchedConfirmPassword
             }
           >
-            {isSavingPassword && (
+            {passwordForm.formState.isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Mettre à jour

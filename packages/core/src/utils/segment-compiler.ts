@@ -6,13 +6,20 @@ function compileCondition(
 ): Prisma.ContactWhereInput {
   const { field, operator, type, value } = node;
 
-  // Dates string need to be parsed to Date object for strict equality if type is 'date'
-  // but Prisma Postgres handles ISO string well in most conditions except some strict comparisons.
-  // For MVP, passing value directly. Prisma's client handles type coerction.
+  const STANDARD_DB_FIELDS = [
+    "name",
+    "email",
+    "phoneE164",
+    "gender",
+    "birthdate",
+    "address",
+    "enterprise",
+    "work",
+  ];
 
-  // Handle JSONB Custom Fields
-  if (field.startsWith("custom.")) {
-    const customKey = field.substring(7); // remove "custom."
+  // Handle JSONB Custom Fields (or fields strictly not in the DB schema)
+  if (field.startsWith("custom.") || !STANDARD_DB_FIELDS.includes(field)) {
+    const customKey = field.startsWith("custom.") ? field.substring(7) : field;
     switch (operator) {
       case "eq":
         if (value === null || value === undefined) {
@@ -39,8 +46,23 @@ function compileCondition(
   switch (operator) {
     case "eq":
       if (value === null || value === undefined) return { [field]: null };
+      if (field === "gender" && typeof value === "string") {
+        const search = value.toUpperCase();
+        return ["UNKNOWN", "MALE", "FEMALE", "OTHER"].includes(search)
+          ? { gender: search as any }
+          : { id: "00000000-0000-0000-0000-000000000000" };
+      }
       return { [field]: value };
     case "contains":
+      if (field === "gender" && typeof value === "string") {
+        const search = value.toUpperCase();
+        const matches = ["UNKNOWN", "MALE", "FEMALE", "OTHER"].filter((g) =>
+          g.includes(search)
+        );
+        return matches.length > 0
+          ? { gender: { in: matches as any[] } }
+          : { id: "00000000-0000-0000-0000-000000000000" };
+      }
       return { [field]: { contains: String(value), mode: "insensitive" } };
     case "in":
       return { [field]: { in: Array.isArray(value) ? value : [value] } };
@@ -70,14 +92,25 @@ function compileCondition(
  * Compiles a Segment JSON definition into a secure Prisma Query (WhereInput).
  * Automatically scopes the query to the provided organizationId to prevent Cross-Workspace leakage.
  */
+const MAX_COMPILE_DEPTH = 10;
+
 export function compileSegmentToPrismaWhere(
   organizationId: string,
   definition: SegmentNode
 ): Prisma.ContactWhereInput {
-  const compileNode = (node: SegmentNode): Prisma.ContactWhereInput => {
+  const compileNode = (
+    node: SegmentNode,
+    depth = 0
+  ): Prisma.ContactWhereInput => {
+    if (depth > MAX_COMPILE_DEPTH) {
+      throw new Error("Segment definition exceeds maximum nesting depth");
+    }
+
     if ("op" in node) {
       // Logical Node (AND / OR)
-      const childrenWheres = node.children.map(compileNode);
+      const childrenWheres = node.children.map((child) =>
+        compileNode(child, depth + 1)
+      );
       if (node.op === "AND") {
         return { AND: childrenWheres };
       } else if (node.op === "OR") {
