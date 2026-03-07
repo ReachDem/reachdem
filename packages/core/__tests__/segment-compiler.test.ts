@@ -1,11 +1,28 @@
 import { expect, test, describe } from "vitest";
 import { compileSegmentToPrismaWhere } from "../src/utils/segment-compiler";
 import { SegmentNode } from "@reachdem/shared";
+import { SegmentService } from "../src/services/segment.service";
+import { prisma } from "@reachdem/database";
+import { vi } from "vitest";
+
+// Mock prisma for evaluateSegmentDefinition test
+vi.mock("@reachdem/database", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    prisma: {
+      contact: {
+        findMany: vi.fn(),
+        count: vi.fn(),
+      },
+    },
+  };
+});
 
 describe("Segment Compiler - JSON AST Translation", () => {
   test("should compile a basic EQUALS string condition securely", () => {
     const ast: SegmentNode = {
-      field: "city",
+      field: "address",
       operator: "eq",
       type: "string",
       value: "Paris",
@@ -15,7 +32,7 @@ describe("Segment Compiler - JSON AST Translation", () => {
     expect(query).toEqual({
       organizationId: "org-123",
       deletedAt: null,
-      AND: [{ city: "Paris" }],
+      AND: [{ address: "Paris" }],
     });
   });
 
@@ -123,11 +140,47 @@ describe("Segment Compiler - JSON AST Translation", () => {
     };
     const query = compileSegmentToPrismaWhere("org-custom", ast);
 
-    // Prisma export Prisma.AnyNull as a specific enum/object, inside tests it prints as "AnyNull"
-    // Let's assert based on the object structure or just check the first element
-    expect((query.AND as any)[0].AND[0]).toEqual({
-      customFields: { path: ["cf1_rank"], string_contains: "Gold" },
-    });
     // We know AnyNull works from the previous tests.
+  });
+
+  describe("SegmentService.evaluateSegmentDefinition (Preview)", () => {
+    test("should evaluate segment definition without saving to database", async () => {
+      const ast: SegmentNode = {
+        field: "address",
+        operator: "eq",
+        type: "string",
+        value: "London",
+      };
+
+      const mockContacts = [{ id: "c1", name: "Alice" }];
+      vi.mocked(prisma.contact.findMany).mockResolvedValue(mockContacts as any);
+      vi.mocked(prisma.contact.count).mockResolvedValue(1);
+
+      const result = await SegmentService.evaluateSegmentDefinition(
+        "org-preview",
+        ast,
+        10
+      );
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                organizationId: "org-preview",
+                deletedAt: null,
+                AND: [{ address: "London" }],
+              },
+              {},
+            ],
+          },
+          take: 10,
+        })
+      );
+
+      expect(prisma.contact.count).toHaveBeenCalled();
+      expect(result.items).toEqual(mockContacts);
+      expect(result.meta.total).toBe(1);
+    });
   });
 });

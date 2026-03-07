@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@reachdem/auth/guards";
-import { SegmentPreviewService } from "@reachdem/core";
+import { SegmentService } from "@reachdem/core";
 import { SegmentNodeSchema } from "@reachdem/shared";
 
 // Evaluate a segment definition without saving it (Dry-Run Preview)
@@ -25,7 +25,7 @@ export const POST = withWorkspace(async ({ req, organizationId }) => {
 
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 50;
 
-    const evalResult = await SegmentPreviewService.evaluateSegmentDefinition(
+    const evalResult = await SegmentService.evaluateSegmentDefinition(
       organizationId,
       result.data,
       limit,
