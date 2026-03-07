@@ -75,7 +75,7 @@ export function LogicalGroup({
           <ToggleGroup
             type="single"
             value={node.op}
-            onValueChange={handleOpChange as any}
+            onValueChange={(val) => handleOpChange(val as "AND" | "OR")}
             className="bg-background h-8 rounded-md border p-0.5"
           >
             <ToggleGroupItem

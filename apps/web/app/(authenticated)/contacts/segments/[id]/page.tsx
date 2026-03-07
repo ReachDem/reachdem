@@ -4,6 +4,7 @@ import {
   getContactFieldDefinitions,
 } from "@/app/actions/segments";
 import { SegmentFormWrapper } from "@/components/segments/segment-form-wrapper";
+import { type Segment } from "@/lib/api/segments";
 import { notFound } from "next/navigation";
 
 export const metadata = { title: "Edit Segment – ReachDem" };
@@ -32,7 +33,7 @@ export default async function EditSegmentPage({
         >
           <SegmentFormWrapper
             mode="edit"
-            segment={segment as any}
+            segment={segment as unknown as Segment}
             customFields={customFields}
           />
         </Suspense>

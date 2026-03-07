@@ -151,14 +151,14 @@ export async function evaluateSegmentContactsPreview(
 
   if (!res.ok) {
     const json = await res.json().catch(() => ({}));
-    let errorMessage = "Échec de la prévisualisation du segment";
+    let errorMessage = "Failed to preview segment";
     if (json.error === "Invalid segment definition") {
       errorMessage =
-        "Certains groupes de règles sont vides ou incomplets. Veuillez ajouter des règles ou supprimer les groupes vides.";
+        "Some rule groups are empty or incomplete. Please add rules or remove empty groups.";
     } else if (json.error) {
       errorMessage = json.error;
     } else {
-      errorMessage += ` (Erreur ${res.status})`;
+      errorMessage += ` (Error ${res.status})`;
     }
     throw new Error(errorMessage);
   }

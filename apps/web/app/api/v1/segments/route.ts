@@ -10,7 +10,9 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
     const limitParam = url.searchParams.get("limit");
     const cursor = url.searchParams.get("cursor");
 
-    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 50;
+    const limit = limitParam
+      ? Math.max(1, Math.min(parseInt(limitParam, 10) || 0, 100))
+      : 50;
 
     const result = await SegmentService.getSegments(organizationId, {
       limit,

@@ -74,7 +74,7 @@ export function RuleNode({
 
     onChange({
       ...node,
-      field: val as any,
+      field: val as SegmentConditionNode["field"],
       type: newType,
       operator: node.operator,
     });
@@ -128,7 +128,7 @@ export function RuleNode({
           onValueChange={(val) =>
             onChange({
               ...node,
-              operator: val as any,
+              operator: val as SegmentConditionNode["operator"],
               value: val.includes("null") ? undefined : node.value,
             })
           }

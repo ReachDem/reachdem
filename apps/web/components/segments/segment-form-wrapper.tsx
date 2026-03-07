@@ -85,7 +85,7 @@ export function SegmentFormWrapper({
         limit: 20,
       });
       setPreviewContacts(res.items);
-      setPreviewTotal(res.meta?.total ?? (res as any).total ?? 0);
+      setPreviewTotal(res.meta?.total ?? 0);
       setHasPreviewed(true);
     } catch (err: any) {
       setPreviewError(err.message || "Failed to load preview");
