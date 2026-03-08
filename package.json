@@ -11,6 +11,8 @@
     "dev:all": "pnpm --filter web --filter links dev",
     "build": "pnpm --filter web build",
     "build:links": "pnpm --filter links build",
+    "dev:workers": "pnpm --filter @reachdem/workers dev",
+    "deploy:workers": "pnpm --filter @reachdem/workers deploy",
     "db:generate": "pnpm --filter @reachdem/database db:generate",
     "db:push": "pnpm --filter @reachdem/database db:push",
     "db:migrate": "pnpm --filter @reachdem/database db:migrate",
