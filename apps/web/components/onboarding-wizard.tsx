@@ -63,9 +63,22 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function OnboardingWizard() {
+interface OnboardingWizardProps {
+  mode?: "email-signup" | "social-onboarding";
+  initialName?: string;
+  initialEmail?: string;
+}
+
+export function OnboardingWizard({
+  mode = "email-signup",
+  initialName,
+  initialEmail,
+}: OnboardingWizardProps) {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
+  const isSocialOnboarding = mode === "social-onboarding";
+  const minimumStep = isSocialOnboarding ? 1 : 0;
+  const totalSteps = isSocialOnboarding ? 3 : 4;
+  const [currentStep, setCurrentStep] = useState(minimumStep);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,9 +122,10 @@ export function OnboardingWizard() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      password: "",
+      name: initialName ?? "",
+      email: initialEmail ?? "",
+      // Keep schema-compatible value when onboarding an already authenticated social user.
+      password: isSocialOnboarding ? "social-auth" : "",
       workspaceName: "",
       role: "Software Engineer",
     },
@@ -138,13 +152,30 @@ export function OnboardingWizard() {
 
   const handleBack = () => {
     setError(null);
-    setCurrentStep((prev) => prev - 1);
+    setCurrentStep((prev) => Math.max(minimumStep, prev - 1));
   };
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setError(null);
     try {
+      if (isSocialOnboarding) {
+        const result = await bootstrapWorkspace({
+          workspaceName: data.workspaceName,
+          role: data.role,
+        });
+
+        if (result?.error) {
+          setError(result.error);
+          setIsSubmitting(false);
+          return;
+        }
+
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
       // 1. Sign up user on the client to automatically manage session cookies
       const { error: signUpError } = await signUp.email({
         email: data.email,
@@ -304,8 +335,8 @@ export function OnboardingWizard() {
           <OnboardingStep>
             <OnboardingStepLeftWrapper
               title={steps[0].title}
-              currentStep={0}
-              totalSteps={4}
+              currentStep={0 - minimumStep}
+              totalSteps={totalSteps}
             >
               <form className="space-y-6 py-4">
                 <div className="space-y-4">
@@ -376,8 +407,8 @@ export function OnboardingWizard() {
           <OnboardingStep>
             <OnboardingStepLeftWrapper
               title={steps[1].title}
-              currentStep={1}
-              totalSteps={4}
+              currentStep={1 - minimumStep}
+              totalSteps={totalSteps}
               goBack={handleBack}
             >
               <form className="space-y-6 py-4">
@@ -419,8 +450,8 @@ export function OnboardingWizard() {
           <OnboardingStep>
             <OnboardingStepLeftWrapper
               title={steps[2].title}
-              currentStep={2}
-              totalSteps={4}
+              currentStep={2 - minimumStep}
+              totalSteps={totalSteps}
               goBack={handleBack}
             >
               <div className="flex h-full flex-col justify-between py-4">
@@ -480,8 +511,8 @@ export function OnboardingWizard() {
           <OnboardingStep>
             <OnboardingStepLeftWrapper
               title={steps[3].title}
-              currentStep={3}
-              totalSteps={4}
+              currentStep={3 - minimumStep}
+              totalSteps={totalSteps}
               goBack={handleBack}
             >
               <form
@@ -527,7 +558,13 @@ export function OnboardingWizard() {
                   className="w-full"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Creating your account..." : "Create account"}
+                  {isSubmitting
+                    ? isSocialOnboarding
+                      ? "Finalizing your workspace..."
+                      : "Creating your account..."
+                    : isSocialOnboarding
+                      ? "Finish setup"
+                      : "Create account"}
                 </Button>
               </form>
             </OnboardingStepLeftWrapper>
