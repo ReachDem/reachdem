@@ -4,15 +4,24 @@ import { ActivityLogger } from "./activity-logger.service";
 import { TwilioAdapter } from "../adapters/sms/twilio.adapter";
 import { InfobipAdapter } from "../adapters/sms/infobip.adapter";
 import { LmtAdapter } from "../adapters/sms/lmt.adapter";
+import { AvlytextAdapter } from "../adapters/sms/avlytext.adapter";
+import { MboaSmsAdapter } from "../adapters/sms/mboa-sms.adapter";
 import { StubAdapter } from "../adapters/sms/stub.adapter";
 import type { SmsProvider } from "@reachdem/database";
+import { getCameroonProviderRoute } from "../utils/cameroon-mobile-routing";
 
 interface SendWithFallbackResult {
   success: boolean;
   providerName: string;
+  senderUsed: string;
   providerMessageId?: string;
   errorCode?: string;
   errorMessage?: string;
+}
+
+interface AdapterExecutionPlan {
+  adapter: SmsSender;
+  payload: SmsPayload;
 }
 
 /**
@@ -34,6 +43,14 @@ function buildAdapter(provider: SmsProvider): SmsSender {
       );
     case "lmt":
       return new LmtAdapter(process.env.LMT_API_KEY!, process.env.LMT_SECRET!);
+    case "mboaSms":
+      return new MboaSmsAdapter(
+        process.env.MBOA_SMS_USERID ?? process.env.NEXT_PUBLIC_MBOA_SMS_USERID!,
+        process.env.MBOA_SMS_API_PASSWORD ??
+          process.env.NEXT_PUBLIC_MBOA_SMS_API_PASSWORD!
+      );
+    case "avlytext":
+      return new AvlytextAdapter(process.env.AVLYTEXT_API_KEY!);
     case "stub":
       return new StubAdapter();
     default: {
@@ -62,6 +79,26 @@ async function buildAdapterChain(organizationId: string): Promise<SmsSender[]> {
   return providers.map(buildAdapter);
 }
 
+async function buildExecutionPlan(
+  organizationId: string,
+  payload: SmsPayload
+): Promise<AdapterExecutionPlan[]> {
+  const cameroonRoute = getCameroonProviderRoute(payload);
+
+  if (cameroonRoute) {
+    return cameroonRoute.map((route) => ({
+      adapter: buildAdapter(route.provider),
+      payload: route.payload,
+    }));
+  }
+
+  const adapters = await buildAdapterChain(organizationId);
+  return adapters.map((adapter) => ({
+    adapter,
+    payload,
+  }));
+}
+
 /**
  * Tries each adapter in order until one succeeds.
  * - Logs an ActivityEvent per attempt (send_attempt, send_success, send_failed, fallback).
@@ -78,13 +115,14 @@ export class CompositeSmseSender {
     correlationId: string,
     payload: SmsPayload
   ): Promise<SendWithFallbackResult> {
-    const adapters = await buildAdapterChain(organizationId);
+    const plan = await buildExecutionPlan(organizationId, payload);
     let lastErrorCode = "unknown";
     let lastErrorMessage = "Unknown error";
     let attemptNo = 0;
 
-    for (let i = 0; i < adapters.length; i++) {
-      const adapter = adapters[i];
+    for (let i = 0; i < plan.length; i++) {
+      const current = plan[i];
+      const adapter = current.adapter;
       attemptNo++;
 
       // Log a fallback event when switching providers
@@ -98,7 +136,7 @@ export class CompositeSmseSender {
           severity: "warn",
           status: "pending",
           meta: {
-            fromProvider: adapters[i - 1].providerName,
+            fromProvider: plan[i - 1].adapter.providerName,
             toProvider: adapter.providerName,
             attemptNo,
           },
@@ -117,7 +155,7 @@ export class CompositeSmseSender {
         meta: { attemptNo },
       });
 
-      const result = await adapter.send(payload);
+      const result = await adapter.send(current.payload);
 
       if (result.success) {
         await ActivityLogger.log({
@@ -135,6 +173,7 @@ export class CompositeSmseSender {
         return {
           success: true,
           providerName: adapter.providerName,
+          senderUsed: current.payload.from,
           providerMessageId: result.providerMessageId,
         };
       }
@@ -168,7 +207,8 @@ export class CompositeSmseSender {
 
     return {
       success: false,
-      providerName: adapters[adapters.length - 1]?.providerName ?? "none",
+      providerName: plan[plan.length - 1]?.adapter.providerName ?? "none",
+      senderUsed: plan[plan.length - 1]?.payload.from ?? payload.from,
       errorCode: lastErrorCode,
       errorMessage: lastErrorMessage,
     };
