@@ -357,6 +357,7 @@ model ProviderCall {
 enum SmsProvider {
   twilio
   infobip
+  lmt
   stub
 }
 

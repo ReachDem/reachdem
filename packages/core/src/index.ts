@@ -18,4 +18,5 @@ export * from "./ports/sms-sender.port";
 export * from "./adapters/sms/stub.adapter";
 export * from "./adapters/sms/twilio.adapter";
 export * from "./adapters/sms/infobip.adapter";
+export * from "./adapters/sms/lmt.adapter";
 export * from "./adapters/sms/error-classifier";

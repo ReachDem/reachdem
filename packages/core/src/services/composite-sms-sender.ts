@@ -3,6 +3,7 @@ import type { SmsSender, SmsPayload } from "../ports/sms-sender.port";
 import { ActivityLogger } from "./activity-logger.service";
 import { TwilioAdapter } from "../adapters/sms/twilio.adapter";
 import { InfobipAdapter } from "../adapters/sms/infobip.adapter";
+import { LmtAdapter } from "../adapters/sms/lmt.adapter";
 import { StubAdapter } from "../adapters/sms/stub.adapter";
 import type { SmsProvider } from "@reachdem/database";
 
@@ -31,6 +32,8 @@ function buildAdapter(provider: SmsProvider): SmsSender {
         process.env.INFOBIP_API_KEY!,
         process.env.INFOBIP_BASE_URL!
       );
+    case "lmt":
+      return new LmtAdapter(process.env.LMT_API_KEY!, process.env.LMT_SECRET!);
     case "stub":
       return new StubAdapter();
     default: {
