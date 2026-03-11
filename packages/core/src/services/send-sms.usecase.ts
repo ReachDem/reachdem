@@ -99,6 +99,7 @@ export class SendSmsUseCase {
     await prisma.message.update({
       where: { id: message.id },
       data: {
+        from: result.senderUsed,
         status: finalStatus,
         providerSelected: result.providerName,
       },

@@ -361,7 +361,7 @@ enum SmsProvider {
   infobip
   lmt
   mboaSms
-  alvytext
+  avlytext
   stub
 }
 
