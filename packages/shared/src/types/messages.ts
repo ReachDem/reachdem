@@ -9,6 +9,7 @@ export interface SendSmsInput {
   text: string;
   from: string; // Sender ID
   idempotency_key: string;
+  campaignId?: string;
 }
 
 export interface SendSmsResult {
@@ -40,6 +41,7 @@ export interface MessageAttemptDto {
 
 export interface MessageDto {
   id: string;
+  campaignId?: string | null;
   channel: MessageChannel;
   toLast4: string;
   from: string;
