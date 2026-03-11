@@ -42,7 +42,8 @@ export class LmtAdapter implements SmsSender {
         body: JSON.stringify({
           message: payload.text,
           senderId: payload.from,
-          msisdn: [payload.to],
+          // LMT n'accepte pas le + en préfixe E.164
+          msisdn: [payload.to.replace(/^\+/, "")],
         }),
         signal: AbortSignal.timeout(15_000),
       });

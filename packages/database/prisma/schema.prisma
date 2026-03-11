@@ -360,6 +360,8 @@ enum SmsProvider {
   twilio
   infobip
   lmt
+  mboaSms
+  alvytext
   stub
 }
 
