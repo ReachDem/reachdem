@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LaunchCampaignUseCase } from "@reachdem/core";
+import {
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+  LaunchCampaignUseCase,
+} from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
 
 // Launch Campaign
@@ -23,10 +27,10 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
   } catch (error: any) {
     console.error("[Campaign API - POST launch] Error:", error);
 
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    if (error.message.includes("Cannot launch campaign")) {
+    if (error instanceof CampaignInvalidStatusError) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }

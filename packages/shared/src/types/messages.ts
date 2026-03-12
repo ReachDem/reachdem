@@ -1,6 +1,6 @@
 // ─── SMS Message Types ────────────────────────────────────────────────────────
 
-export type MessageStatus = "queued" | "sent" | "failed";
+export type MessageStatus = "queued" | "sending" | "sent" | "failed";
 export type AttemptStatus = "queued" | "sent" | "failed";
 export type MessageChannel = "sms";
 
@@ -17,6 +17,13 @@ export interface SendSmsResult {
   status: MessageStatus;
   correlation_id: string;
   idempotent: boolean; // true if this was a duplicate idempotent request
+}
+
+export interface SmsExecutionJob {
+  message_id: string;
+  organization_id: string;
+  channel: MessageChannel;
+  delivery_cycle: number;
 }
 
 export interface ListMessagesOptions {

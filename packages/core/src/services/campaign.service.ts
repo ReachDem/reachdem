@@ -7,6 +7,11 @@ import {
   CampaignListResponse,
   CampaignAudienceResponse,
 } from "@reachdem/shared";
+import {
+  CampaignAudienceValidationError,
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+} from "../errors/campaign.errors";
 
 export class CampaignService {
   /**
@@ -93,11 +98,13 @@ export class CampaignService {
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(`Cannot update campaign in status '${campaign.status}'`);
+      throw new CampaignInvalidStatusError(
+        `Cannot update campaign in status '${campaign.status}'`
+      );
     }
 
     const updated = await prisma.campaign.update({
@@ -126,11 +133,13 @@ export class CampaignService {
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(`Cannot delete campaign in status '${campaign.status}'`);
+      throw new CampaignInvalidStatusError(
+        `Cannot delete campaign in status '${campaign.status}'`
+      );
     }
 
     await prisma.campaign.delete({
@@ -150,7 +159,7 @@ export class CampaignService {
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     const audiences = await prisma.campaignAudience.findMany({
@@ -182,11 +191,11 @@ export class CampaignService {
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(
+      throw new CampaignInvalidStatusError(
         `Cannot modify audience of campaign in status '${campaign.status}'`
       );
     }
@@ -246,7 +255,7 @@ export class CampaignService {
       });
 
       if (groups.length !== new Set(groupIds).size) {
-        throw new Error(
+        throw new CampaignAudienceValidationError(
           "Cannot modify audience with groups outside this workspace"
         );
       }
@@ -262,7 +271,7 @@ export class CampaignService {
       });
 
       if (segments.length !== new Set(segmentIds).size) {
-        throw new Error(
+        throw new CampaignAudienceValidationError(
           "Cannot modify audience with segments outside this workspace"
         );
       }

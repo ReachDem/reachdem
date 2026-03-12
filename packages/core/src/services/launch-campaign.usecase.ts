@@ -4,6 +4,15 @@ import { SendSmsUseCase } from "./send-sms.usecase";
 import { SegmentService } from "./segment.service";
 import { ActivityLogger } from "./activity-logger.service";
 import { createHash } from "crypto";
+import {
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+} from "../errors/campaign.errors";
+
+type ResolvedContact = {
+  id: string;
+  phoneE164: string;
+};
 
 export class LaunchCampaignUseCase {
   static async execute(
@@ -15,11 +24,11 @@ export class LaunchCampaignUseCase {
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(
+      throw new CampaignInvalidStatusError(
         `Cannot launch campaign in status '${campaign.status}'. Must be 'draft'.`
       );
     }
@@ -172,14 +181,11 @@ export class LaunchCampaignUseCase {
     );
 
     // Map of contactId to contact object
-    const uniqueContacts = new Map<string, { id: string; phoneE164: string; [key: string]: any }>();
+    const uniqueContacts = new Map<string, ResolvedContact>();
 
     for (const audience of audiences) {
-      let contacts: any[] = [];
       if (audience.sourceType === "group") {
-        // Get all contacts in group (ignoring cursor pagination for MVP script simplicity, OR fetching all)
-        // Since group.memberships can be large, we should probably query Contacts directly
-        contacts = await prisma.contact.findMany({
+        const contacts = await prisma.contact.findMany({
           where: {
             organizationId,
             memberships: {
@@ -187,16 +193,20 @@ export class LaunchCampaignUseCase {
             },
             phoneE164: { not: null },
           },
+          select: {
+            id: true,
+            phoneE164: true,
+          },
         });
-      } else if (audience.sourceType === "segment") {
-        contacts = await this.resolveSegment(organizationId, audience.sourceId);
+        this.collectContacts(uniqueContacts, contacts);
+        continue;
       }
 
-      for (const contact of contacts) {
-        if (!uniqueContacts.has(contact.id) && contact.phoneE164) {
-          uniqueContacts.set(contact.id, contact);
-        }
-      }
+      await this.collectSegmentContacts(
+        uniqueContacts,
+        organizationId,
+        audience.sourceId
+      );
     }
 
     const contactsToTarget = Array.from(uniqueContacts.values());
@@ -236,18 +246,30 @@ export class LaunchCampaignUseCase {
   /**
    * Resolves a segment's contacts by building the raw SQL query.
    */
-  private static async resolveSegment(
+  private static collectContacts(
+    uniqueContacts: Map<string, ResolvedContact>,
+    contacts: Array<{ id: string; phoneE164: string | null }>
+  ): void {
+    for (const contact of contacts) {
+      if (!contact.phoneE164 || uniqueContacts.has(contact.id)) continue;
+
+      uniqueContacts.set(contact.id, {
+        id: contact.id,
+        phoneE164: contact.phoneE164,
+      });
+    }
+  }
+
+  private static async collectSegmentContacts(
+    uniqueContacts: Map<string, ResolvedContact>,
     organizationId: string,
     segmentId: string
-  ) {
-    // We fetch the segment definition first
+  ): Promise<void> {
     const segment = await SegmentService.getSegmentById(
       organizationId,
       segmentId
     );
 
-    // Evaluate it in batches of 500
-    const allContacts = [];
     let cursor: string | undefined = undefined;
 
     while (true) {
@@ -258,14 +280,10 @@ export class LaunchCampaignUseCase {
         cursor
       );
 
-      for (const c of result.items) {
-        if (c.phoneE164) allContacts.push(c);
-      }
+      this.collectContacts(uniqueContacts, result.items);
 
       if (!result.meta.nextCursor) break;
       cursor = result.meta.nextCursor;
     }
-
-    return allContacts;
   }
 }
