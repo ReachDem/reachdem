@@ -3,6 +3,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "reachdem-worker",
+  "account_id": "76b1a7d0081890ccba80ea74cf5a9889",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,11 +13,12 @@
 
   // ─── Cron Triggers ───────────────────────────────────────────
   // These scheduled triggers invoke the `scheduled()` handler
-  "triggers": {
-    "crons": [
-      "*/2 * * * *"
-    ]
-  },
+  // DISABLED: Uncomment to re-enable the cron scheduler
+  // "triggers": {
+  //   "crons": [
+  //     "*/2 * * * *"
+  //   ]
+  // },
 
   // ─── Queues ──────────────────────────────────────────────────
   // Producer: bindings to send messages to queues
