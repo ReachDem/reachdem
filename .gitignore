@@ -48,3 +48,6 @@ packages/stripe-app/.build/*
 
 # env vars cloudflare, etc
 .dev.vars
+.wrangler/*
+.wrangler*
+.wrangler
