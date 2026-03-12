@@ -22,7 +22,7 @@ export const sendSmsSchema = z.object({
 });
 
 export const listMessagesSchema = z.object({
-  status: z.enum(["queued", "sent", "failed"]).optional(),
+  status: z.enum(["queued", "sending", "sent", "failed"]).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),

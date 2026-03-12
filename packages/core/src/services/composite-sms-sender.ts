@@ -14,6 +14,16 @@ interface SendWithFallbackResult {
   success: boolean;
   providerName: string;
   senderUsed: string;
+  attempts: Array<{
+    providerName: string;
+    senderUsed: string;
+    durationMs: number;
+    success: boolean;
+    providerMessageId?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    retryable?: boolean;
+  }>;
   providerMessageId?: string;
   errorCode?: string;
   errorMessage?: string;
@@ -118,6 +128,7 @@ export class CompositeSmseSender {
     const plan = await buildExecutionPlan(organizationId, payload);
     let lastErrorCode = "unknown";
     let lastErrorMessage = "Unknown error";
+    const attempts: SendWithFallbackResult["attempts"] = [];
     let attemptNo = 0;
 
     for (let i = 0; i < plan.length; i++) {
@@ -158,6 +169,13 @@ export class CompositeSmseSender {
       const result = await adapter.send(current.payload);
 
       if (result.success) {
+        attempts.push({
+          providerName: adapter.providerName,
+          senderUsed: current.payload.from,
+          durationMs: result.durationMs,
+          success: true,
+          providerMessageId: result.providerMessageId,
+        });
         await ActivityLogger.log({
           organizationId,
           correlationId,
@@ -174,6 +192,7 @@ export class CompositeSmseSender {
           success: true,
           providerName: adapter.providerName,
           senderUsed: current.payload.from,
+          attempts,
           providerMessageId: result.providerMessageId,
         };
       }
@@ -181,6 +200,15 @@ export class CompositeSmseSender {
       // Failed — log it
       lastErrorCode = result.errorCode;
       lastErrorMessage = result.errorMessage;
+      attempts.push({
+        providerName: adapter.providerName,
+        senderUsed: current.payload.from,
+        durationMs: result.durationMs,
+        success: false,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        retryable: result.retryable,
+      });
 
       await ActivityLogger.log({
         organizationId,
@@ -209,6 +237,7 @@ export class CompositeSmseSender {
       success: false,
       providerName: plan[plan.length - 1]?.adapter.providerName ?? "none",
       senderUsed: plan[plan.length - 1]?.payload.from ?? payload.from,
+      attempts,
       errorCode: lastErrorCode,
       errorMessage: lastErrorMessage,
     };

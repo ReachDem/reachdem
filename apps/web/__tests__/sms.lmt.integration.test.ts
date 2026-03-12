@@ -25,6 +25,7 @@ import {
   beforeEach,
 } from "vitest";
 import { POST as sendSmsHandler } from "../app/api/v1/sms/send/route";
+import { ProcessSmsMessageJobUseCase } from "@reachdem/core";
 import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { NextRequest } from "next/server";
@@ -73,6 +74,10 @@ describe("SMS LMT - Envoi réel vers +237654495152", () => {
   const createdMessageIds: string[] = [];
   let hadExistingConfig = false;
   let originalProvider: string | null = null;
+  const workerBaseUrl =
+    process.env.SMS_WORKER_BASE_URL ??
+    process.env.CLOUDFLARE_WORKER_BASE_URL ??
+    "http://127.0.0.1:8787";
 
   /** Bascule le workspace sur LMT comme provider principal */
   beforeAll(async () => {
@@ -100,6 +105,20 @@ describe("SMS LMT - Envoi réel vers +237654495152", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `${workerBaseUrl}/queue/sms`) {
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return originalFetch(input, init);
+      })
+    );
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: TEST_USER_ID, email: TEST_USER_EMAIL } as any,
       session: { activeOrganizationId: REAL_ORG_ID } as any,
@@ -156,10 +175,25 @@ describe("SMS LMT - Envoi réel vers +237654495152", () => {
 
     expect(res.status).toBe(201);
     expect(body).toHaveProperty("message_id");
-    expect(body.status).toBe("sent");
+    expect(body.status).toBe("queued");
     expect(body.correlation_id).toBeDefined();
 
     createdMessageIds.push(body.message_id);
+
+    const outcome = await ProcessSmsMessageJobUseCase.execute(
+      {
+        message_id: body.message_id,
+        organization_id: REAL_ORG_ID!,
+        channel: "sms",
+        delivery_cycle: 1,
+      },
+      {
+        republish: async () => {
+          throw new Error("Unexpected republish in LMT integration test");
+        },
+      }
+    );
+    expect(outcome).toBe("sent");
 
     // Vérification en base de données
     const msg = await prisma.message.findUnique({

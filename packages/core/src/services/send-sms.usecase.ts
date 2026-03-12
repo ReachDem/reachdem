@@ -51,6 +51,7 @@ export class SendSmsUseCase {
       data: {
         organizationId,
         campaignId: input.campaignId ?? null,
+        toE164: input.to,
         toHashed: hashPhone(input.to),
         toLast4: last4(input.to),
         from: input.from,
@@ -62,9 +63,6 @@ export class SendSmsUseCase {
     });
 
     // 3. Delegate to the composite sender (handles primary → fallback)
-    let attemptNo = 0;
-    const now = Date.now();
-
     const result = await CompositeSmseSender.send(
       organizationId,
       correlationId,
@@ -75,24 +73,25 @@ export class SendSmsUseCase {
       }
     );
 
-    attemptNo++;
-
-    // 4. Record the MessageAttempt
-    await prisma.messageAttempt.create({
-      data: {
-        messageId: message.id,
-        organizationId,
-        provider: result.providerName,
-        attemptNo,
-        status: result.success ? "sent" : "failed",
-        providerMessageId: result.success ? result.providerMessageId : null,
-        errorCode: result.success ? null : (result.errorCode ?? null),
-        errorMessage: result.success
-          ? null
-          : truncate(result.errorMessage ?? "", 500),
-        durationMs: Date.now() - now,
-      },
-    });
+    for (const [index, attempt] of result.attempts.entries()) {
+      await prisma.messageAttempt.create({
+        data: {
+          messageId: message.id,
+          organizationId,
+          provider: attempt.providerName,
+          attemptNo: index + 1,
+          status: attempt.success ? "sent" : "failed",
+          providerMessageId: attempt.success
+            ? (attempt.providerMessageId ?? null)
+            : null,
+          errorCode: attempt.success ? null : (attempt.errorCode ?? null),
+          errorMessage: attempt.success
+            ? null
+            : truncate(attempt.errorMessage ?? "", 500),
+          durationMs: attempt.durationMs,
+        },
+      });
+    }
 
     // 5. Update Message status
     const finalStatus = result.success ? "sent" : "failed";

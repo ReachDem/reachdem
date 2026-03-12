@@ -25,6 +25,7 @@
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as sendSmsHandler } from "../app/api/v1/sms/send/route";
+import { ProcessSmsMessageJobUseCase } from "@reachdem/core";
 import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { NextRequest } from "next/server";
@@ -121,9 +122,27 @@ const ROUTING_CASES: RoutingCase[] = [
 
 describe("SMS Cameroon routing - real sends", () => {
   const createdMessageIds: string[] = [];
+  const workerBaseUrl =
+    process.env.SMS_WORKER_BASE_URL ??
+    process.env.CLOUDFLARE_WORKER_BASE_URL ??
+    "http://127.0.0.1:8787";
 
   beforeEach(() => {
     vi.clearAllMocks();
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `${workerBaseUrl}/queue/sms`) {
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return originalFetch(input, init);
+      })
+    );
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: TEST_USER_ID, email: TEST_USER_EMAIL } as any,
       session: { activeOrganizationId: REAL_ORG_ID } as any,
@@ -164,7 +183,24 @@ describe("SMS Cameroon routing - real sends", () => {
 
       expect([200, 201]).toContain(res.status);
       expect(body).toHaveProperty("message_id");
+      expect(body.status).toBe("queued");
       createdMessageIds.push(body.message_id);
+
+      const outcome = await ProcessSmsMessageJobUseCase.execute(
+        {
+          message_id: body.message_id,
+          organization_id: REAL_ORG_ID,
+          channel: "sms",
+          delivery_cycle: 1,
+        },
+        {
+          republish: async () => {
+            throw new Error(
+              "Unexpected republish during real routing integration test"
+            );
+          },
+        }
+      );
 
       const message = await prisma.message.findUnique({
         where: { id: body.message_id },
@@ -180,6 +216,7 @@ describe("SMS Cameroon routing - real sends", () => {
       });
 
       expect(message).not.toBeNull();
+      expect(["sent", "requeued", "failed"]).toContain(outcome);
       expect(message!.status).toBe("sent");
       expect([testCase.primaryProvider, testCase.fallbackProvider]).toContain(
         message!.providerSelected
@@ -187,8 +224,10 @@ describe("SMS Cameroon routing - real sends", () => {
       expect(message!.from).toBe(
         testCase.senderForProvider[message!.providerSelected!]
       );
-      expect(message!.attempts).toHaveLength(1);
-      expect(message!.attempts[0].provider).toBe(message!.providerSelected);
+      expect(message!.attempts.length).toBeGreaterThanOrEqual(1);
+      expect(message!.attempts[message!.attempts.length - 1].provider).toBe(
+        message!.providerSelected
+      );
 
       const fallbackEvents = activityEvents.filter(
         (event) => event.action === "fallback"
@@ -223,7 +262,7 @@ describe("SMS Cameroon routing - real sends", () => {
       }
 
       console.log(
-        `[CM Routing][Result] ${testCase.label} | to=${testCase.phone} | primary=${testCase.primaryProvider} | selected=${message!.providerSelected} | sender=${message!.from} | providerMessageId=${message!.attempts[0].providerMessageId ?? "n/a"}`
+        `[CM Routing][Result] ${testCase.label} | to=${testCase.phone} | primary=${testCase.primaryProvider} | selected=${message!.providerSelected} | sender=${message!.from} | providerMessageId=${message!.attempts[message!.attempts.length - 1].providerMessageId ?? "n/a"}`
       );
     }
   }, 120_000);

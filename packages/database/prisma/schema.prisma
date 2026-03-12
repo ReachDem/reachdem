@@ -371,6 +371,7 @@ enum MessageChannel {
 
 enum MessageStatus {
   queued
+  sending
   sent
   failed
 }
@@ -399,6 +400,7 @@ model Message {
   organizationId   String
   campaignId       String?
   channel          MessageChannel @default(sms)
+  toE164           String?
   toHashed         String // SHA-256 of full E.164 number
   toLast4          String // Last 4 digits for display/debug
   from             String // Sender ID

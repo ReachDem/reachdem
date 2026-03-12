@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CampaignService } from "@reachdem/core";
+import {
+  CampaignAudienceValidationError,
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+  CampaignService,
+} from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
 import { setCampaignAudienceSchema } from "@reachdem/shared";
 
@@ -11,7 +16,7 @@ export const GET = withWorkspace(async ({ req, organizationId, params }) => {
     return NextResponse.json(audiences);
   } catch (error: any) {
     console.error("[Campaign Audience API - GET] Error:", error);
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
     return NextResponse.json(
@@ -44,10 +49,13 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
     return NextResponse.json(audiences, { status: 201 });
   } catch (error: any) {
     console.error("[Campaign Audience API - POST] Error:", error);
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    if (error.message.includes("Cannot modify audience")) {
+    if (
+      error instanceof CampaignInvalidStatusError ||
+      error instanceof CampaignAudienceValidationError
+    ) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }
