@@ -47,7 +47,7 @@ export class CampaignService {
     organizationId: string,
     id: string
   ): Promise<CampaignResponse | null> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, organizationId },
     });
 
