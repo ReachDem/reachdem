@@ -1,24 +1,24 @@
 import { prisma } from "@reachdem/database";
-import { randomUUID, createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import type {
-  SendSmsInput,
+  EmailExecutionJob,
+  SendEmailInput,
   SendSmsResult,
-  SmsExecutionJob,
 } from "@reachdem/shared";
 
-function hashPhone(phone: string): string {
-  return createHash("sha256").update(phone).digest("hex");
+function hashEmail(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 }
 
-function last4(phone: string): string {
-  return phone.replace(/\D/g, "").slice(-4);
+function last4Email(email: string): string {
+  return email.trim().toLowerCase().slice(-4);
 }
 
-export class EnqueueSmsUseCase {
+export class EnqueueEmailUseCase {
   static async execute(
     organizationId: string,
-    input: SendSmsInput,
-    publish: (job: SmsExecutionJob) => Promise<void>
+    input: SendEmailInput,
+    publish: (job: EmailExecutionJob) => Promise<void>
   ): Promise<SendSmsResult> {
     const existing = await prisma.message.findUnique({
       where: {
@@ -43,11 +43,13 @@ export class EnqueueSmsUseCase {
       data: {
         organizationId,
         campaignId: input.campaignId ?? null,
-        toE164: input.to,
-        toHashed: hashPhone(input.to),
-        toLast4: last4(input.to),
-        from: input.from,
-        text: input.text,
+        channel: "email",
+        toEmail: input.to,
+        toHashed: hashEmail(input.to),
+        toLast4: last4Email(input.to),
+        from: input.from ?? "ReachDem Notifications",
+        subject: input.subject,
+        html: input.html,
         status: input.scheduledAt ? "scheduled" : "queued",
         correlationId,
         idempotencyKey: input.idempotency_key,
@@ -55,20 +57,25 @@ export class EnqueueSmsUseCase {
       },
     });
 
-    const job: SmsExecutionJob = {
+    if (input.scheduledAt) {
+      return {
+        message_id: message.id,
+        status: "scheduled",
+        correlation_id: correlationId,
+        idempotent: false,
+      };
+    }
+
+    await publish({
       message_id: message.id,
       organization_id: organizationId,
-      channel: "sms",
+      channel: "email",
       delivery_cycle: 1,
-    };
-
-    if (!input.scheduledAt) {
-      await publish(job);
-    }
+    });
 
     return {
       message_id: message.id,
-      status: input.scheduledAt ? "scheduled" : "queued",
+      status: "queued",
       correlation_id: correlationId,
       idempotent: false,
     };

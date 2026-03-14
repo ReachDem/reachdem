@@ -106,9 +106,12 @@ async function handleEnqueueEmail(
   try {
     const body = (await request.json()) as EmailMessage;
 
-    if (!body.to || !body.subject || !body.html || !body.contactId) {
+    if (!body.message_id || !body.organization_id || !body.channel) {
       return Response.json(
-        { error: "Missing required fields: to, subject, html, contactId" },
+        {
+          error:
+            "Missing required fields: message_id, organization_id, channel",
+        },
         { status: 400 }
       );
     }
@@ -116,8 +119,8 @@ async function handleEnqueueEmail(
     await env.EMAIL_QUEUE.send(body);
     return Response.json({
       success: true,
-      message: "Email queued",
-      to: body.to,
+      message: "Email job queued",
+      job: body,
     });
   } catch {
     return Response.json({ error: "Invalid request body" }, { status: 400 });

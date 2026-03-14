@@ -31,7 +31,7 @@ export async function handleSmsBatch(
         `[SMS Queue] Failed to process message ${message.body.message_id}:`,
         error
       );
-      message.retry();
+      message.ack();
     }
   }
 }

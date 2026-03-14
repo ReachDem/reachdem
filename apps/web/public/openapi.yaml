@@ -630,6 +630,35 @@ paths:
         "422":
           description: No SMS provider configured for this workspace
 
+  /email/send:
+    post:
+      summary: Send an Email
+      description: |
+        Queues an email for asynchronous delivery through the worker pipeline.
+        Idempotency is guaranteed per workspace using the `idempotency_key` field.
+      tags: [Email]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailRequest"
+      responses:
+        "201":
+          description: Email accepted successfully (new request)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "200":
+          description: Idempotent response — message already exists for this key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "400":
+          description: Validation error (invalid email, empty HTML, etc.)
+
   /sms/messages:
     get:
       summary: List Messages
@@ -640,7 +669,7 @@ paths:
           name: status
           schema:
             type: string
-            enum: [queued, sent, failed]
+            enum: [scheduled, queued, sending, sent, failed]
         - in: query
           name: from
           schema:
@@ -726,6 +755,10 @@ components:
           type: string
           maxLength: 128
           example: "campaign_123:contact_456"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
 
     SendSmsResponse:
       type: object
@@ -734,7 +767,52 @@ components:
           type: string
         status:
           type: string
-          enum: [queued, sent, failed]
+          enum: [scheduled, queued, sending, sent, failed]
+        correlation_id:
+          type: string
+          format: uuid
+        idempotent:
+          type: boolean
+          description: true if this was a duplicate idempotent request
+
+    SendEmailRequest:
+      type: object
+      required: [to, subject, html, idempotency_key]
+      properties:
+        to:
+          type: string
+          format: email
+          example: "user@example.com"
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+        from:
+          type: string
+          maxLength: 200
+          nullable: true
+          example: "ReachDem Notifications"
+        idempotency_key:
+          type: string
+          maxLength: 128
+          example: "email_123:contact_456"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    SendEmailResponse:
+      type: object
+      properties:
+        message_id:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, queued, sending, sent, failed]
         correlation_id:
           type: string
           format: uuid
@@ -749,7 +827,7 @@ components:
           type: string
         channel:
           type: string
-          enum: [sms]
+          enum: [sms, email]
         toLast4:
           type: string
           example: "5678"
@@ -757,7 +835,7 @@ components:
           type: string
         status:
           type: string
-          enum: [queued, sent, failed]
+          enum: [scheduled, queued, sending, sent, failed]
         providerSelected:
           type: string
           nullable: true
