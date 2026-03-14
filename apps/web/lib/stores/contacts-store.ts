@@ -5,6 +5,7 @@ interface ContactsState {
   /** Full list of contacts for the active organisation */
   contacts: ContactRow[];
   isLoading: boolean;
+  hasHydrated: boolean;
 
   /** Hydrate from server-fetched data (e.g. in a server component) */
   setContacts: (contacts: ContactRow[]) => void;
@@ -19,14 +20,20 @@ interface ContactsState {
 export const useContactsStore = create<ContactsState>((set) => ({
   contacts: [],
   isLoading: false,
+  hasHydrated: false,
 
-  setContacts: (contacts) => set({ contacts, isLoading: false }),
+  setContacts: (contacts) =>
+    set({ contacts, isLoading: false, hasHydrated: true }),
 
   addContact: (contact) =>
-    set((state) => ({ contacts: [contact, ...state.contacts] })),
+    set((state) => ({
+      contacts: [contact, ...state.contacts],
+      hasHydrated: true,
+    })),
 
   removeContacts: (ids) =>
     set((state) => ({
       contacts: state.contacts.filter((c) => !ids.includes(c.id)),
+      hasHydrated: true,
     })),
 }));

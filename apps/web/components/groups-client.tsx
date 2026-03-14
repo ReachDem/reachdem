@@ -437,7 +437,7 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90 text-white"
+              variant="destructive"
             >
               {isDeleting && (
                 <IconLoader2 className="mr-2 size-4 animate-spin" />

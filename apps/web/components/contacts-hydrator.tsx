@@ -11,9 +11,10 @@ import { useContactsStore } from "@/lib/stores/contacts-store";
  */
 export function ContactsHydrator({ contacts }: { contacts: ContactRow[] }) {
   const hydrated = useRef(false);
+  const setContacts = useContactsStore((s) => s.setContacts);
 
   if (!hydrated.current) {
-    useContactsStore.setState({ contacts, isLoading: false });
+    setContacts(contacts);
     hydrated.current = true;
   }
 
