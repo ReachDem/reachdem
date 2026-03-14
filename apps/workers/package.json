@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
     "test": "vitest run"
   },
   "dependencies": {
@@ -13,6 +16,7 @@
   },
   "devDependencies": {
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.39.0"
   }
 }

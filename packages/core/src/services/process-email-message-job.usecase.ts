@@ -1,23 +1,37 @@
 import { prisma } from "@reachdem/database";
-import { CompositeSmseSender } from "./composite-sms-sender";
-import { truncate } from "../utils/pii-scrubber";
-import type { SmsExecutionJob } from "@reachdem/shared";
+import type { EmailExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
+import { truncate } from "../utils/pii-scrubber";
 
-interface ProcessJobOptions {
-  republish: (job: SmsExecutionJob) => Promise<void>;
+export interface EmailSendResult {
+  success: boolean;
+  providerName: string;
+  providerMessageId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  durationMs: number;
 }
 
-export class ProcessSmsMessageJobUseCase {
+interface ProcessEmailJobOptions {
+  republish: (job: EmailExecutionJob) => Promise<void>;
+  sendEmail: (input: {
+    to: string;
+    subject: string;
+    html: string;
+    from: string;
+  }) => Promise<EmailSendResult>;
+}
+
+export class ProcessEmailMessageJobUseCase {
   static async execute(
-    job: SmsExecutionJob,
-    options: ProcessJobOptions
+    job: EmailExecutionJob,
+    options: ProcessEmailJobOptions
   ): Promise<"skipped" | "sent" | "requeued" | "failed"> {
     const message = await prisma.message.findFirst({
       where: {
         id: job.message_id,
         organizationId: job.organization_id,
-        channel: job.channel,
+        channel: "email",
       },
       include: {
         attempts: {
@@ -30,23 +44,23 @@ export class ProcessSmsMessageJobUseCase {
       return "skipped";
     }
 
-    if (!message.toE164 || !message.text) {
+    if (!message.toEmail || !message.subject || !message.html) {
+      await prisma.message.update({
+        where: { id: job.message_id },
+        data: { status: "failed" },
+      });
+
       await ActivityLogger.log({
         organizationId: job.organization_id,
         correlationId: message.correlationId,
-        category: "sms",
+        category: "email",
         action: "send_failed",
         resourceType: "message",
         resourceId: message.id,
         status: "failed",
         meta: {
-          message: "Message has incomplete SMS payload for worker execution",
+          message: "Message has incomplete email payload for worker execution",
         },
-      });
-
-      await prisma.message.update({
-        where: { id: message.id },
-        data: { status: "failed" },
       });
 
       return "failed";
@@ -67,43 +81,36 @@ export class ProcessSmsMessageJobUseCase {
       return "skipped";
     }
 
-    const baseAttemptNo = message.attempts.length;
+    const attemptNo = message.attempts.length + 1;
+    const result = await options.sendEmail({
+      to: message.toEmail,
+      subject: message.subject,
+      html: message.html,
+      from: message.from,
+    });
 
-    const result = await CompositeSmseSender.send(
-      job.organization_id,
-      message.correlationId,
-      {
-        to: message.toE164,
-        text: message.text,
-        from: message.from,
-      }
-    );
-
-    for (const [index, attempt] of result.attempts.entries()) {
-      await prisma.messageAttempt.create({
-        data: {
-          messageId: message.id,
-          organizationId: job.organization_id,
-          provider: attempt.providerName,
-          attemptNo: baseAttemptNo + index + 1,
-          status: attempt.success ? "sent" : "failed",
-          providerMessageId: attempt.success
-            ? (attempt.providerMessageId ?? null)
-            : null,
-          errorCode: attempt.success ? null : (attempt.errorCode ?? null),
-          errorMessage: attempt.success
-            ? null
-            : truncate(attempt.errorMessage ?? "", 500),
-          durationMs: attempt.durationMs,
-        },
-      });
-    }
+    await prisma.messageAttempt.create({
+      data: {
+        messageId: message.id,
+        organizationId: job.organization_id,
+        provider: result.providerName,
+        attemptNo,
+        status: result.success ? "sent" : "failed",
+        providerMessageId: result.success
+          ? (result.providerMessageId ?? null)
+          : null,
+        errorCode: result.success ? null : (result.errorCode ?? null),
+        errorMessage: result.success
+          ? null
+          : truncate(result.errorMessage ?? "", 500),
+        durationMs: result.durationMs,
+      },
+    });
 
     if (result.success) {
       await prisma.message.update({
         where: { id: message.id },
         data: {
-          from: result.senderUsed,
           status: "sent",
           providerSelected: result.providerName,
         },
@@ -116,7 +123,6 @@ export class ProcessSmsMessageJobUseCase {
       await prisma.message.update({
         where: { id: message.id },
         data: {
-          from: result.senderUsed,
           status: "queued",
           providerSelected: result.providerName,
         },
@@ -125,13 +131,13 @@ export class ProcessSmsMessageJobUseCase {
       await ActivityLogger.log({
         organizationId: job.organization_id,
         correlationId: message.correlationId,
-        category: "sms",
+        category: "email",
         action: "updated",
         resourceType: "message",
         resourceId: message.id,
         status: "pending",
         meta: {
-          message: `Requeued message after failed delivery cycle ${job.delivery_cycle}`,
+          message: `Requeued email after failed delivery cycle ${job.delivery_cycle}`,
           deliveryCycle: job.delivery_cycle,
           nextDeliveryCycle: job.delivery_cycle + 1,
           provider: result.providerName,
@@ -149,7 +155,6 @@ export class ProcessSmsMessageJobUseCase {
     await prisma.message.update({
       where: { id: message.id },
       data: {
-        from: result.senderUsed,
         status: "failed",
         providerSelected: result.providerName,
       },
@@ -158,13 +163,13 @@ export class ProcessSmsMessageJobUseCase {
     await ActivityLogger.log({
       organizationId: job.organization_id,
       correlationId: message.correlationId,
-      category: "sms",
+      category: "email",
       action: "send_failed",
       resourceType: "message",
       resourceId: message.id,
       status: "failed",
       meta: {
-        message: `Message failed after ${job.delivery_cycle} delivery cycles`,
+        message: `Email failed after ${job.delivery_cycle} delivery cycles`,
         deliveryCycle: job.delivery_cycle,
         provider: result.providerName,
         errorCode: result.errorCode,

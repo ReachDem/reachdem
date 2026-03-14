@@ -1,4 +1,4 @@
-import type { SmsExecutionJob } from "@reachdem/shared";
+import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
 
 export interface QueueProducer<T> {
   send(message: T): Promise<void>;
@@ -26,8 +26,10 @@ export interface ScheduledController {
 
 export interface Env {
   SMS_QUEUE: QueueProducer<SmsExecutionJob>;
-  EMAIL_QUEUE: QueueProducer<EmailMessage>;
+  EMAIL_QUEUE: QueueProducer<EmailExecutionJob>;
   ENVIRONMENT: string;
+  API_BASE_URL: string;
+  INTERNAL_API_SECRET: string;
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_USER: string;
@@ -37,13 +39,5 @@ export interface Env {
   SENDER_NAME: string;
 }
 
-export interface EmailMessage {
-  to: string;
-  subject: string;
-  html: string;
-  contactId: string;
-  campaignId?: string;
-  scheduledAt?: string;
-}
-
 export type SmsMessage = SmsExecutionJob;
+export type EmailMessage = EmailExecutionJob;

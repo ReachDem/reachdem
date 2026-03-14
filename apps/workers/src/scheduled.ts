@@ -1,77 +1,110 @@
-import nodemailer from "nodemailer";
+import type { MessageExecutionJob } from "@reachdem/shared";
 import type { Env, ScheduledController } from "./types";
 
-let executionCount = 0;
-const MAX_EXECUTIONS = 2;
+interface ScheduledMessageResponse {
+  items: Array<{
+    id: string;
+    organizationId: string;
+    channel: "sms" | "email";
+  }>;
+}
 
 export async function handleScheduled(
   controller: ScheduledController,
   env: Env
 ): Promise<void> {
-  const cronPattern = controller.cron;
   const scheduledTime = new Date(controller.scheduledTime);
 
   console.log(
-    `[Cron] Triggered: "${cronPattern}" at ${scheduledTime.toISOString()}`
+    `[Cron] Triggered: "${controller.cron}" at ${scheduledTime.toISOString()}`
   );
 
-  if (executionCount >= MAX_EXECUTIONS) {
-    console.log(`[Cron] Already sent ${MAX_EXECUTIONS} messages. Skipping.`);
-    return;
-  }
-
-  switch (cronPattern) {
-    case "*/2 * * * *":
-      await handleScheduledEmail(env, scheduledTime);
+  switch (controller.cron) {
+    case "* * * * *":
+      await handleScheduledMessages(env, scheduledTime);
       break;
     default:
-      console.warn(`[Cron] Unknown cron pattern: ${cronPattern}`);
+      console.warn(`[Cron] Unknown cron pattern: ${controller.cron}`);
   }
 }
 
-async function handleScheduledEmail(
+async function handleScheduledMessages(
   env: Env,
   scheduledTime: Date
 ): Promise<void> {
-  executionCount++;
-  console.log(
-    `[Cron] Execution ${executionCount}/${MAX_EXECUTIONS} - Sending scheduled emails...`
+  const response = await fetch(
+    `${env.API_BASE_URL}/api/internal/messages/scheduled?until=${encodeURIComponent(scheduledTime.toISOString())}`,
+    {
+      headers: {
+        "x-internal-secret": env.INTERNAL_API_SECRET,
+      },
+    }
   );
 
-  const transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: parseInt(env.SMTP_PORT || "465", 10),
-    secure: env.SMTP_SECURE === "true",
-    authMethod: "LOGIN",
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASSWORD,
-    },
-  });
-
-  const time = scheduledTime.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const recipients = ["latioms@gmail.com", "reachdemltd@gmail.com"];
-
-  for (const [index, to] of recipients.entries()) {
-    await transporter.sendMail({
-      from: `"${env.SENDER_NAME}" <${env.SENDER_EMAIL}>`,
-      to,
-      subject: `Message scheduled and sent at time ${time}`,
-      html: `
-        <h2>Message scheduled and sent at time ${time}</h2>
-        <p><strong>Recipient:</strong> ${to}</p>
-        <p><strong>Execution:</strong> ${executionCount}/${MAX_EXECUTIONS}</p>
-        <p><strong>Environment:</strong> ${env.ENVIRONMENT}</p>
-        <hr/>
-        <p>This is an automated scheduled email from the Cloudflare Worker cron trigger.</p>
-      `,
-    });
-
-    console.log(`[Cron] Email ${index + 1} sent to ${to}`);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch scheduled messages: HTTP ${response.status}`
+    );
   }
 
-  console.log(`[Cron] Execution ${executionCount}/${MAX_EXECUTIONS} done`);
+  const payload = (await response.json()) as ScheduledMessageResponse;
+  console.log(`[Cron] Found ${payload.items.length} scheduled message(s)`);
+
+  if (payload.items.length === 0) {
+    return;
+  }
+
+  const updateResponse = await fetch(
+    `${env.API_BASE_URL}/api/internal/messages/status`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": env.INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify({
+        ids: payload.items.map((item) => item.id),
+        status: "queued",
+      }),
+    }
+  );
+
+  if (!updateResponse.ok) {
+    throw new Error(
+      `Failed to update scheduled message statuses: HTTP ${updateResponse.status}`
+    );
+  }
+
+  const updatedPayload = (await updateResponse.json()) as {
+    updated: number;
+    ids: string[];
+  };
+  const queueableIds = new Set(updatedPayload.ids);
+
+  for (const item of payload.items) {
+    if (!queueableIds.has(item.id)) continue;
+
+    const job: MessageExecutionJob =
+      item.channel === "sms"
+        ? {
+            message_id: item.id,
+            organization_id: item.organizationId,
+            channel: "sms",
+            delivery_cycle: 1,
+          }
+        : {
+            message_id: item.id,
+            organization_id: item.organizationId,
+            channel: "email",
+            delivery_cycle: 1,
+          };
+
+    if (job.channel === "sms") {
+      await env.SMS_QUEUE.send(job);
+    } else {
+      await env.EMAIL_QUEUE.send(job);
+    }
+  }
+
+  console.log(`[Cron] Queued ${updatedPayload.updated} scheduled message(s)`);
 }
