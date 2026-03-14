@@ -10,7 +10,7 @@ export class LaunchCampaignUseCase {
     organizationId: string,
     campaignId: string
   ): Promise<void> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
     });
 
