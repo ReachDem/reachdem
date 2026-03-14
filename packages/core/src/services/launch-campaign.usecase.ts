@@ -172,7 +172,7 @@ export class LaunchCampaignUseCase {
     );
 
     // Map of contactId to contact object
-    const uniqueContacts = new Map<string, any>();
+    const uniqueContacts = new Map<string, { id: string; phoneE164: string; [key: string]: any }>();
 
     for (const audience of audiences) {
       let contacts: any[] = [];
