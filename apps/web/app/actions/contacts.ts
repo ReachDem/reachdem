@@ -235,3 +235,28 @@ export async function getContacts() {
 
   return contacts;
 }
+
+/**
+ * Soft-delete one or more contacts for the active organization.
+ */
+export async function deleteContacts(ids: string[]) {
+  const organizationId = await getOrganizationId();
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+  if (uniqueIds.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const result = await prisma.contact.updateMany({
+    where: {
+      id: { in: uniqueIds },
+      organizationId,
+      deletedAt: null,
+    },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
+
+  return { success: true, count: result.count };
+}
