@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { authClient, useSession } from "@reachdem/auth/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -63,6 +63,11 @@ const data = {
       title: "Home",
       url: "#",
       icon: IconHome,
+    },
+    {
+      title: "Campaigns",
+      url: "/campaigns",
+      icon: IconMessage,
     },
     // {
     //   title: "SMS",
@@ -143,24 +148,33 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { data: organizations } = authClient.useListOrganizations();
+  const [isHydrated, setIsHydrated] = React.useState(false);
 
-  const currentWorkspaceName = activeOrg?.name || data.currentWorkspace.name;
-  const currentWorkspaceLogo = activeOrg?.logo || data.currentWorkspace.logo;
-  const workspaces = organizations?.length
-    ? organizations.map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        logo: org.logo,
-      }))
-    : data.workspaces;
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
-  const userData = session?.user
-    ? {
-        name: session.user.name,
-        email: session.user.email,
-        avatar: session.user.image || data.user.avatar,
-      }
-    : data.user;
+  const currentWorkspaceName =
+    isHydrated && activeOrg?.name ? activeOrg.name : data.currentWorkspace.name;
+  const currentWorkspaceLogo =
+    isHydrated && activeOrg?.logo ? activeOrg.logo : data.currentWorkspace.logo;
+  const workspaces =
+    isHydrated && organizations?.length
+      ? organizations.map((org: any) => ({
+          id: org.id,
+          name: org.name,
+          logo: org.logo,
+        }))
+      : data.workspaces;
+
+  const userData =
+    isHydrated && session?.user
+      ? {
+          name: session.user.name,
+          email: session.user.email,
+          avatar: session.user.image || data.user.avatar,
+        }
+      : data.user;
 
   const orgInitial = currentWorkspaceName
     ? currentWorkspaceName.charAt(0).toUpperCase()
