@@ -272,7 +272,7 @@ export class CampaignService {
   /**
    * Mapper correctly formatting the database model to external representation
    */
-  private static mapToResponse(campaign: any): CampaignResponse {
+  private static mapToResponse(campaign: Prisma.Campaign): CampaignResponse {
     return {
       id: campaign.id,
       organizationId: campaign.organizationId,
