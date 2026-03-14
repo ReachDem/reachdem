@@ -415,6 +415,187 @@ paths:
         "400":
           description: Invalid or missing date range
 
+  # ─── Campaigns ─────────────────────────────────────────────────────────────
+
+  /campaigns:
+    get:
+      summary: List Campaigns
+      description: Returns a paginated, workspace-scoped list of campaigns.
+      tags: [Campaigns]
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated campaign list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignListResponse"
+    post:
+      summary: Create Campaign
+      description: Creates a new draft campaign.
+      tags: [Campaigns]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignDto"
+      responses:
+        "201":
+          description: Campaign created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "400":
+          description: Validation error
+
+  /campaigns/{id}:
+    get:
+      summary: Get Campaign Detail
+      description: Returns a single campaign.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "404":
+          description: Campaign not found
+    patch:
+      summary: Update Campaign
+      description: Updates a draft campaign.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCampaignDto"
+      responses:
+        "200":
+          description: Campaign updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "400":
+          description: Validation error or campaign not in draft status
+        "404":
+          description: Campaign not found
+    delete:
+      summary: Delete Campaign
+      description: Deletes a draft campaign.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign deleted successfully
+        "400":
+          description: Campaign not in draft status
+        "404":
+          description: Campaign not found
+
+  /campaigns/{id}/audience:
+    get:
+      summary: Get Campaign Audiences
+      description: Returns the groups and segments attached to the campaign.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of campaign audiences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudienceResponse"
+        "404":
+          description: Campaign not found
+    post:
+      summary: Set Campaign Audiences
+      description: Replaces the existing audiences with a new list (only works in draft).
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCampaignAudienceDto"
+      responses:
+        "201":
+          description: Audiences updated successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudienceResponse"
+        "400":
+          description: Validation error or campaign not in draft status
+        "404":
+          description: Campaign not found
+
+  /campaigns/{id}/launch:
+    post:
+      summary: Launch Campaign
+      description: Resolves the audience, deduplicates contacts, and triggers the SMS sending process. Changes status to running, then completed, partial, or failed.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign launched successfully
+        "400":
+          description: Campaign not in draft status
+        "404":
+          description: Campaign not found
+
   # ─── SMS Messaging ─────────────────────────────────────────────────────────
 
   /sms/send:
@@ -787,3 +968,136 @@ components:
           type: integer
         fallbackCount:
           type: integer
+
+    # ─── Campaigns ───────────────────────────────────────────────────────────
+
+    CreateCampaignDto:
+      type: object
+      required:
+        - name
+        - content
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        channel:
+          type: string
+          enum: [sms]
+          default: sms
+        content:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateCampaignDto:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        channel:
+          type: string
+          enum: [sms]
+        content:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CampaignResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        channel:
+          type: string
+          enum: [sms]
+        status:
+          type: string
+          enum: [draft, running, partial, completed, failed]
+        content:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CampaignListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CampaignResponse"
+        nextCursor:
+          type: string
+          nullable: true
+
+    CampaignAudienceInput:
+      type: object
+      required:
+        - sourceType
+        - sourceId
+      properties:
+        sourceType:
+          type: string
+          enum: [group, segment]
+        sourceId:
+          type: string
+
+    SetCampaignAudienceDto:
+      type: object
+      required:
+        - audiences
+      properties:
+        audiences:
+          type: array
+          items:
+            $ref: "#/components/schemas/CampaignAudienceInput"
+
+    CampaignAudienceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        sourceType:
+          type: string
+          enum: [group, segment]
+        sourceId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

@@ -101,6 +101,7 @@ model Organization {
   activityEvents ActivityEvent[]
   smsConfig      WorkspaceSmsConfig?
   messages       Message[]
+  campaigns      Campaign[]
 
   @@map("organization")
 }
@@ -191,8 +192,9 @@ model Contact {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime? // Soft delete
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships  GroupMember[]
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships     GroupMember[]
+  campaignTargets CampaignTarget[]
 
   @@index([organizationId])
   @@index([phoneE164])
@@ -392,6 +394,7 @@ model WorkspaceSmsConfig {
 model Message {
   id               String         @id @default(cuid())
   organizationId   String
+  campaignId       String?
   channel          MessageChannel @default(sms)
   toHashed         String // SHA-256 of full E.164 number
   toLast4          String // Last 4 digits for display/debug
@@ -409,6 +412,7 @@ model Message {
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
+  @@index([organizationId, campaignId])
   @@index([organizationId, status])
   @@map("message")
 }
@@ -431,4 +435,93 @@ model MessageAttempt {
   @@index([messageId])
   @@index([organizationId, createdAt])
   @@map("message_attempt")
+}
+
+// ─── Campaigns ──────────────────────────────────────────────────────────────
+
+enum CampaignStatus {
+  draft
+  running
+  partial
+  completed
+  failed
+}
+
+enum CampaignChannel {
+  sms
+}
+
+enum AudienceSourceType {
+  group
+  segment
+}
+
+enum TargetStatus {
+  pending
+  sent
+  failed
+  skipped
+}
+
+model Campaign {
+  id             String          @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  channel        CampaignChannel @default(sms)
+  status         CampaignStatus  @default(draft)
+  content        String
+  scheduledAt    DateTime?
+  createdBy      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  audiences    CampaignAudience[]
+  targets      CampaignTarget[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("campaign")
+}
+
+model CampaignAudience {
+  id             String             @id @default(uuid())
+  campaignId     String
+  organizationId String
+  sourceType     AudienceSourceType
+  sourceId       String // ID of the Group or Segment
+
+  createdAt DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, sourceType, sourceId])
+  @@index([campaignId])
+  @@map("campaign_audience")
+}
+
+model CampaignTarget {
+  id             String       @id @default(uuid())
+  campaignId     String
+  organizationId String
+  contactId      String
+  resolvedTo     String // Hashed phone E.164
+  status         TargetStatus @default(pending)
+  messageId      String? // Reference to the actual sent Message (nullable)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Note: We don't define a strict relation to Message to avoid circular dependencies
+  // or cascade issues, it's just a reference ID.
+
+  @@unique([campaignId, contactId]) // Prevent duplicate targets in the same campaign
+  @@index([campaignId, status])
+  @@index([organizationId, contactId])
+  @@map("campaign_target")
 }

@@ -50,6 +50,7 @@ export class SendSmsUseCase {
     const message = await prisma.message.create({
       data: {
         organizationId,
+        campaignId: input.campaignId ?? null,
         toHashed: hashPhone(input.to),
         toLast4: last4(input.to),
         from: input.from,

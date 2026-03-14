@@ -31,6 +31,7 @@ export class MessageService {
       ...(opts.cursor && { cursor: { id: opts.cursor }, skip: 1 }),
       select: {
         id: true,
+        campaignId: true,
         channel: true,
         toLast4: true,
         from: true,
