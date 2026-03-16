@@ -1,33 +1,23 @@
-import { auth } from "@reachdem/auth";
-import { prisma } from "@reachdem/database";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { getAuthFlowState } from "@/lib/auth-flow";
 
 export default async function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const flow = await getAuthFlowState();
 
-  if (!session) {
+  if (!flow.hasSession) {
     redirect("/login");
   }
 
-  // Check if user has completed onboarding
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { defaultOrganizationId: true },
-  });
-
-  if (!dbUser?.defaultOrganizationId) {
-    redirect("/signup");
+  if (!flow.isReady) {
+    redirect("/continue-setup");
   }
 
   return (

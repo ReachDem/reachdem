@@ -1,3 +1,4 @@
+import type { Campaign } from "@reachdem/database";
 import { prisma } from "@reachdem/database";
 import {
   CreateCampaignDto,
@@ -272,7 +273,7 @@ export class CampaignService {
   /**
    * Mapper correctly formatting the database model to external representation
    */
-  private static mapToResponse(campaign: Prisma.Campaign): CampaignResponse {
+  private static mapToResponse(campaign: Campaign): CampaignResponse {
     return {
       id: campaign.id,
       organizationId: campaign.organizationId,
