@@ -50,6 +50,9 @@ export class ProcessEmailMessageJobUseCase {
         data: { status: "failed" },
       });
 
+      await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+
       await ActivityLogger.log({
         organizationId: job.organization_id,
         correlationId: message.correlationId,
@@ -116,6 +119,9 @@ export class ProcessEmailMessageJobUseCase {
         },
       });
 
+      await this.markCampaignTarget(message.id, "sent");
+      await this.finalizeCampaignIfReady(message.campaignId);
+
       return "sent";
     }
 
@@ -160,6 +166,9 @@ export class ProcessEmailMessageJobUseCase {
       },
     });
 
+    await this.markCampaignTarget(message.id, "failed");
+    await this.finalizeCampaignIfReady(message.campaignId);
+
     await ActivityLogger.log({
       organizationId: job.organization_id,
       correlationId: message.correlationId,
@@ -178,5 +187,43 @@ export class ProcessEmailMessageJobUseCase {
     });
 
     return "failed";
+  }
+
+  private static async markCampaignTarget(
+    messageId: string,
+    status: "sent" | "failed"
+  ): Promise<void> {
+    await prisma.campaignTarget.updateMany({
+      where: { messageId },
+      data: { status },
+    });
+  }
+
+  private static async finalizeCampaignIfReady(
+    campaignId: string | null
+  ): Promise<void> {
+    if (!campaignId) return;
+
+    const groupedStatuses = await prisma.campaignTarget.groupBy({
+      by: ["status"],
+      where: { campaignId },
+      _count: { _all: true },
+    });
+
+    const counts = new Map(
+      groupedStatuses.map((item) => [item.status, item._count._all])
+    );
+    const pendingCount = counts.get("pending") ?? 0;
+    if (pendingCount > 0) return;
+
+    const sentCount = counts.get("sent") ?? 0;
+    const failedCount = counts.get("failed") ?? 0;
+    const finalStatus =
+      failedCount === 0 ? "completed" : sentCount === 0 ? "failed" : "partial";
+
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: finalStatus },
+    });
   }
 }

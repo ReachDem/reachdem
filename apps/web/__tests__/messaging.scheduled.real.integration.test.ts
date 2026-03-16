@@ -8,6 +8,10 @@ import { GET as getScheduledHandler } from "../app/api/internal/messages/schedul
 import { PATCH as updateMessageStatusHandler } from "../app/api/internal/messages/status/route";
 import { handleScheduled } from "../../workers/src/scheduled";
 import { handleSmsBatch } from "../../workers/src/queue-sms";
+import {
+  getScheduledExecutionConfig,
+  waitForScheduledExecution,
+} from "./utils/scheduled-test";
 import type {
   Env,
   MessageBatch,
@@ -136,7 +140,7 @@ describe("Messaging scheduled - real worker integration", () => {
   }
 
   it("processes scheduled SMS through cron then queue consumer", async () => {
-    const scheduledAt = new Date(Date.now() - 60_000).toISOString();
+    const schedule = getScheduledExecutionConfig();
 
     const smsReq = new NextRequest("http://localhost/api/v1/sms/send", {
       method: "POST",
@@ -145,7 +149,7 @@ describe("Messaging scheduled - real worker integration", () => {
         text: `ReachDem scheduled SMS test ${new Date().toISOString()}`,
         from: getExpectedSmsSender(TEST_SCHEDULED_SMS_PHONE),
         idempotency_key: `scheduled-sms-${Date.now()}`,
-        scheduledAt,
+        scheduledAt: schedule.scheduledAtIso,
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -195,9 +199,15 @@ describe("Messaging scheduled - real worker integration", () => {
       })
     );
 
+    console.log(
+      `[Scheduled Integration][SMS] mode=${schedule.mode} scheduledAt=${schedule.scheduledAtIso}`
+    );
+
+    await waitForScheduledExecution(schedule);
+
     const controller: ScheduledController = {
       cron: "* * * * *",
-      scheduledTime: Date.now(),
+      scheduledTime: schedule.cronScheduledTimeMs,
     };
 
     await handleScheduled(controller, env);

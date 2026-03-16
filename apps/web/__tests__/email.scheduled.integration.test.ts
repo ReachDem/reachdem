@@ -7,6 +7,10 @@ import { GET as getScheduledHandler } from "../app/api/internal/messages/schedul
 import { PATCH as updateMessageStatusHandler } from "../app/api/internal/messages/status/route";
 import { handleScheduled } from "../../workers/src/scheduled";
 import { handleEmailBatch } from "../../workers/src/queue-email";
+import {
+  getScheduledExecutionConfig,
+  waitForScheduledExecution,
+} from "./utils/scheduled-test";
 import type {
   EmailMessage,
   Env,
@@ -133,7 +137,7 @@ describe("Email scheduled - real worker integration", () => {
   }
 
   it("processes a scheduled email through cron then queue consumer", async () => {
-    const scheduledAt = new Date(Date.now() - 60_000).toISOString();
+    const schedule = getScheduledExecutionConfig();
 
     const emailReq = new NextRequest("http://localhost/api/v1/email/send", {
       method: "POST",
@@ -147,7 +151,7 @@ describe("Email scheduled - real worker integration", () => {
           `,
         from: SENDER_NAME,
         idempotency_key: `scheduled-email-${Date.now()}`,
-        scheduledAt,
+        scheduledAt: schedule.scheduledAtIso,
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -197,9 +201,15 @@ describe("Email scheduled - real worker integration", () => {
       })
     );
 
+    console.log(
+      `[Scheduled Email Integration] mode=${schedule.mode} scheduledAt=${schedule.scheduledAtIso}`
+    );
+
+    await waitForScheduledExecution(schedule);
+
     const controller: ScheduledController = {
       cron: "* * * * *",
-      scheduledTime: Date.now(),
+      scheduledTime: schedule.cronScheduledTimeMs,
     };
 
     await handleScheduled(controller, env);
