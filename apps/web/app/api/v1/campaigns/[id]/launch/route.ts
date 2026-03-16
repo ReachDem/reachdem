@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LaunchCampaignUseCase } from "@reachdem/core";
+import {
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+  LaunchCampaignUseCase,
+} from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
+import { publishEmailJob } from "../../../../../../lib/publish-email-job";
+import { publishSmsJob } from "../../../../../../lib/publish-sms-job";
 
 // Launch Campaign
 export const POST = withWorkspace(async ({ req, organizationId, params }) => {
@@ -14,7 +20,12 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
     // We will await it to ensure we can catch immediate validation errors (like Not Draft).
 
     // If we don't await, serverless might kill the function before it finishes sending SMS.
-    await LaunchCampaignUseCase.execute(organizationId, id);
+    await LaunchCampaignUseCase.execute(
+      organizationId,
+      id,
+      publishSmsJob,
+      publishEmailJob
+    );
 
     return NextResponse.json(
       { message: "Campaign launched successfully" },
@@ -23,10 +34,10 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
   } catch (error: any) {
     console.error("[Campaign API - POST launch] Error:", error);
 
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    if (error.message.includes("Cannot launch campaign")) {
+    if (error instanceof CampaignInvalidStatusError) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }

@@ -1,5 +1,5 @@
 import { prisma, Prisma } from "@reachdem/database";
-import type { ListMessagesOptions } from "@reachdem/shared";
+import type { ListMessagesOptions, MessageStatus } from "@reachdem/shared";
 
 export class MessageService {
   /**
@@ -39,6 +39,7 @@ export class MessageService {
         providerSelected: true,
         correlationId: true,
         idempotencyKey: true,
+        scheduledAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -64,5 +65,67 @@ export class MessageService {
 
     if (!message) throw new Error("NOT_FOUND");
     return message;
+  }
+
+  static async listScheduledMessages(until: Date) {
+    return prisma.message.findMany({
+      where: {
+        status: "scheduled",
+        scheduledAt: {
+          not: null,
+          lte: until,
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+      select: {
+        id: true,
+        organizationId: true,
+        channel: true,
+      },
+    });
+  }
+
+  static async updateMessageStatuses(ids: string[], status: MessageStatus) {
+    if (ids.length === 0) return { count: 0, ids: [] as string[] };
+
+    if (status === "queued") {
+      return prisma.$transaction(async (tx) => {
+        const scheduledMessages = await tx.message.findMany({
+          where: {
+            id: { in: ids },
+            status: "scheduled",
+          },
+          select: { id: true },
+        });
+
+        const scheduledIds = scheduledMessages.map((message) => message.id);
+        if (scheduledIds.length === 0) {
+          return { count: 0, ids: [] as string[] };
+        }
+
+        await tx.message.updateMany({
+          where: {
+            id: { in: scheduledIds },
+            status: "scheduled",
+          },
+          data: {
+            status: "queued",
+          },
+        });
+
+        return { count: scheduledIds.length, ids: scheduledIds };
+      });
+    }
+
+    const result = await prisma.message.updateMany({
+      where: {
+        id: { in: ids },
+      },
+      data: {
+        status,
+      },
+    });
+
+    return { count: result.count, ids };
   }
 }

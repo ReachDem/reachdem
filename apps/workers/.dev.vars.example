@@ -1,0 +1,10 @@
+API_BASE_URL=http://localhost:3000
+INTERNAL_API_SECRET=replace-me
+ENVIRONMENT=development
+SMTP_HOST=smtp.example.com
+SMTP_PORT=465
+SMTP_USER=notifications@example.com
+SMTP_PASSWORD=replace-me
+SMTP_SECURE=true
+SENDER_EMAIL=notifications@example.com
+SENDER_NAME=ReachDem Notifications

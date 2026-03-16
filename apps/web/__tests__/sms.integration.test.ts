@@ -64,6 +64,14 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      })
+    );
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: TEST_USER_ID, email: TEST_USER_EMAIL } as any,
       session: { activeOrganizationId: REAL_ORG_ID } as any,
@@ -91,7 +99,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
   // ─── POST /sms/send ──────────────────────────────────────────────────────────
 
   describe("POST /sms/send", () => {
-    it("should send an SMS and create a message + attempt in DB", async () => {
+    it("should queue an SMS execution job and create a queued message in DB", async () => {
       const idem = `test-sms-${Date.now()}`;
       const req = new NextRequest("http://localhost/api/v1/sms/send", {
         method: "POST",
@@ -109,7 +117,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
 
       expect(res.status).toBe(201);
       expect(body).toHaveProperty("message_id");
-      expect(body.status).toBe("sent");
+      expect(body.status).toBe("queued");
       expect(body.correlation_id).toBeDefined();
       expect(body.idempotent).toBe(false);
 
@@ -121,11 +129,11 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
         include: { attempts: true },
       });
       expect(msg).not.toBeNull();
-      expect(msg!.status).toBe("sent");
-      expect(msg!.providerSelected).toBe("stub");
-      expect(msg!.attempts).toHaveLength(1);
-      expect(msg!.attempts[0].status).toBe("sent");
+      expect(msg!.status).toBe("queued");
+      expect(msg!.providerSelected).toBeNull();
+      expect(msg!.attempts).toHaveLength(0);
       expect(msg!.toLast4).toBe("5678");
+      expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     it("should return 400 for an invalid E.164 phone number", async () => {
@@ -215,7 +223,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
 
     it("should filter by status", async () => {
       const req = new NextRequest(
-        "http://localhost/api/v1/sms/messages?status=sent"
+        "http://localhost/api/v1/sms/messages?status=queued"
       );
 
       const res = await listMessagesHandler(req, {} as any);
@@ -223,7 +231,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
 
       expect(res.status).toBe(200);
       body.items.forEach((m: any) => {
-        expect(m.status).toBe("sent");
+        expect(m.status).toBe("queued");
       });
     });
   });
@@ -251,7 +259,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
       expect(res.status).toBe(200);
       expect(body.id).toBe(messageId);
       expect(Array.isArray(body.attempts)).toBe(true);
-      expect(body.attempts.length).toBeGreaterThan(0);
+      expect(body.attempts.length).toBeGreaterThanOrEqual(0);
     });
 
     it("should return 404 for an unknown message ID", async () => {

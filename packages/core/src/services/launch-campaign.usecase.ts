@@ -1,44 +1,56 @@
-import { prisma, type CampaignStatus } from "@reachdem/database";
-import { CampaignService } from "./campaign.service";
-import { SendSmsUseCase } from "./send-sms.usecase";
-import { SegmentService } from "./segment.service";
-import { ActivityLogger } from "./activity-logger.service";
+import { prisma } from "@reachdem/database";
+import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
 import { createHash } from "crypto";
+import { ActivityLogger } from "./activity-logger.service";
+import { CampaignService } from "./campaign.service";
+import { EnqueueEmailUseCase } from "./enqueue-email.usecase";
+import { EnqueueSmsUseCase } from "./enqueue-sms.usecase";
+import { SegmentService } from "./segment.service";
+import {
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+} from "../errors/campaign.errors";
+
+type ResolvedContact = {
+  id: string;
+  phoneE164?: string;
+  email?: string;
+};
 
 export class LaunchCampaignUseCase {
   static async execute(
     organizationId: string,
-    campaignId: string
+    campaignId: string,
+    publishSmsJob: (job: SmsExecutionJob) => Promise<void>,
+    publishEmailJob: (job: EmailExecutionJob) => Promise<void>
   ): Promise<void> {
     const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(
+      throw new CampaignInvalidStatusError(
         `Cannot launch campaign in status '${campaign.status}'. Must be 'draft'.`
       );
     }
 
-    // 1. Transition to RUNNING before resolving and sending
     await prisma.campaign.update({
       where: { id: campaignId },
       data: { status: "running" },
     });
 
     try {
-      // 2. Resolve audience & deduplicate
       const targets = await this.resolveAndCreateTargets(
         organizationId,
-        campaignId
+        campaignId,
+        campaign.channel
       );
 
       if (targets.length === 0) {
-        // Edge case: empty audience
         await prisma.campaign.update({
           where: { id: campaignId },
           data: { status: "completed" },
@@ -62,78 +74,123 @@ export class LaunchCampaignUseCase {
         return;
       }
 
-      // 3. Send messages sequentially for MVP (simplest approach without heavy workers)
-      let sentCount = 0;
+      let queuedCount = 0;
+      let scheduledCount = 0;
       let failedCount = 0;
+      const parsedCampaign = CampaignService.getCampaignContent(
+        campaign as any
+      );
+      const isEmailCampaign = (campaign.channel as "sms" | "email") === "email";
+      const logCategory = isEmailCampaign ? "email" : "sms";
 
       for (const target of targets) {
-        // Skip previously resolved targets if we're retrying a stuck campaign (though currently it must be 'draft')
         if (target.status !== "pending") continue;
 
         try {
-          // Idempotency key per workspace, per campaign, per target
           const idempotencyKey = `campaign_${campaignId}_contact_${target.contactId}`;
-
-          const messageResponse = await SendSmsUseCase.execute(organizationId, {
-            from: "ReachDem Campaign", // Default MVP sender
-            to: target.contact.phoneE164!,
-            text: campaign.content,
-            idempotency_key: idempotencyKey,
-            campaignId,
-          });
+          const scheduledAt = campaign.scheduledAt?.toISOString();
+          const messageResponse = await (!isEmailCampaign
+            ? EnqueueSmsUseCase.execute(
+                organizationId,
+                {
+                  from:
+                    ("text" in parsedCampaign
+                      ? parsedCampaign.from
+                      : undefined) ?? "ReachDem Campaign",
+                  to: target.contact.phoneE164!,
+                  text: "text" in parsedCampaign ? parsedCampaign.text : "",
+                  idempotency_key: idempotencyKey,
+                  campaignId,
+                  scheduledAt,
+                },
+                publishSmsJob
+              )
+            : EnqueueEmailUseCase.execute(
+                organizationId,
+                {
+                  to: target.contact.email!,
+                  subject:
+                    "subject" in parsedCampaign ? parsedCampaign.subject : "",
+                  html: "html" in parsedCampaign ? parsedCampaign.html : "",
+                  from:
+                    ("subject" in parsedCampaign
+                      ? parsedCampaign.from
+                      : undefined) ?? "ReachDem Notifications",
+                  idempotency_key: idempotencyKey,
+                  campaignId,
+                  scheduledAt,
+                },
+                publishEmailJob
+              ));
 
           await prisma.campaignTarget.update({
             where: { id: target.id },
             data: {
-              status: "sent",
               messageId: messageResponse.message_id,
             },
           });
-          sentCount++;
-        } catch (error: any) {
+
+          if (messageResponse.status === "scheduled") {
+            scheduledCount++;
+          } else {
+            queuedCount++;
+          }
+        } catch (error) {
           await prisma.campaignTarget.update({
             where: { id: target.id },
             data: { status: "failed" },
           });
           failedCount++;
           console.error(
-            `Failed to send campaign message to target ${target.id}:`,
+            `Failed to enqueue campaign message for target ${target.id}:`,
             error
           );
         }
       }
 
-      const finalStatus: CampaignStatus =
-        failedCount === 0
-          ? "completed"
-          : sentCount === 0
-            ? "failed"
-            : "partial";
+      if (queuedCount === 0 && scheduledCount === 0 && failedCount > 0) {
+        await prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: "failed" },
+        });
 
-      // 4. Transition to final status
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: { status: finalStatus },
-      });
+        await ActivityLogger.log({
+          organizationId,
+          actorType: "system",
+          actorId: "system",
+          category: logCategory,
+          action: "send_failed",
+          resourceType: "campaign",
+          resourceId: campaignId,
+          status: "failed",
+          meta: {
+            message: `Campaign ${campaign.name} failed during enqueue`,
+            queuedCount,
+            scheduledCount,
+            failedCount,
+          },
+        });
+        return;
+      }
 
       await ActivityLogger.log({
         organizationId,
         actorType: "system",
         actorId: "system",
-        category: "sms",
+        category: logCategory,
         action: "updated",
         resourceType: "campaign",
         resourceId: campaignId,
-        status: finalStatus === "failed" ? "failed" : "success",
+        status: "success",
         meta: {
-          message: `Campaign ${campaign.name} finished with status ${finalStatus}. Sent: ${sentCount}, Failed: ${failedCount}`,
-          finalStatus,
-          sentCount,
+          message: `Campaign ${campaign.name} launched for asynchronous processing`,
+          queuedCount,
+          scheduledCount,
           failedCount,
+          targetCount: targets.length,
         },
       });
     } catch (error: any) {
-      // Critical error during preparation or overall execution
       await prisma.campaign.update({
         where: { id: campaignId },
         data: { status: "failed" },
@@ -158,63 +215,59 @@ export class LaunchCampaignUseCase {
     }
   }
 
-  /**
-   * Resolves the audiences assigned to this campaign into actual contacts,
-   * deduplicates them, hashes their phones, and creates CampaignTargets.
-   */
   private static async resolveAndCreateTargets(
     organizationId: string,
-    campaignId: string
+    campaignId: string,
+    channel: "sms" | "email"
   ) {
     const audiences = await CampaignService.getAudiences(
       organizationId,
       campaignId
     );
 
-    // Map of contactId to contact object
-    const uniqueContacts = new Map<string, { id: string; phoneE164: string; [key: string]: any }>();
+    const uniqueContacts = new Map<string, ResolvedContact>();
 
     for (const audience of audiences) {
-      let contacts: any[] = [];
       if (audience.sourceType === "group") {
-        // Get all contacts in group (ignoring cursor pagination for MVP script simplicity, OR fetching all)
-        // Since group.memberships can be large, we should probably query Contacts directly
-        contacts = await prisma.contact.findMany({
+        const contacts = await prisma.contact.findMany({
           where: {
             organizationId,
             memberships: {
               some: { groupId: audience.sourceId },
             },
-            phoneE164: { not: null },
+            ...(channel === "sms"
+              ? { phoneE164: { not: null } }
+              : { email: { not: null } }),
+          },
+          select: {
+            id: true,
+            phoneE164: true,
+            email: true,
           },
         });
-      } else if (audience.sourceType === "segment") {
-        contacts = await this.resolveSegment(organizationId, audience.sourceId);
+        this.collectContacts(uniqueContacts, contacts);
+        continue;
       }
 
-      for (const contact of contacts) {
-        if (!uniqueContacts.has(contact.id) && contact.phoneE164) {
-          uniqueContacts.set(contact.id, contact);
-        }
-      }
+      await this.collectSegmentContacts(
+        uniqueContacts,
+        organizationId,
+        audience.sourceId
+      );
     }
 
-    const contactsToTarget = Array.from(uniqueContacts.values());
+    const targetPayloads = Array.from(uniqueContacts.values()).map(
+      (contact) => ({
+        campaignId,
+        organizationId,
+        contactId: contact.id,
+        resolvedTo: createHash("sha256")
+          .update(channel === "sms" ? contact.phoneE164! : contact.email!)
+          .digest("hex"),
+        status: "pending" as const,
+      })
+    );
 
-    // Create targets in Database. For a true MVP we can insert sequentially or with createMany
-    // Note: createMany cannot be used easily with SQLite, but we are using Postgres!
-    // But CampaignTarget needs `resolvedTo` (hashed phone).
-
-    const targetPayloads = contactsToTarget.map((c) => ({
-      campaignId,
-      organizationId,
-      contactId: c.id,
-      resolvedTo: createHash("sha256").update(c.phoneE164).digest("hex"),
-      status: "pending" as const,
-    }));
-
-    // If duplicate targets exist somehow, we can use try-catch or query first.
-    // For safety, we clear existing targets if any exist (e.g. if it crashed during PREPARING)
     await prisma.campaignTarget.deleteMany({
       where: { campaignId },
     });
@@ -225,30 +278,48 @@ export class LaunchCampaignUseCase {
       });
     }
 
-    // Return the inserted targets with their contact phone for the sender loop
-    return await prisma.campaignTarget.findMany({
+    return prisma.campaignTarget.findMany({
       where: { campaignId },
-      include: { contact: true }, // Contact is needed for phone number
+      include: { contact: true },
       orderBy: { createdAt: "asc" },
     });
   }
 
-  /**
-   * Resolves a segment's contacts by building the raw SQL query.
-   */
-  private static async resolveSegment(
+  private static collectContacts(
+    uniqueContacts: Map<string, ResolvedContact>,
+    contacts: Array<{
+      id: string;
+      phoneE164: string | null;
+      email?: string | null;
+    }>
+  ): void {
+    for (const contact of contacts) {
+      if (
+        (!contact.phoneE164 && !contact.email) ||
+        uniqueContacts.has(contact.id)
+      ) {
+        continue;
+      }
+
+      uniqueContacts.set(contact.id, {
+        id: contact.id,
+        phoneE164: contact.phoneE164 ?? undefined,
+        email: contact.email ?? undefined,
+      });
+    }
+  }
+
+  private static async collectSegmentContacts(
+    uniqueContacts: Map<string, ResolvedContact>,
     organizationId: string,
     segmentId: string
-  ) {
-    // We fetch the segment definition first
+  ): Promise<void> {
     const segment = await SegmentService.getSegmentById(
       organizationId,
       segmentId
     );
 
-    // Evaluate it in batches of 500
-    const allContacts = [];
-    let cursor: string | undefined = undefined;
+    let cursor: string | undefined;
 
     while (true) {
       const result = await SegmentService.evaluateSegmentDefinition(
@@ -258,14 +329,10 @@ export class LaunchCampaignUseCase {
         cursor
       );
 
-      for (const c of result.items) {
-        if (c.phoneE164) allContacts.push(c);
-      }
+      this.collectContacts(uniqueContacts, result.items);
 
       if (!result.meta.nextCursor) break;
       cursor = result.meta.nextCursor;
     }
-
-    return allContacts;
   }
 }
