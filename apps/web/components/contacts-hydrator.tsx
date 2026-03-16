@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ContactRow } from "@/components/contact-data-table";
 import { useContactsStore } from "@/lib/stores/contacts-store";
 
@@ -13,10 +13,12 @@ export function ContactsHydrator({ contacts }: { contacts: ContactRow[] }) {
   const hydrated = useRef(false);
   const setContacts = useContactsStore((s) => s.setContacts);
 
-  if (!hydrated.current) {
-    setContacts(contacts);
-    hydrated.current = true;
-  }
+  useEffect(() => {
+    if (!hydrated.current) {
+      setContacts(contacts);
+      hydrated.current = true;
+    }
+  }, [contacts, setContacts]);
 
   return null;
 }
