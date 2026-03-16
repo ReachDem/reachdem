@@ -16,6 +16,10 @@ import { POST as launchCampaignHandler } from "../app/api/v1/campaigns/[id]/laun
 
 import { prisma } from "@reachdem/database";
 import { SegmentNode } from "@reachdem/shared";
+import {
+  ProcessEmailMessageJobUseCase,
+  ProcessSmsMessageJobUseCase,
+} from "@reachdem/core";
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 
@@ -46,10 +50,15 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
   let testCampaignId: string;
   let testGroupId: string;
   let testContactId: string;
+  let testEmailCampaignId: string;
   let testSegmentId: string;
   let foreignGroupId: string;
   let smsConfigCreated = false;
   const segmentMatchAddress = `Campaign Segment Match ${Date.now()}`;
+  const workerBaseUrl =
+    process.env.SMS_WORKER_BASE_URL ??
+    process.env.CLOUDFLARE_WORKER_BASE_URL ??
+    "http://127.0.0.1:8787";
 
   beforeAll(async () => {
     // 1. Mock authentication
@@ -75,6 +84,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       data: {
         organizationId: REAL_ORG_ID,
         phoneE164: "+14155552671",
+        email: `campaign-contact-${Date.now()}@example.com`,
         name: "Test Contact",
         address: segmentMatchAddress,
         memberships: {
@@ -135,6 +145,24 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       });
       smsConfigCreated = true;
     }
+
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (
+          url === `${workerBaseUrl}/queue/sms` ||
+          url === `${workerBaseUrl}/queue/email`
+        ) {
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return originalFetch(input, init);
+      })
+    );
   }, 30000);
 
   // Note: We don't cleanup because Database cleanup is handled globally or kept for inspection.
@@ -142,7 +170,11 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
   it("POST /campaigns -> creates a draft campaign", async () => {
     const payload = {
       name: "Integration Test Campaign",
-      content: "Hello from Vitest!",
+      channel: "sms",
+      content: {
+        text: "Hello from Vitest!",
+        from: "ReachDem Campaign",
+      },
     };
 
     const req = new NextRequest("http://localhost/api/v1/campaigns", {
@@ -157,7 +189,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     const body = await res.json();
 
     expect(body.name).toBe(payload.name);
-    expect(body.content).toBe(payload.content);
+    expect(body.content).toEqual(payload.content);
     expect(body.status).toBe("draft");
     expect(body.organizationId).toBe(REAL_ORG_ID);
 
@@ -220,7 +252,8 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       method: "POST",
       body: JSON.stringify({
         name: `Cross workspace campaign ${Date.now()}`,
-        content: "Audience validation",
+        channel: "sms",
+        content: { text: "Audience validation", from: "ReachDem Campaign" },
       }),
     });
 
@@ -249,7 +282,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     expect(body.details).toMatch(/outside this workspace/);
   });
 
-  it("POST /campaigns/:id/launch -> executes the campaign", async () => {
+  it("POST /campaigns/:id/launch -> enqueues campaign messages for async delivery", async () => {
     const req = new NextRequest(
       `http://localhost/api/v1/campaigns/${testCampaignId}/launch`,
       {
@@ -269,13 +302,13 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     const campaign = await prisma.campaign.findUnique({
       where: { id: testCampaignId },
     });
-    expect(campaign!.status).toBe("completed");
+    expect(campaign!.status).toBe("running");
 
     const targets = await prisma.campaignTarget.findMany({
       where: { campaignId: testCampaignId },
     });
     expect(targets).toHaveLength(1);
-    expect(targets[0].status).toBe("sent");
+    expect(targets[0].status).toBe("pending");
     expect(targets[0].messageId).toBeDefined();
 
     const message = await prisma.message.findUnique({
@@ -283,6 +316,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     });
     expect(message).toBeDefined();
     expect(message!.campaignId).toBe(testCampaignId);
+    expect(message!.status).toBe("queued");
 
     const activity = await prisma.activityEvent.findFirst({
       where: {
@@ -297,10 +331,142 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     expect(activity).toBeDefined();
     // Use type assertion since meta is typed as Prisma.JsonValue in the strict DB schema
     const metaObj = activity!.meta as {
-      sentCount?: number;
+      queuedCount?: number;
+      scheduledCount?: number;
       targetCount?: number;
     };
-    expect(metaObj?.sentCount ?? metaObj?.targetCount).toBeDefined();
+    expect(
+      metaObj?.queuedCount ?? metaObj?.scheduledCount ?? metaObj?.targetCount
+    ).toBeDefined();
+
+    const outcome = await ProcessSmsMessageJobUseCase.execute(
+      {
+        message_id: message!.id,
+        organization_id: REAL_ORG_ID,
+        channel: "sms",
+        delivery_cycle: 1,
+      },
+      {
+        republish: async () => {
+          throw new Error("Unexpected republish for stub-backed campaign test");
+        },
+      }
+    );
+
+    expect(outcome).toBe("sent");
+
+    const processedCampaign = await prisma.campaign.findUnique({
+      where: { id: testCampaignId },
+    });
+    const processedTarget = await prisma.campaignTarget.findUnique({
+      where: { id: targets[0].id },
+    });
+    const processedMessage = await prisma.message.findUnique({
+      where: { id: message!.id },
+    });
+
+    expect(processedCampaign!.status).toBe("completed");
+    expect(processedTarget!.status).toBe("sent");
+    expect(processedMessage!.status).toBe("sent");
+  }, 40000);
+
+  it("POST /campaigns and launch -> supports email campaigns through async processing", async () => {
+    const createReq = new NextRequest("http://localhost/api/v1/campaigns", {
+      method: "POST",
+      body: JSON.stringify({
+        name: `Email campaign ${Date.now()}`,
+        channel: "email",
+        content: {
+          subject: "ReachDem Email Campaign",
+          html: "<p>Hello from email campaign</p>",
+          from: "ReachDem Notifications",
+        },
+      }),
+    });
+
+    const createRes = await createCampaignHandler(createReq, {
+      params: Promise.resolve({}),
+    });
+    expect(createRes.status).toBe(201);
+    const createdCampaign = await createRes.json();
+    testEmailCampaignId = createdCampaign.id;
+
+    const audienceReq = new NextRequest(
+      `http://localhost/api/v1/campaigns/${testEmailCampaignId}/audience`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          audiences: [{ sourceType: "group", sourceId: testGroupId }],
+        }),
+      }
+    );
+
+    const audienceRes = await setAudienceHandler(audienceReq, {
+      params: Promise.resolve({ id: testEmailCampaignId }),
+    });
+    expect(audienceRes.status).toBe(201);
+
+    const launchReq = new NextRequest(
+      `http://localhost/api/v1/campaigns/${testEmailCampaignId}/launch`,
+      {
+        method: "POST",
+      }
+    );
+
+    const launchRes = await launchCampaignHandler(launchReq, {
+      params: Promise.resolve({ id: testEmailCampaignId }),
+    });
+    expect(launchRes.status).toBe(200);
+
+    const emailTarget = await prisma.campaignTarget.findFirst({
+      where: { campaignId: testEmailCampaignId },
+    });
+    expect(emailTarget).toBeDefined();
+    expect(emailTarget!.messageId).toBeDefined();
+
+    const emailMessage = await prisma.message.findUnique({
+      where: { id: emailTarget!.messageId! },
+    });
+    expect(emailMessage!.channel).toBe("email");
+    expect(emailMessage!.status).toBe("queued");
+
+    const outcome = await ProcessEmailMessageJobUseCase.execute(
+      {
+        message_id: emailMessage!.id,
+        organization_id: REAL_ORG_ID,
+        channel: "email",
+        delivery_cycle: 1,
+      },
+      {
+        republish: async () => {
+          throw new Error(
+            "Unexpected republish for email stub-backed campaign test"
+          );
+        },
+        sendEmail: async () => ({
+          success: true,
+          providerName: "smtp",
+          providerMessageId: "email-campaign-ok",
+          durationMs: 1,
+        }),
+      }
+    );
+
+    expect(outcome).toBe("sent");
+
+    const processedCampaign = await prisma.campaign.findUnique({
+      where: { id: testEmailCampaignId },
+    });
+    const processedTarget = await prisma.campaignTarget.findUnique({
+      where: { id: emailTarget!.id },
+    });
+    const processedMessage = await prisma.message.findUnique({
+      where: { id: emailMessage!.id },
+    });
+
+    expect(processedCampaign!.status).toBe("completed");
+    expect(processedTarget!.status).toBe("sent");
+    expect(processedMessage!.status).toBe("sent");
   }, 40000);
 
   it("DELETE /campaigns/:id -> fails to delete non-draft campaign", async () => {

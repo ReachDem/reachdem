@@ -442,7 +442,7 @@ paths:
                 $ref: "#/components/schemas/CampaignListResponse"
     post:
       summary: Create Campaign
-      description: Creates a new draft campaign.
+      description: Creates a new draft SMS or email campaign with structured content and optional scheduling.
       tags: [Campaigns]
       requestBody:
         required: true
@@ -482,7 +482,7 @@ paths:
           description: Campaign not found
     patch:
       summary: Update Campaign
-      description: Updates a draft campaign.
+      description: Updates a draft campaign. Once launched, the campaign can no longer be edited.
       tags: [Campaigns]
       parameters:
         - in: path
@@ -580,7 +580,7 @@ paths:
   /campaigns/{id}/launch:
     post:
       summary: Launch Campaign
-      description: Resolves the audience, deduplicates contacts, and triggers the SMS sending process. Changes status to running, then completed, partial, or failed.
+      description: Resolves the audience, deduplicates contacts, creates one message per target, and hands execution to the async worker pipeline. If `scheduledAt` is in the future, messages are created in `scheduled`; otherwise they are created in `queued`.
       tags: [Campaigns]
       parameters:
         - in: path
@@ -590,7 +590,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Campaign launched successfully
+          description: Campaign launch accepted successfully
         "400":
           description: Campaign not in draft status
         "404":
@@ -630,6 +630,35 @@ paths:
         "422":
           description: No SMS provider configured for this workspace
 
+  /email/send:
+    post:
+      summary: Send an Email
+      description: |
+        Queues an email for asynchronous delivery through the worker pipeline.
+        Idempotency is guaranteed per workspace using the `idempotency_key` field.
+      tags: [Email]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailRequest"
+      responses:
+        "201":
+          description: Email accepted successfully (new request)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "200":
+          description: Idempotent response — message already exists for this key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "400":
+          description: Validation error (invalid email, empty HTML, etc.)
+
   /sms/messages:
     get:
       summary: List Messages
@@ -640,7 +669,7 @@ paths:
           name: status
           schema:
             type: string
-            enum: [queued, sent, failed]
+            enum: [scheduled, queued, sending, sent, failed]
         - in: query
           name: from
           schema:
@@ -726,6 +755,10 @@ components:
           type: string
           maxLength: 128
           example: "campaign_123:contact_456"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
 
     SendSmsResponse:
       type: object
@@ -734,7 +767,54 @@ components:
           type: string
         status:
           type: string
-          enum: [queued, sent, failed]
+          enum: [scheduled, queued, sending, sent, failed]
+          description: Immediate API responses normally return `queued` or `scheduled`. `sent` is reached asynchronously after worker execution.
+        correlation_id:
+          type: string
+          format: uuid
+        idempotent:
+          type: boolean
+          description: true if this was a duplicate idempotent request
+
+    SendEmailRequest:
+      type: object
+      required: [to, subject, html, idempotency_key]
+      properties:
+        to:
+          type: string
+          format: email
+          example: "user@example.com"
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+        from:
+          type: string
+          maxLength: 200
+          nullable: true
+          example: "ReachDem Notifications"
+        idempotency_key:
+          type: string
+          maxLength: 128
+          example: "email_123:contact_456"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    SendEmailResponse:
+      type: object
+      properties:
+        message_id:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, queued, sending, sent, failed]
+          description: Immediate API responses normally return `queued` or `scheduled`. `sent` is reached asynchronously after worker execution.
         correlation_id:
           type: string
           format: uuid
@@ -749,7 +829,7 @@ components:
           type: string
         channel:
           type: string
-          enum: [sms]
+          enum: [sms, email]
         toLast4:
           type: string
           example: "5678"
@@ -757,7 +837,7 @@ components:
           type: string
         status:
           type: string
-          enum: [queued, sent, failed]
+          enum: [scheduled, queued, sending, sent, failed]
         providerSelected:
           type: string
           nullable: true
@@ -971,10 +1051,54 @@ components:
 
     # ─── Campaigns ───────────────────────────────────────────────────────────
 
+    CampaignSmsContent:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+          example: "Hello from ReachDem"
+        from:
+          type: string
+          maxLength: 20
+          nullable: true
+          example: "ReachDem Orange"
+
+    CampaignEmailContent:
+      type: object
+      required:
+        - subject
+        - html
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Welcome to ReachDem"
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+          example: "<p>Hello from ReachDem</p>"
+        from:
+          type: string
+          maxLength: 200
+          nullable: true
+          example: "ReachDem Notifications"
+
+    CampaignContent:
+      oneOf:
+        - $ref: "#/components/schemas/CampaignSmsContent"
+        - $ref: "#/components/schemas/CampaignEmailContent"
+
     CreateCampaignDto:
       type: object
       required:
         - name
+        - channel
         - content
       properties:
         name:
@@ -986,14 +1110,30 @@ components:
           nullable: true
         channel:
           type: string
-          enum: [sms]
+          enum: [sms, email]
           default: sms
         content:
-          type: string
+          $ref: "#/components/schemas/CampaignContent"
         scheduledAt:
           type: string
           format: date-time
           nullable: true
+      examples:
+        sms:
+          value:
+            name: "March promo SMS"
+            channel: "sms"
+            content:
+              text: "Promo flash cette semaine"
+              from: "ReachDem Orange"
+        email:
+          value:
+            name: "March newsletter"
+            channel: "email"
+            content:
+              subject: "March updates"
+              html: "<h1>News</h1><p>Latest updates</p>"
+              from: "ReachDem Notifications"
 
     UpdateCampaignDto:
       type: object
@@ -1007,9 +1147,9 @@ components:
           nullable: true
         channel:
           type: string
-          enum: [sms]
+          enum: [sms, email]
         content:
-          type: string
+          $ref: "#/components/schemas/CampaignContent"
         scheduledAt:
           type: string
           format: date-time
@@ -1031,12 +1171,12 @@ components:
           nullable: true
         channel:
           type: string
-          enum: [sms]
+          enum: [sms, email]
         status:
           type: string
           enum: [draft, running, partial, completed, failed]
         content:
-          type: string
+          $ref: "#/components/schemas/CampaignContent"
         scheduledAt:
           type: string
           format: date-time

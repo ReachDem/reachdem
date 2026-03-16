@@ -1,0 +1,22 @@
+{
+  "name": "@reachdem/workers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reachdem/core": "workspace:*",
+    "@reachdem/shared": "workspace:*",
+    "nodemailer": "^8.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.39.0"
+  }
+}

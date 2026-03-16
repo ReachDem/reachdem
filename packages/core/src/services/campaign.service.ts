@@ -1,5 +1,4 @@
-import type { Campaign } from "@reachdem/database";
-import { prisma } from "@reachdem/database";
+import { prisma, type Campaign } from "@reachdem/database";
 import {
   CreateCampaignDto,
   UpdateCampaignDto,
@@ -7,9 +6,25 @@ import {
   CampaignResponse,
   CampaignListResponse,
   CampaignAudienceResponse,
+  type CampaignContent,
+  type EmailCampaignContent,
+  type SmsCampaignContent,
+  parseCampaignContent,
 } from "@reachdem/shared";
+import {
+  CampaignAudienceValidationError,
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+} from "../errors/campaign.errors";
 
 export class CampaignService {
+  static getCampaignContent(campaign: {
+    channel: "sms" | "email";
+    content: unknown;
+  }): SmsCampaignContent | EmailCampaignContent {
+    return parseCampaignContent(campaign.channel, campaign.content);
+  }
+
   /**
    * List campaigns for a workspace (paginated)
    */
@@ -70,12 +85,12 @@ export class CampaignService {
         organizationId,
         name: data.name,
         description: data.description || null,
-        channel: data.channel as "sms",
+        channel: data.channel as any,
         status: "draft",
-        content: data.content,
+        content: data.content as any,
         scheduledAt: data.scheduledAt || null,
         createdBy: userId || null,
-      },
+      } as any,
     });
 
     return this.mapToResponse(campaign);
@@ -89,27 +104,33 @@ export class CampaignService {
     id: string,
     data: UpdateCampaignDto
   ): Promise<CampaignResponse> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, organizationId },
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(`Cannot update campaign in status '${campaign.status}'`);
+      throw new CampaignInvalidStatusError(
+        `Cannot update campaign in status '${campaign.status}'`
+      );
     }
+
+    const nextChannel = data.channel ?? campaign.channel;
+    const nextContent = data.content ?? campaign.content;
+    parseCampaignContent(nextChannel, nextContent);
 
     const updated = await prisma.campaign.update({
       where: { id },
       data: {
         name: data.name,
         description: data.description,
-        channel: data.channel as "sms",
-        content: data.content,
+        channel: data.channel as any,
+        ...(data.content && { content: data.content as any }),
         scheduledAt: data.scheduledAt,
-      },
+      } as any,
     });
 
     return this.mapToResponse(updated);
@@ -122,16 +143,18 @@ export class CampaignService {
     organizationId: string,
     id: string
   ): Promise<void> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, organizationId },
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(`Cannot delete campaign in status '${campaign.status}'`);
+      throw new CampaignInvalidStatusError(
+        `Cannot delete campaign in status '${campaign.status}'`
+      );
     }
 
     await prisma.campaign.delete({
@@ -146,12 +169,12 @@ export class CampaignService {
     organizationId: string,
     campaignId: string
   ): Promise<CampaignAudienceResponse[]> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     const audiences = await prisma.campaignAudience.findMany({
@@ -177,17 +200,17 @@ export class CampaignService {
     campaignId: string,
     data: SetCampaignAudienceDto
   ): Promise<CampaignAudienceResponse[]> {
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
       include: { audiences: true },
     });
 
     if (!campaign) {
-      throw new Error("Campaign not found");
+      throw new CampaignNotFoundError();
     }
 
     if (campaign.status !== "draft") {
-      throw new Error(
+      throw new CampaignInvalidStatusError(
         `Cannot modify audience of campaign in status '${campaign.status}'`
       );
     }
@@ -247,7 +270,7 @@ export class CampaignService {
       });
 
       if (groups.length !== new Set(groupIds).size) {
-        throw new Error(
+        throw new CampaignAudienceValidationError(
           "Cannot modify audience with groups outside this workspace"
         );
       }
@@ -263,7 +286,7 @@ export class CampaignService {
       });
 
       if (segments.length !== new Set(segmentIds).size) {
-        throw new Error(
+        throw new CampaignAudienceValidationError(
           "Cannot modify audience with segments outside this workspace"
         );
       }
@@ -281,7 +304,7 @@ export class CampaignService {
       description: campaign.description,
       channel: campaign.channel,
       status: campaign.status,
-      content: campaign.content,
+      content: this.getCampaignContent(campaign as any) as CampaignContent,
       scheduledAt: campaign.scheduledAt,
       createdBy: campaign.createdBy,
       createdAt: campaign.createdAt,

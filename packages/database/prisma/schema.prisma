@@ -359,15 +359,21 @@ model ProviderCall {
 enum SmsProvider {
   twilio
   infobip
+  lmt
+  mboaSms
+  avlytext
   stub
 }
 
 enum MessageChannel {
   sms
+  email
 }
 
 enum MessageStatus {
+  scheduled
   queued
+  sending
   sent
   failed
 }
@@ -396,14 +402,19 @@ model Message {
   organizationId   String
   campaignId       String?
   channel          MessageChannel @default(sms)
+  toEmail          String?
+  toE164           String?
   toHashed         String // SHA-256 of full E.164 number
   toLast4          String // Last 4 digits for display/debug
   from             String // Sender ID
-  text             String // Content (in clear for MVP)
+  subject          String?
+  text             String? // Content (in clear for MVP)
+  html             String?
   status           MessageStatus  @default(queued)
   providerSelected String? // Name of the winning provider
   correlationId    String         @default(uuid())
   idempotencyKey   String
+  scheduledAt      DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -414,6 +425,7 @@ model Message {
   @@index([organizationId, createdAt])
   @@index([organizationId, campaignId])
   @@index([organizationId, status])
+  @@index([organizationId, channel, status, scheduledAt])
   @@map("message")
 }
 
@@ -449,6 +461,7 @@ enum CampaignStatus {
 
 enum CampaignChannel {
   sms
+  email
 }
 
 enum AudienceSourceType {
@@ -470,7 +483,7 @@ model Campaign {
   description    String?
   channel        CampaignChannel @default(sms)
   status         CampaignStatus  @default(draft)
-  content        String
+  content        Json
   scheduledAt    DateTime?
   createdBy      String?
 

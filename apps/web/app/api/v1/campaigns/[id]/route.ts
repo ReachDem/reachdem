@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CampaignService } from "@reachdem/core";
+import {
+  CampaignInvalidStatusError,
+  CampaignNotFoundError,
+  CampaignService,
+} from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
 import { updateCampaignSchema } from "@reachdem/shared";
 
@@ -46,10 +50,10 @@ export const PATCH = withWorkspace(async ({ req, organizationId, params }) => {
     return NextResponse.json(campaign);
   } catch (error: any) {
     console.error("[Campaign API - PATCH :id] Error:", error);
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    if (error.message.includes("Cannot update campaign")) {
+    if (error instanceof CampaignInvalidStatusError) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }
@@ -70,10 +74,10 @@ export const DELETE = withWorkspace(async ({ req, organizationId, params }) => {
     return NextResponse.json({ message: "Campaign deleted successfully" });
   } catch (error: any) {
     console.error("[Campaign API - DELETE :id] Error:", error);
-    if (error.message.includes("not found")) {
+    if (error instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    if (error.message.includes("Cannot delete campaign")) {
+    if (error instanceof CampaignInvalidStatusError) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }
