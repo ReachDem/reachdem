@@ -20,5 +20,10 @@ export default async function authProxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard"],
+  matcher: [
+    "/dashboard",
+    "/campaigns/:path*",
+    "/contacts/:path*",
+    "/settings/:path*",
+  ],
 };

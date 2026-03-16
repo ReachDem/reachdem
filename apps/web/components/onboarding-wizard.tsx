@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
+
+import { bootstrapWorkspace } from "@/actions/onboarding";
+import {
+  OnboardingStep,
+  OnboardingStepLeftWrapper,
+  OnboardingStepRightWrapper,
+  DashboardIllustration,
+} from "@/components/onboarding1";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,28 +22,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { REGEXP_ONLY_DIGITS } from "input-otp";
-
+import { Label } from "@/components/ui/label";
 import { useSound } from "@/hooks/use-sound";
+import { voiceoverPackFemaleReadySound } from "@/lib/voiceover-pack-female-ready";
+import { voiceoverPackFighterFinalRoundSound } from "@/lib/voiceover-pack-fighter-final-round";
 import { round1Sound } from "@/lib/round-1";
 import { round2Sound } from "@/lib/round-2";
-import { voiceoverPackFighterFinalRoundSound } from "@/lib/voiceover-pack-fighter-final-round";
-import { voiceoverPackFemaleReadySound } from "@/lib/voiceover-pack-female-ready";
-
-import { bootstrapWorkspace } from "@/actions/onboarding";
-import { signUp, authClient } from "@reachdem/auth/client";
-import {
-  OnboardingStep,
-  OnboardingStepLeftWrapper,
-  OnboardingStepRightWrapper,
-  DashboardIllustration,
-} from "@/components/onboarding1";
 import { cn } from "@/lib/utils";
+import { authClient, signUp } from "@reachdem/auth/client";
 
 const workspaceRoles = [
   "Software Engineer",
@@ -50,6 +48,7 @@ const workspaceRoles = [
 ] as const;
 
 type WorkspaceRole = (typeof workspaceRoles)[number];
+type OnboardingMode = "email-signup" | "verify-email" | "account-setup";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -64,7 +63,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface OnboardingWizardProps {
-  mode?: "email-signup" | "social-onboarding";
+  mode?: OnboardingMode;
   initialName?: string;
   initialEmail?: string;
 }
@@ -75,24 +74,27 @@ export function OnboardingWizard({
   initialEmail,
 }: OnboardingWizardProps) {
   const router = useRouter();
-  const isSocialOnboarding = mode === "social-onboarding";
-  const minimumStep = isSocialOnboarding ? 1 : 0;
-  const totalSteps = isSocialOnboarding ? 3 : 4;
+  const isEmailSignup = mode === "email-signup";
+  const isVerifyEmail = mode === "verify-email";
+  const isAccountSetup = mode === "account-setup";
+  const minimumStep = isAccountSetup ? 1 : 0;
+  const totalSteps = isAccountSetup ? 3 : 4;
   const [currentStep, setCurrentStep] = useState(minimumStep);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // OTP State
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
 
-  // Count down the resend cooldown
   useEffect(() => {
     if (resendCooldown <= 0) return;
-    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    const timer = setTimeout(
+      () => setResendCooldown((count) => count - 1),
+      1000
+    );
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
@@ -124,8 +126,7 @@ export function OnboardingWizard({
     defaultValues: {
       name: initialName ?? "",
       email: initialEmail ?? "",
-      // Keep schema-compatible value when onboarding an already authenticated social user.
-      password: isSocialOnboarding ? "social-auth" : "",
+      password: isEmailSignup ? "" : "authenticated-user",
       workspaceName: "",
       role: "Software Engineer",
     },
@@ -133,50 +134,94 @@ export function OnboardingWizard({
 
   const watchRole = watch("role");
   const watchWorkspace = watch("workspaceName");
+  const watchEmail = watch("email");
 
-  const steps = [
-    { title: "Set up your profile", fields: ["name", "email", "password"] },
-    { title: "Set up your workspace", fields: ["workspaceName"] },
-    { title: "Tell us more about you", fields: ["role"] },
-    { title: "Review and start", fields: [] },
-  ];
+  const steps = isVerifyEmail
+    ? [
+        { title: "Verify your email", fields: [] },
+        { title: "Set up your workspace", fields: ["workspaceName"] },
+        { title: "Tell us more about you", fields: ["role"] },
+        { title: "Review and start", fields: [] },
+      ]
+    : [
+        { title: "Set up your profile", fields: ["name", "email", "password"] },
+        { title: "Set up your workspace", fields: ["workspaceName"] },
+        { title: "Tell us more about you", fields: ["role"] },
+        { title: "Review and start", fields: [] },
+      ];
+
+  const sendVerificationCode = async () => {
+    const { error: sendError } = await authClient.emailOtp.sendVerificationOtp({
+      email: watchEmail,
+      type: "email-verification",
+    });
+
+    if (sendError) {
+      setOtpError(sendError.message || "Failed to send verification code.");
+      return false;
+    }
+
+    setOtpError(null);
+    setOtpValue("");
+    setVerificationEmailSent(true);
+    setResendCooldown(15);
+    setIsOtpModalOpen(true);
+    return true;
+  };
 
   const handleNext = async () => {
     const fieldsToValidate = steps[currentStep].fields as (keyof FormValues)[];
     const isStepValid = await trigger(fieldsToValidate);
+
     if (isStepValid) {
       setError(null);
-      setCurrentStep((prev) => prev + 1);
+      setCurrentStep((step) => step + 1);
     }
   };
 
   const handleBack = () => {
     setError(null);
-    setCurrentStep((prev) => Math.max(minimumStep, prev - 1));
+    setCurrentStep((step) => Math.max(minimumStep, step - 1));
+  };
+
+  const finalizeWorkspace = async (
+    workspaceName: string,
+    role: WorkspaceRole
+  ) => {
+    const result = await bootstrapWorkspace({
+      workspaceName,
+      role,
+    });
+
+    if (result?.error) {
+      return result.error;
+    }
+
+    router.replace("/");
+    router.refresh();
+    return null;
   };
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setError(null);
-    try {
-      if (isSocialOnboarding) {
-        const result = await bootstrapWorkspace({
-          workspaceName: data.workspaceName,
-          role: data.role,
-        });
 
-        if (result?.error) {
-          setError(result.error);
+    try {
+      if (!isEmailSignup) {
+        const setupError = await finalizeWorkspace(
+          data.workspaceName,
+          data.role
+        );
+
+        if (setupError) {
+          setError(setupError);
           setIsSubmitting(false);
           return;
         }
 
-        router.push("/dashboard");
-        router.refresh();
         return;
       }
 
-      // 1. Sign up user on the client to automatically manage session cookies
       const { error: signUpError } = await signUp.email({
         email: data.email,
         password: data.password,
@@ -189,23 +234,15 @@ export function OnboardingWizard({
         return;
       }
 
-      // Step 2: Send OTP and open modal
-      const { error: otpSendError } =
-        await authClient.emailOtp.sendVerificationOtp({
-          email: data.email,
-          type: "email-verification",
-        });
+      const sent = await sendVerificationCode();
 
-      if (otpSendError) {
-        setError(otpSendError.message || "Failed to send verification code.");
+      if (!sent) {
         setIsSubmitting(false);
         return;
       }
 
       setIsSubmitting(false);
-      setResendCooldown(15);
-      setIsOtpModalOpen(true);
-    } catch (err: Error | unknown) {
+    } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred."
       );
@@ -218,10 +255,9 @@ export function OnboardingWizard({
     setOtpError(null);
 
     try {
-      // 1. Verify OTP with Better Auth
       const { error: verifyError } = await authClient.emailOtp.verifyEmail({
-        email: watch("email"),
-        otp: otp,
+        email: watchEmail,
+        otp,
       });
 
       if (verifyError) {
@@ -232,27 +268,24 @@ export function OnboardingWizard({
         return;
       }
 
-      // 2. Bootstrap workspace securely via server action now that session is verified
-      const result = await bootstrapWorkspace({
-        workspaceName: watch("workspaceName"),
-        role: watch("role") as
-          | "Software Engineer"
-          | "Product Manager"
-          | "Designer"
-          | "Founder"
-          | "Sales"
-          | "Marketing"
-          | "Other",
-      });
-
-      if (result?.error) {
-        setOtpError(result.error);
+      if (isVerifyEmail) {
+        setIsOtpModalOpen(false);
         setOtpLoading(false);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
+        setCurrentStep(1);
+        return;
       }
-    } catch (err: Error | unknown) {
+
+      const setupError = await finalizeWorkspace(
+        watch("workspaceName"),
+        watch("role") as WorkspaceRole
+      );
+
+      if (setupError) {
+        setOtpError(setupError);
+        setOtpLoading(false);
+        return;
+      }
+    } catch (err) {
       setOtpError(
         err instanceof Error ? err.message : "An unexpected error occurred."
       );
@@ -262,18 +295,7 @@ export function OnboardingWizard({
 
   const handleResendOtp = async () => {
     if (resendCooldown > 0) return;
-    setOtpError(null);
-    setOtpValue("");
-    const { error: resendError } =
-      await authClient.emailOtp.sendVerificationOtp({
-        email: watch("email"),
-        type: "email-verification",
-      });
-    if (resendError) {
-      setOtpError(resendError.message || "Failed to resend code.");
-    } else {
-      setResendCooldown(15);
-    }
+    await sendVerificationCode();
   };
 
   const roles = workspaceRoles;
@@ -327,10 +349,17 @@ export function OnboardingWizard({
     }
   };
 
+  const submitLabel = isEmailSignup ? "Create account" : "Finish setup";
+  const submittingLabel = isEmailSignup
+    ? "Creating your account..."
+    : "Finalizing your workspace...";
+  const failureTitle = isEmailSignup
+    ? "Failed to create account"
+    : "Failed to finish setup";
+
   return (
     <div className="flex min-h-svh items-center justify-center py-10">
       <div className="w-full max-w-5xl px-4">
-        {/* Step 1: Profile */}
         {currentStep === 0 && (
           <OnboardingStep>
             <OnboardingStepLeftWrapper
@@ -338,71 +367,109 @@ export function OnboardingWizard({
               currentStep={0 - minimumStep}
               totalSteps={totalSteps}
             >
-              <form className="space-y-6 py-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full name</Label>
-                    <Input
-                      id="name"
-                      placeholder="John Doe"
-                      {...register("name")}
-                    />
-                    {errors.name && (
-                      <p className="text-destructive text-sm">
-                        {errors.name.message}
-                      </p>
-                    )}
+              {isVerifyEmail ? (
+                <div className="space-y-6 py-4">
+                  <div className="space-y-3">
+                    <p className="text-sm leading-6">
+                      You are signed in, but your account is not ready yet.
+                      Verify <span className="font-semibold">{watchEmail}</span>{" "}
+                      before creating your workspace.
+                    </p>
+                    <p className="text-muted-foreground text-sm leading-6">
+                      We will send a 6-digit verification code and keep you in
+                      setup until the account is fully provisioned.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="john@example.com"
-                      {...register("email")}
-                    />
-                    {errors.email && (
-                      <p className="text-destructive text-sm">
-                        {errors.email.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      {...register("password")}
-                    />
-                    {errors.password && (
-                      <p className="text-destructive text-sm">
-                        {errors.password.message}
-                      </p>
-                    )}
-                  </div>
+
+                  {error && (
+                    <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
+                      <p className="font-semibold">Unable to continue</p>
+                      <p>{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      setError(null);
+                      const sent = await sendVerificationCode();
+                      if (!sent) {
+                        setError("Failed to send verification code.");
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    {verificationEmailSent
+                      ? "Send a new verification code"
+                      : "Send verification code"}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="mt-4 w-full"
-                >
-                  Continue
-                </Button>
-              </form>
+              ) : (
+                <form className="space-y-6 py-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full name</Label>
+                      <Input
+                        id="name"
+                        placeholder="John Doe"
+                        {...register("name")}
+                      />
+                      {errors.name && (
+                        <p className="text-destructive text-sm">
+                          {errors.name.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="john@example.com"
+                        {...register("email")}
+                      />
+                      {errors.email && (
+                        <p className="text-destructive text-sm">
+                          {errors.email.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        {...register("password")}
+                      />
+                      {errors.password && (
+                        <p className="text-destructive text-sm">
+                          {errors.password.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="mt-4 w-full"
+                  >
+                    Continue
+                  </Button>
+                </form>
+              )}
             </OnboardingStepLeftWrapper>
             <OnboardingStepRightWrapper>
               <DashboardIllustration
                 userProfile={{
                   name: watch("name"),
-                  email: watch("email"),
+                  email: watchEmail,
                 }}
               />
             </OnboardingStepRightWrapper>
           </OnboardingStep>
         )}
 
-        {/* Step 2: Workspace */}
         {currentStep === 1 && (
           <OnboardingStep>
             <OnboardingStepLeftWrapper
@@ -445,7 +512,6 @@ export function OnboardingWizard({
           </OnboardingStep>
         )}
 
-        {/* Step 3: Role */}
         {currentStep === 2 && (
           <OnboardingStep>
             <OnboardingStepLeftWrapper
@@ -459,21 +525,21 @@ export function OnboardingWizard({
                   <div className="space-y-2">
                     <p className="text-sm">What best describes your work?</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      {roles.map((r) => (
+                      {roles.map((role) => (
                         <div
-                          key={r}
+                          key={role}
                           role="button"
                           className={cn(
                             "cursor-pointer rounded-lg border px-3 py-2 text-sm",
-                            watchRole === r
+                            watchRole === role
                               ? "border-primary bg-primary/10"
                               : "hover:bg-muted/50"
                           )}
                           onClick={() =>
-                            setValue("role", r, { shouldValidate: true })
+                            setValue("role", role, { shouldValidate: true })
                           }
                         >
-                          {r}
+                          {role}
                         </div>
                       ))}
                     </div>
@@ -506,7 +572,6 @@ export function OnboardingWizard({
           </OnboardingStep>
         )}
 
-        {/* Step 4: Review and Submit */}
         {currentStep === 3 && (
           <OnboardingStep>
             <OnboardingStepLeftWrapper
@@ -530,7 +595,7 @@ export function OnboardingWizard({
                     <p className="text-muted-foreground text-sm font-medium">
                       Email
                     </p>
-                    <p>{watch("email")}</p>
+                    <p>{watchEmail}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-sm font-medium">
@@ -548,7 +613,7 @@ export function OnboardingWizard({
 
                 {error && (
                   <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
-                    <p className="font-semibold">Failed to create account</p>
+                    <p className="font-semibold">{failureTitle}</p>
                     <p>{error}</p>
                   </div>
                 )}
@@ -558,13 +623,7 @@ export function OnboardingWizard({
                   className="w-full"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? isSocialOnboarding
-                      ? "Finalizing your workspace..."
-                      : "Creating your account..."
-                    : isSocialOnboarding
-                      ? "Finish setup"
-                      : "Create account"}
+                  {isSubmitting ? submittingLabel : submitLabel}
                 </Button>
               </form>
             </OnboardingStepLeftWrapper>
@@ -585,7 +644,7 @@ export function OnboardingWizard({
             <DialogDescription>
               We sent a 6-digit verification code to{" "}
               <span className="text-foreground font-semibold">
-                {watch("email")}
+                {watchEmail}
               </span>
               . Please enter it below.
             </DialogDescription>
@@ -598,7 +657,7 @@ export function OnboardingWizard({
               onChange={(value) => {
                 setOtpValue(value);
                 if (value.length === 6) {
-                  handleVerifyOtp(value);
+                  void handleVerifyOtp(value);
                 }
               }}
               disabled={otpLoading}
@@ -630,7 +689,9 @@ export function OnboardingWizard({
               ) : (
                 <button
                   type="button"
-                  onClick={handleResendOtp}
+                  onClick={() => {
+                    void handleResendOtp();
+                  }}
                   className="text-foreground hover:text-primary font-semibold underline underline-offset-4 transition-colors"
                 >
                   Resend code

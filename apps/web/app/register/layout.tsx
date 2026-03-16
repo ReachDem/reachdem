@@ -2,12 +2,16 @@ import { redirect } from "next/navigation";
 
 import { getAuthFlowState } from "@/lib/auth-flow";
 
-export default async function SignupPage() {
+export default async function RegisterLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const flow = await getAuthFlowState();
 
   if (flow.hasSession) {
-    redirect("/continue-setup");
+    redirect(flow.nextPath);
   }
 
-  redirect("/register");
+  return <>{children}</>;
 }

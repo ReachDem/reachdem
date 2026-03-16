@@ -1,7 +1,5 @@
+import { OnboardingWizard } from "@/components/onboarding-wizard";
+
 export default function RegisterPage() {
-  return (
-    <div>
-      <h1>Register</h1>
-    </div>
-  );
+  return <OnboardingWizard mode="email-signup" />;
 }

@@ -24,10 +24,10 @@ export type WorkspacePayload = z.infer<typeof workspaceSchema>;
 export async function bootstrapWorkspace(payload: WorkspacePayload) {
   try {
     const validatedData = workspaceSchema.parse(payload);
+    const requestHeaders = await headers();
 
-    // 1. Get the authenticated user (created by the client-side signUp)
     const session = await auth.api.getSession({
-      headers: await headers(),
+      headers: requestHeaders,
     });
 
     if (!session?.user?.id) {
@@ -36,52 +36,62 @@ export async function bootstrapWorkspace(payload: WorkspacePayload) {
       };
     }
 
+    if (!session.user.emailVerified) {
+      return {
+        error: "Verify your email address before creating a workspace.",
+      };
+    }
+
     const userId = session.user.id;
 
-    // 2. Idempotency guard – prevent duplicate orgs / DoS via repeated calls
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
       select: { defaultOrganizationId: true },
     });
 
     if (existingUser?.defaultOrganizationId) {
-      return { success: true }; // already onboarded, treat as no-op
+      if (
+        session.session.activeOrganizationId !==
+        existingUser.defaultOrganizationId
+      ) {
+        await auth.api.setActiveOrganization({
+          headers: requestHeaders,
+          body: {
+            organizationId: existingUser.defaultOrganizationId,
+          },
+        });
+      }
+
+      return {
+        success: true,
+        organizationId: existingUser.defaultOrganizationId,
+      };
     }
 
-    // 3. Transact: Create Organization, Membership, Update User
     const slug = await generateUniqueOrganizationSlug(
       validatedData.workspaceName
     );
-    const orgId = crypto.randomUUID();
-    const memberId = crypto.randomUUID();
+    const organization = await auth.api.createOrganization({
+      headers: requestHeaders,
+      body: {
+        name: validatedData.workspaceName,
+        slug,
+      },
+    });
 
-    await prisma.$transaction([
-      prisma.organization.create({
-        data: {
-          id: orgId,
-          name: validatedData.workspaceName,
-          slug,
-        },
-      }),
-      prisma.member.create({
-        data: {
-          id: memberId,
-          organizationId: orgId,
-          userId: userId,
-          role: "owner",
-        },
-      }),
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          role: validatedData.role,
-          defaultOrganizationId: orgId,
-        },
-      }),
-    ]);
+    if (!organization?.id) {
+      return { error: "Failed to create your workspace." };
+    }
 
-    // Return success, the client will then redirect
-    return { success: true };
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: validatedData.role,
+        defaultOrganizationId: organization.id,
+      },
+    });
+
+    return { success: true, organizationId: organization.id };
   } catch (error: Error | unknown) {
     console.error("Workspace setup failed:", error);
     return { error: "An unexpected error occurred during workspace setup." };
