@@ -5,6 +5,7 @@ import {
   IconMessage,
   type Icon,
 } from "@tabler/icons-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,17 +86,19 @@ export function NavMain({
               </div>
             ) : (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton tooltip={item.title}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                  {item.badge && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-auto px-1.5 py-0 text-[10px]"
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
+                <SidebarMenuButton tooltip={item.title} asChild>
+                  <Link href={item.url}>
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                    {item.badge && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto px-1.5 py-0 text-[10px]"
+                      >
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )

@@ -30,7 +30,7 @@ export function LoginForm({
       setLoading(true);
       await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: "/",
       });
     } catch (error) {
       console.error("Erreur login Google:", error);
@@ -50,13 +50,13 @@ export function LoginForm({
       const result = await signIn.email({
         email,
         password,
-        callbackURL: "/dashboard",
+        callbackURL: "/",
       });
 
       if (result.error) {
         setError(result.error.message ?? "Invalid email or password.");
       } else {
-        router.push("/dashboard");
+        router.replace("/");
       }
     } catch (err) {
       console.error("Erreur login email:", err);
@@ -71,7 +71,9 @@ export function LoginForm({
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Login with your Google account</CardDescription>
+          <CardDescription>
+            Sign in to continue or finish setting up your workspace.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6">
@@ -115,15 +117,7 @@ export function LoginForm({
                 />
               </div>
               <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <a
-                    href="#"
-                    className="ml-auto text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -142,8 +136,8 @@ export function LoginForm({
             </form>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
-              <a href="/signup" className="underline underline-offset-4">
-                Sign up
+              <a href="/register" className="underline underline-offset-4">
+                Create one
               </a>
             </div>
           </div>

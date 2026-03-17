@@ -25,7 +25,14 @@ export class GroupMemberService {
 
     const [memberships, total] = await Promise.all([
       prisma.groupMember.findMany({
-        where: { groupId },
+        where: {
+          groupId,
+          contact: {
+            is: {
+              deletedAt: null,
+            },
+          },
+        },
         take: limit,
         orderBy: { addedAt: "desc" },
         include: {
@@ -49,7 +56,16 @@ export class GroupMemberService {
           : undefined,
         skip: options.cursor ? 1 : undefined,
       }),
-      prisma.groupMember.count({ where: { groupId } }),
+      prisma.groupMember.count({
+        where: {
+          groupId,
+          contact: {
+            is: {
+              deletedAt: null,
+            },
+          },
+        },
+      }),
     ]);
 
     const items = memberships.map((m) => m.contact);
@@ -94,6 +110,7 @@ export class GroupMemberService {
           where: {
             id: { in: chunk },
             organizationId,
+            deletedAt: null,
           },
         });
         validContactsCount += count;

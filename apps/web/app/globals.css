@@ -121,3 +121,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes theme-wave-reveal {
+  from {
+    clip-path: circle(0 at var(--theme-wave-x, 50vw) var(--theme-wave-y, 50vh));
+  }
+
+  to {
+    clip-path: circle(
+      150vmax at var(--theme-wave-x, 50vw) var(--theme-wave-y, 50vh)
+    );
+  }
+}
+
+html.theme-transition::view-transition-old(root),
+html.theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-transition::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.theme-transition::view-transition-new(root) {
+  z-index: 2;
+  animation: theme-wave-reveal 1400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
