@@ -86,7 +86,7 @@ export async function createCampaign(data: {
   const payload: CreateCampaignDto = {
     name: data.name,
     description: data.description ?? undefined,
-    channel: data.channel as "sms",
+    channel: data.channel as "sms" | "email" | "push",
     content: data.content,
   };
 
