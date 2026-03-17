@@ -118,7 +118,7 @@ export async function updateCampaign(
   data: {
     name?: string;
     description?: string | null;
-    channel?: string;
+    channel?: "sms" | "email";
     content?: UpdateCampaignDto["content"];
     audienceGroups?: string[];
     audienceSegments?: string[];
