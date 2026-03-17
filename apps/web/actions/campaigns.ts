@@ -74,7 +74,7 @@ export async function getCampaignById(id: string): Promise<Campaign | null> {
 export async function createCampaign(data: {
   name: string;
   description: string | null;
-  channel: string;
+  channel: "sms" | "email";
   content: CreateCampaignDto["content"];
   audienceGroups: string[];
   audienceSegments: string[];
