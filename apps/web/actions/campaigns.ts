@@ -14,6 +14,8 @@ import type {
   UpdateCampaignDto,
   CampaignResponse,
 } from "@reachdem/shared";
+import { publishEmailJob } from "@/lib/publish-email-job";
+import { publishSmsJob } from "@/lib/publish-sms-job";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -73,7 +75,7 @@ export async function createCampaign(data: {
   name: string;
   description: string | null;
   channel: string;
-  content: string;
+  content: CreateCampaignDto["content"];
   audienceGroups: string[];
   audienceSegments: string[];
 }) {
@@ -82,7 +84,7 @@ export async function createCampaign(data: {
   const payload: CreateCampaignDto = {
     name: data.name,
     description: data.description ?? undefined,
-    channel: data.channel as "sms" | "email" | "push",
+    channel: data.channel as "sms" | "email",
     content: data.content,
   };
 
@@ -117,7 +119,7 @@ export async function updateCampaign(
     name?: string;
     description?: string | null;
     channel?: string;
-    content?: string;
+    content?: UpdateCampaignDto["content"];
     audienceGroups?: string[];
     audienceSegments?: string[];
   }
@@ -128,7 +130,8 @@ export async function updateCampaign(
   if (data.name !== undefined) payload.name = data.name;
   if (data.description !== undefined)
     payload.description = data.description ?? undefined;
-  if (data.channel !== undefined) payload.channel = data.channel as "sms";
+  if (data.channel !== undefined)
+    payload.channel = data.channel as "sms" | "email";
   if (data.content !== undefined) payload.content = data.content;
 
   const updatedCampaign = await CampaignService.updateCampaign(
@@ -180,7 +183,12 @@ export async function deleteCampaign(id: string) {
 
 export async function launchCampaign(id: string) {
   const { organizationId } = await getOrganizationId();
-  await LaunchCampaignUseCase.execute(organizationId, id);
+  await LaunchCampaignUseCase.execute(
+    organizationId,
+    id,
+    publishSmsJob,
+    publishEmailJob
+  );
   revalidatePath("/campaigns");
   revalidatePath(`/campaigns/${id}/edit`);
   return { success: true };

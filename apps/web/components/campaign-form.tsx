@@ -70,10 +70,10 @@ export function CampaignForm({
         typeof (initialData as any)?.content === "string"
           ? ((initialData as any)?.content as string)
           : initialData?.channel === "sms"
-          ? (((initialData as any)?.content?.text as string) ?? "")
-          : initialData?.channel === "email"
-          ? (((initialData as any)?.content?.html as string) ?? "")
-          : "",
+            ? (((initialData as any)?.content?.text as string) ?? "")
+            : initialData?.channel === "email"
+              ? (((initialData as any)?.content?.html as string) ?? "")
+              : "",
       audienceGroups: initialData?.audienceGroups || [],
       audienceSegments: initialData?.audienceSegments || [],
     },
@@ -235,7 +235,7 @@ export function CampaignForm({
               <Select
                 value={watchChannel}
                 onValueChange={(val) =>
-                  setValue("channel", val, {
+                  setValue("channel", val as FormValues["channel"], {
                     shouldValidate: true,
                     shouldDirty: true,
                   })
