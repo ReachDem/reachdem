@@ -23,7 +23,10 @@ async function main() {
     name: "Winter Outreach 2026",
     description: "Cold outreach to potential leads.",
     channel: "sms",
-    content: "Hi there, winter is coming. Get ready with ReachDem!",
+    content: {
+      text: "Hi there, winter is coming. Get ready with ReachDem!",
+      from: "ReachDem",
+    },
   });
   console.log(`Created Campaign: ${camp1.name} (${camp1.id})`);
 
@@ -31,7 +34,10 @@ async function main() {
     name: "VIP Members Alert",
     description: "Exclusive notification for VIP members.",
     channel: "sms",
-    content: "You are a VIP! Reply to this message to claim your reward.",
+    content: {
+      text: "You are a VIP! Reply to this message to claim your reward.",
+      from: "ReachDem",
+    },
   });
   console.log(`Created Campaign: ${camp2.name} (${camp2.id})`);
 
@@ -41,7 +47,10 @@ async function main() {
       name: `Automated Follow-up Batch ${i}`,
       description: `Auto-generated batch ${i} for testing.`,
       channel: "sms",
-      content: `Hello, this is message batch ${i}. Thank you for subscribing.`,
+      content: {
+        text: `Hello, this is message batch ${i}. Thank you for subscribing.`,
+        from: "ReachDem",
+      },
     });
     console.log(`Created Campaign: ${camp.name} (${camp.id})`);
   }
