@@ -9,7 +9,11 @@ import {
   SegmentService,
   LaunchCampaignUseCase,
 } from "@reachdem/core";
-import type { CreateCampaignDto, UpdateCampaignDto } from "@reachdem/shared";
+import type {
+  CreateCampaignDto,
+  UpdateCampaignDto,
+  CampaignResponse,
+} from "@reachdem/shared";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -23,17 +27,9 @@ async function getOrganizationId() {
   return { organizationId, userId: session.user.id };
 }
 
-export type Campaign = {
-  id: string;
-  name: string;
-  description: string | null;
-  channel: string;
-  content: string;
-  status: string;
+export type Campaign = CampaignResponse & {
   audienceGroups: string[];
   audienceSegments: string[];
-  createdAt: string | Date;
-  updatedAt: string | Date;
 };
 
 export async function getCampaigns(): Promise<Campaign[]> {

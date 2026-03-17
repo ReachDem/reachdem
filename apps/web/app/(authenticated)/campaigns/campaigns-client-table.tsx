@@ -110,20 +110,35 @@ export function CampaignsClientTable({
             Draft
           </Badge>
         );
-      case "active":
+      case "running":
         return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600">Active</Badge>
+          <Badge className="bg-emerald-500 hover:bg-emerald-600">
+            Running
+          </Badge>
         );
-      case "scheduled":
+      case "partial":
         return (
-          <Badge variant="secondary" className="text-blue-500">
-            Scheduled
+          <Badge
+            variant="secondary"
+            className="bg-amber-50 text-amber-700 hover:bg-amber-100"
+          >
+            Partial
           </Badge>
         );
       case "completed":
         return <Badge variant="secondary">Completed</Badge>;
+      case "failed":
+        return (
+          <Badge variant="destructive">
+            Failed
+          </Badge>
+        );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return (
+          <Badge variant="outline" className="capitalize">
+            {status}
+          </Badge>
+        );
     }
   };
 

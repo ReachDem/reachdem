@@ -28,7 +28,10 @@ import { zodFormResolver } from "@/lib/zod-form-resolver";
 const formSchema = z.object({
   name: z.string().min(1, "Campaign name is required"),
   description: z.string().optional(),
-  channel: z.string().min(1, "Please select a channel"),
+  channel: z.enum(["sms", "email"], {
+    required_error: "Please select a channel",
+    invalid_type_error: "Please select a valid channel",
+  }),
   content: z.string().min(1, "Campaign content is required"),
   audienceGroups: z.array(z.string()),
   audienceSegments: z.array(z.string()),
@@ -62,8 +65,15 @@ export function CampaignForm({
     defaultValues: {
       name: initialData?.name || "",
       description: initialData?.description || "",
-      channel: initialData?.channel || "",
-      content: initialData?.content || "",
+      channel: (initialData?.channel as FormValues["channel"]) || "sms",
+      content:
+        typeof (initialData as any)?.content === "string"
+          ? ((initialData as any)?.content as string)
+          : initialData?.channel === "sms"
+          ? (((initialData as any)?.content?.text as string) ?? "")
+          : initialData?.channel === "email"
+          ? (((initialData as any)?.content?.html as string) ?? "")
+          : "",
       audienceGroups: initialData?.audienceGroups || [],
       audienceSegments: initialData?.audienceSegments || [],
     },
@@ -87,15 +97,29 @@ export function CampaignForm({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const payload = {
-        ...values,
+      const dtoPayload = {
+        name: values.name,
         description: values.description || null,
+        channel: values.channel,
+        content:
+          values.channel === "sms"
+            ? {
+                text: values.content,
+                from: "",
+              }
+            : {
+                subject: "",
+                html: values.content,
+                from: "",
+              },
+        audienceGroups: values.audienceGroups,
+        audienceSegments: values.audienceSegments,
       };
       if (isEditing && initialData) {
-        await updateCampaign(initialData.id, payload);
+        await updateCampaign(initialData.id, dtoPayload);
         toast.success("Campaign updated successfully");
       } else {
-        await createCampaign(payload);
+        await createCampaign(dtoPayload);
         toast.success("Campaign created successfully");
       }
       router.push("/campaigns");
@@ -231,7 +255,6 @@ export function CampaignForm({
                 <SelectContent>
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="push">Push Notification</SelectItem>
                 </SelectContent>
               </Select>
               {errors.channel && (
