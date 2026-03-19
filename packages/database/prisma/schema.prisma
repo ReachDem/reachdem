@@ -102,6 +102,7 @@ model Organization {
   smsConfig      WorkspaceSmsConfig?
   messages       Message[]
   campaigns      Campaign[]
+  trackedLinks   TrackedLink[]
 
   @@map("organization")
 }
@@ -195,6 +196,7 @@ model Contact {
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships     GroupMember[]
   campaignTargets CampaignTarget[]
+  trackedLinks    TrackedLink[]
 
   @@index([organizationId])
   @@index([phoneE164])
@@ -420,6 +422,7 @@ model Message {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   attempts     MessageAttempt[]
+  trackedLinks  TrackedLink[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
@@ -464,6 +467,11 @@ enum CampaignChannel {
   email
 }
 
+enum TrackedLinkStatus {
+  active
+  disabled
+}
+
 enum AudienceSourceType {
   group
   segment
@@ -493,6 +501,7 @@ model Campaign {
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   audiences    CampaignAudience[]
   targets      CampaignTarget[]
+  trackedLinks TrackedLink[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
@@ -537,4 +546,36 @@ model CampaignTarget {
   @@index([campaignId, status])
   @@index([organizationId, contactId])
   @@map("campaign_target")
+}
+
+model TrackedLink {
+  id              String            @id @default(uuid())
+  organizationId  String
+  sinkLinkId      String
+  slug            String
+  shortUrl        String
+  targetUrl       String
+  campaignId      String?
+  messageId       String?
+  contactId       String?
+  channel         MessageChannel?
+  status          TrackedLinkStatus @default(active)
+  totalClicks     Int?
+  uniqueClicks    Int?
+  lastStatsSyncAt DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  message      Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, slug])
+  @@unique([sinkLinkId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, campaignId])
+  @@index([organizationId, messageId])
+  @@index([organizationId, contactId])
+  @@map("tracked_link")
 }

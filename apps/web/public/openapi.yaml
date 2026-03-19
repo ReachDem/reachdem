@@ -596,6 +596,135 @@ paths:
         "404":
           description: Campaign not found
 
+  /links:
+    get:
+      summary: List Tracked Links
+      description: Returns a paginated, workspace-scoped list of tracked links with optional campaign, message, or contact filters.
+      tags: [Links]
+      parameters:
+        - in: query
+          name: campaignId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: messageId
+          schema:
+            type: string
+        - in: query
+          name: contactId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated tracked link list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedLinkListResponse"
+    post:
+      summary: Create Tracked Link
+      description: Creates a short link in Sink, then stores the business mapping in ReachDem.
+      tags: [Links]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTrackedLinkDto"
+      responses:
+        "201":
+          description: Tracked link created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedLinkResponse"
+        "400":
+          description: Validation error
+
+  /links/{id}:
+    get:
+      summary: Get Tracked Link
+      description: Returns a single tracked link scoped to the active workspace.
+      tags: [Links]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Tracked link detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedLinkResponse"
+        "404":
+          description: Tracked link not found
+    patch:
+      summary: Update Tracked Link
+      description: Updates a tracked link in ReachDem and, when supported, propagates the target change to Sink.
+      tags: [Links]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTrackedLinkDto"
+      responses:
+        "200":
+          description: Tracked link updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedLinkResponse"
+        "400":
+          description: Validation error
+        "404":
+          description: Tracked link not found
+
+  /links/{id}/stats:
+    get:
+      summary: Refresh Tracked Link Stats
+      description: Refreshes total and unique click counters from Sink using the tracked link slug.
+      tags: [Links]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Tracked link stats refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedLinkStatsResponse"
+        "404":
+          description: Tracked link not found
+
   # ─── SMS Messaging ─────────────────────────────────────────────────────────
 
   /sms/send:
@@ -1241,3 +1370,130 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    CreateTrackedLinkDto:
+      type: object
+      required:
+        - targetUrl
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+          example: "https://example.com/landing"
+        slug:
+          type: string
+          nullable: true
+          example: "reachdem-campaign"
+        campaignId:
+          type: string
+          format: uuid
+          nullable: true
+        messageId:
+          type: string
+          nullable: true
+        contactId:
+          type: string
+          format: uuid
+          nullable: true
+        channel:
+          type: string
+          enum: [sms, email]
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+
+    UpdateTrackedLinkDto:
+      type: object
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          type: string
+          enum: [active, disabled]
+          nullable: true
+
+    TrackedLinkResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+        sinkLinkId:
+          type: string
+        slug:
+          type: string
+        shortUrl:
+          type: string
+          format: uri
+        targetUrl:
+          type: string
+          format: uri
+        campaignId:
+          type: string
+          format: uuid
+          nullable: true
+        messageId:
+          type: string
+          nullable: true
+        contactId:
+          type: string
+          format: uuid
+          nullable: true
+        channel:
+          type: string
+          enum: [sms, email]
+          nullable: true
+        status:
+          type: string
+          enum: [active, disabled]
+        totalClicks:
+          type: integer
+          nullable: true
+        uniqueClicks:
+          type: integer
+          nullable: true
+        lastStatsSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TrackedLinkStatsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+        totalClicks:
+          type: integer
+          nullable: true
+        uniqueClicks:
+          type: integer
+          nullable: true
+        lastStatsSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    TrackedLinkListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackedLinkResponse"
+        nextCursor:
+          type: string
+          nullable: true
