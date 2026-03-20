@@ -3,6 +3,7 @@ import { CompositeSmseSender } from "./composite-sms-sender";
 import { truncate } from "../utils/pii-scrubber";
 import type { SmsExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
+import { CampaignStatsService } from "./campaign-stats.service";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
@@ -51,6 +52,7 @@ export class ProcessSmsMessageJobUseCase {
 
       await this.markCampaignTarget(message.id, "failed");
       await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       return "failed";
     }
@@ -114,6 +116,7 @@ export class ProcessSmsMessageJobUseCase {
 
       await this.markCampaignTarget(message.id, "sent");
       await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       return "sent";
     }
@@ -163,6 +166,7 @@ export class ProcessSmsMessageJobUseCase {
 
     await this.markCampaignTarget(message.id, "failed");
     await this.finalizeCampaignIfReady(message.campaignId);
+    await CampaignStatsService.invalidate(message.campaignId);
 
     await ActivityLogger.log({
       organizationId: job.organization_id,

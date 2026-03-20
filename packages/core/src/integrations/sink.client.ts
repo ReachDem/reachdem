@@ -95,32 +95,12 @@ export class SinkClient {
     return parsed.data;
   }
 
-  private static async requestJson(
-    path: string,
-    init: RequestInit
-  ): Promise<unknown> {
-    let response: Response;
-
-    try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        ...init,
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          ...(init.body ? { "Content-Type": "application/json" } : {}),
-          ...init.headers,
-        },
-      });
-    } catch (error: any) {
-      throw new SinkUnavailableError(error?.message);
-    }
-
-    if (!response.ok) {
-      throw new SinkUnavailableError(
-        `Sink API request failed with HTTP ${response.status}`
-      );
-    }
-
-    return response.json();
+  static getPublicShortUrl(slug: string): string {
+    const base =
+      process.env.SINK_PUBLIC_BASE_URL ??
+      process.env.SINK_API_BASE_URL ??
+      "https://rcdm.ink";
+    return `${base.replace(/\/+$/, "")}/${slug}`;
   }
 
   static async createLink(input: {
@@ -128,7 +108,7 @@ export class SinkClient {
     slug?: string;
     comment?: string;
   }): Promise<SinkLinkResponse> {
-    const payload = await this.requestJson("/api/link/create", {
+    const payload = await this.request<unknown>("/api/link/create", {
       method: "POST",
       body: JSON.stringify(input),
     });

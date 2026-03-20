@@ -10,6 +10,7 @@ export * from "./services/segment.service";
 
 export * from "./services/activity-logger.service";
 export * from "./services/campaign.service";
+export * from "./services/campaign-stats.service";
 export * from "./services/launch-campaign.usecase";
 export * from "./services/send-sms.usecase";
 export * from "./services/composite-sms-sender";
@@ -22,6 +23,7 @@ export * from "./services/process-email-message-job.usecase";
 export * from "./services/tracked-link.service";
 export * from "./errors/campaign.errors";
 export * from "./integrations/sink.client";
+export * from "./integrations/redis-cache.client";
 export * from "./utils/segment-compiler";
 export * from "./utils/pii-scrubber";
 export * from "./utils/cameroon-mobile-routing";

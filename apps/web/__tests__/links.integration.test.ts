@@ -1,4 +1,12 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { NextRequest } from "next/server";
 import { prisma } from "@reachdem/database";
 import { randomUUID } from "crypto";
@@ -44,6 +52,7 @@ describe("Links API - integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     currentTargetUrl = "https://example.com/landing";
     currentSlug = `reachdem-test-link-${Date.now()}`;
     currentSinkId = `sink_${Date.now()}`;
@@ -144,6 +153,10 @@ describe("Links API - integration", () => {
         return originalFetch(input, init);
       })
     );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   afterAll(async () => {

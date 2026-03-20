@@ -7,6 +7,7 @@ import type {
   UpdateTrackedLinkDto,
 } from "@reachdem/shared";
 import { SinkClient } from "../integrations/sink.client";
+import { CampaignStatsService } from "./campaign-stats.service";
 
 export class TrackedLinkNotFoundError extends Error {
   constructor() {
@@ -52,7 +53,7 @@ export class TrackedLinkService {
         organizationId,
         sinkLinkId: created.id,
         slug: created.slug,
-        shortUrl: `${process.env.SINK_PUBLIC_BASE_URL ?? process.env.SINK_API_BASE_URL ?? "https://rcdm.ink"}/${created.slug}`,
+        shortUrl: SinkClient.getPublicShortUrl(created.slug),
         targetUrl: created.url,
         campaignId: data.campaignId ?? null,
         messageId: data.messageId ?? null,
@@ -120,29 +121,20 @@ export class TrackedLinkService {
       throw new TrackedLinkNotFoundError();
     }
 
+    let targetUrl = existing.targetUrl;
+
     if (data.targetUrl) {
       const updatedRemote = await SinkClient.editLink({
         slug: existing.slug,
         url: data.targetUrl,
       });
-
-      const updated = await prisma.trackedLink.update({
-        where: { id: existing.id },
-        data: {
-          targetUrl: updatedRemote.url,
-        },
-      });
-
-      return this.toResponse(updated);
-    }
-
-    if (data.status === "disabled" && existing.status !== "disabled") {
-      await SinkClient.deleteLink(existing.slug);
+      targetUrl = updatedRemote.url;
     }
 
     const updated = await prisma.trackedLink.update({
       where: { id: existing.id },
       data: {
+        targetUrl,
         ...(data.status ? { status: data.status } : {}),
       },
     });
@@ -171,6 +163,8 @@ export class TrackedLinkService {
         lastStatsSyncAt: new Date(),
       },
     });
+
+    await CampaignStatsService.invalidate(updated.campaignId);
 
     return {
       id: updated.id,

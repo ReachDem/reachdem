@@ -2,6 +2,7 @@ import { prisma } from "@reachdem/database";
 import type { EmailExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { truncate } from "../utils/pii-scrubber";
+import { CampaignStatsService } from "./campaign-stats.service";
 
 export interface EmailSendResult {
   success: boolean;
@@ -52,6 +53,7 @@ export class ProcessEmailMessageJobUseCase {
 
       await this.markCampaignTarget(message.id, "failed");
       await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       await ActivityLogger.log({
         organizationId: job.organization_id,
@@ -121,6 +123,7 @@ export class ProcessEmailMessageJobUseCase {
 
       await this.markCampaignTarget(message.id, "sent");
       await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       return "sent";
     }
@@ -168,6 +171,7 @@ export class ProcessEmailMessageJobUseCase {
 
     await this.markCampaignTarget(message.id, "failed");
     await this.finalizeCampaignIfReady(message.campaignId);
+    await CampaignStatsService.invalidate(message.campaignId);
 
     await ActivityLogger.log({
       organizationId: job.organization_id,
