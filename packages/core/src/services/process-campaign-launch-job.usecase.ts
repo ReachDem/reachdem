@@ -285,7 +285,8 @@ export class ProcessCampaignLaunchJobUseCase {
   ): void {
     for (const contact of contacts) {
       if (
-        (!contact.phoneE164 && !contact.email) ||
+        (channel === "sms" && !contact.phoneE164) ||
+        (channel === "email" && !contact.email) ||
         uniqueContacts.has(contact.id)
       ) {
         continue;
