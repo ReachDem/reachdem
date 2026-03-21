@@ -235,14 +235,15 @@ export class ProcessCampaignLaunchJobUseCase {
             email: true,
           },
         });
-        this.collectContacts(uniqueContacts, contacts);
+        this.collectContacts(uniqueContacts, contacts, channel);
         continue;
       }
 
       await this.collectSegmentContacts(
         uniqueContacts,
         organizationId,
-        audience.sourceId
+        audience.sourceId,
+        channel
       );
     }
 
@@ -281,7 +282,8 @@ export class ProcessCampaignLaunchJobUseCase {
       id: string;
       phoneE164: string | null;
       email?: string | null;
-    }>
+    }>,
+    channel: "sms" | "email"
   ): void {
     for (const contact of contacts) {
       if (
@@ -303,7 +305,8 @@ export class ProcessCampaignLaunchJobUseCase {
   private static async collectSegmentContacts(
     uniqueContacts: Map<string, ResolvedContact>,
     organizationId: string,
-    segmentId: string
+    segmentId: string,
+    channel: "sms" | "email"
   ): Promise<void> {
     const segment = await SegmentService.getSegmentById(
       organizationId,
@@ -320,7 +323,7 @@ export class ProcessCampaignLaunchJobUseCase {
         cursor
       );
 
-      this.collectContacts(uniqueContacts, result.items);
+      this.collectContacts(uniqueContacts, result.items, channel);
 
       if (!result.meta.nextCursor) break;
       cursor = result.meta.nextCursor;
