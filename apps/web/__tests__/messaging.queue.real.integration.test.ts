@@ -57,6 +57,9 @@ function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
 
 function createWorkerEnv(): Env {
   return {
+    CAMPAIGN_LAUNCH_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     SMS_QUEUE: {
       send: vi.fn().mockResolvedValue(undefined),
     },

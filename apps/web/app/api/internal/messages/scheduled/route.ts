@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { MessageService } from "@reachdem/core";
+import { z } from "zod";
 
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET;
 
@@ -41,6 +42,52 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ items });
   } catch (error) {
     console.error("[GET /internal/messages/scheduled]", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+const claimScheduledSchema = z.object({
+  until: z.string().datetime(),
+  smsLimit: z.number().int().positive(),
+  emailLimit: z.number().int().positive(),
+});
+
+export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const parsed = claimScheduledSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const untilDate = new Date(parsed.data.until);
+    if (Number.isNaN(untilDate.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid until value" },
+        { status: 400 }
+      );
+    }
+
+    const result = await MessageService.claimScheduledMessages({
+      until: untilDate,
+      smsLimit: parsed.data.smsLimit,
+      emailLimit: parsed.data.emailLimit,
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("[POST /internal/messages/scheduled]", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

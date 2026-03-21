@@ -2,11 +2,12 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { prisma } from "@reachdem/database";
 import { isOrange } from "@reachdem/core";
+import type { CampaignLaunchJob } from "@reachdem/shared";
 import { POST as createCampaignHandler } from "../app/api/v1/campaigns/route";
 import { POST as setAudienceHandler } from "../app/api/v1/campaigns/[id]/audience/route";
 import { POST as launchCampaignHandler } from "../app/api/v1/campaigns/[id]/launch/route";
-import { GET as getScheduledHandler } from "../app/api/internal/messages/scheduled/route";
-import { PATCH as updateMessageStatusHandler } from "../app/api/internal/messages/status/route";
+import { POST as claimScheduledHandler } from "../app/api/internal/messages/scheduled/route";
+import { handleCampaignLaunchBatch } from "../../workers/src/campaign-launch";
 import { handleScheduled } from "../../workers/src/scheduled";
 import { handleSmsBatch } from "../../workers/src/queue-sms";
 import {
@@ -73,6 +74,9 @@ function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
 
 function createWorkerEnv(smsJobs: SmsMessage[]): Env {
   return {
+    CAMPAIGN_LAUNCH_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     SMS_QUEUE: {
       send: vi.fn(async (job: SmsMessage) => {
         smsJobs.push(job);
@@ -109,6 +113,11 @@ function getCampaignSmsSender(phones: string[]): string {
 
 describe("Campaigns SMS - REAL SCHEDULED WORKER INTEGRATION", () => {
   let testGroupId: string;
+  const queuedCampaignLaunchJobs: CampaignLaunchJob[] = [];
+  const workerBaseUrl =
+    process.env.SMS_WORKER_BASE_URL ??
+    process.env.CLOUDFLARE_WORKER_BASE_URL ??
+    "http://127.0.0.1:8787";
 
   beforeAll(async () => {
     authMock.api.getSession.mockResolvedValue({
@@ -140,6 +149,24 @@ describe("Campaigns SMS - REAL SCHEDULED WORKER INTEGRATION", () => {
         },
       });
     }
+
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `${workerBaseUrl}/queue/campaign-launch` && init?.body) {
+          queuedCampaignLaunchJobs.push(
+            JSON.parse(String(init.body)) as CampaignLaunchJob
+          );
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return originalFetch(input, init);
+      })
+    );
   }, 30_000);
 
   if (TEST_CAMPAIGN_SMS_PHONES.length === 0) {
@@ -154,6 +181,8 @@ describe("Campaigns SMS - REAL SCHEDULED WORKER INTEGRATION", () => {
 
   it("launches a scheduled SMS campaign, then sends it through cron and the worker queue", async () => {
     const schedule = getScheduledExecutionConfig();
+    const queuedSmsJobs: SmsMessage[] = [];
+    const env = createWorkerEnv(queuedSmsJobs);
     const campaignSender = getCampaignSmsSender(TEST_CAMPAIGN_SMS_PHONES);
 
     const createReq = new NextRequest("http://localhost/api/v1/campaigns", {
@@ -201,6 +230,17 @@ describe("Campaigns SMS - REAL SCHEDULED WORKER INTEGRATION", () => {
       params: Promise.resolve({ id: campaign.id }),
     });
     expect(launchRes.status).toBe(200);
+    expect(queuedCampaignLaunchJobs).toHaveLength(1);
+
+    await handleCampaignLaunchBatch(
+      {
+        queue: "reachdem-campaign-launch-queue",
+        messages: queuedCampaignLaunchJobs
+          .splice(0)
+          .map((job) => createEnvelope(job)),
+      } satisfies MessageBatch<CampaignLaunchJob>,
+      env
+    );
 
     const scheduledTargets = await prisma.campaignTarget.findMany({
       where: { campaignId: campaign.id },
@@ -223,38 +263,22 @@ describe("Campaigns SMS - REAL SCHEDULED WORKER INTEGRATION", () => {
       scheduledMessages.every((message) => message.status === "scheduled")
     ).toBe(true);
 
-    const queuedSmsJobs: SmsMessage[] = [];
-    const env = createWorkerEnv(queuedSmsJobs);
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
 
-        if (
-          url.startsWith(
-            "http://localhost:3000/api/internal/messages/scheduled"
-          )
-        ) {
+        if (url === "http://localhost:3000/api/internal/messages/scheduled") {
           const req = new NextRequest(url, {
-            method: "GET",
-            headers: {
-              "x-internal-secret": INTERNAL_API_SECRET,
-            },
-          });
-          return getScheduledHandler(req);
-        }
-
-        if (url === "http://localhost:3000/api/internal/messages/status") {
-          const req = new NextRequest(url, {
-            method: "PATCH",
+            method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-internal-secret": INTERNAL_API_SECRET,
             },
             body: init?.body,
           });
-          return updateMessageStatusHandler(req);
+          return claimScheduledHandler(req);
         }
 
         return originalFetch(input, init);

@@ -15,13 +15,19 @@ import {
 import { POST as launchCampaignHandler } from "../app/api/v1/campaigns/[id]/launch/route";
 
 import { prisma } from "@reachdem/database";
-import { SegmentNode } from "@reachdem/shared";
+import { SegmentNode, type CampaignLaunchJob } from "@reachdem/shared";
 import {
   ProcessEmailMessageJobUseCase,
   ProcessSmsMessageJobUseCase,
 } from "@reachdem/core";
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
+import { handleCampaignLaunchBatch } from "../../workers/src/campaign-launch";
+import type {
+  Env,
+  MessageBatch,
+  QueueMessageEnvelope,
+} from "../../workers/src/types";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Map()),
@@ -54,6 +60,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
   let testSegmentId: string;
   let foreignGroupId: string;
   let smsConfigCreated = false;
+  const queuedCampaignLaunchJobs: CampaignLaunchJob[] = [];
   const segmentMatchAddress = `Campaign Segment Match ${Date.now()}`;
   const workerBaseUrl =
     process.env.SMS_WORKER_BASE_URL ??
@@ -152,9 +159,15 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (
+          url === `${workerBaseUrl}/queue/campaign-launch` ||
           url === `${workerBaseUrl}/queue/sms` ||
           url === `${workerBaseUrl}/queue/email`
         ) {
+          if (url === `${workerBaseUrl}/queue/campaign-launch` && init?.body) {
+            queuedCampaignLaunchJobs.push(
+              JSON.parse(String(init.body)) as CampaignLaunchJob
+            );
+          }
           return new Response(JSON.stringify({ success: true }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -166,6 +179,48 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
   }, 30000);
 
   // Note: We don't cleanup because Database cleanup is handled globally or kept for inspection.
+
+  function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
+    ack: ReturnType<typeof vi.fn>;
+    retry: ReturnType<typeof vi.fn>;
+  } {
+    return {
+      body,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+  }
+
+  function createWorkerEnv(): Env {
+    return {
+      CAMPAIGN_LAUNCH_QUEUE: {
+        send: vi.fn().mockResolvedValue(undefined),
+      },
+      SMS_QUEUE: {
+        send: vi.fn().mockResolvedValue(undefined),
+      },
+      EMAIL_QUEUE: {
+        send: vi.fn().mockResolvedValue(undefined),
+      },
+      ENVIRONMENT: "test",
+      API_BASE_URL: "http://localhost:3000",
+      INTERNAL_API_SECRET: process.env.INTERNAL_API_SECRET ?? "test-secret",
+      SMTP_HOST: process.env.SMTP_HOST ?? "",
+      SMTP_PORT: process.env.SMTP_PORT ?? "465",
+      SMTP_USER: process.env.SMTP_USER ?? "",
+      SMTP_PASSWORD: process.env.SMTP_PASSWORD ?? "",
+      SMTP_SECURE: process.env.SMTP_SECURE ?? "true",
+      SENDER_EMAIL:
+        process.env.SENDER_EMAIL ??
+        process.env.ALIBABA_SENDER_EMAIL ??
+        process.env.SMTP_USER ??
+        "",
+      SENDER_NAME:
+        process.env.SENDER_NAME ??
+        process.env.ALIBABA_SENDER_NAME ??
+        "ReachDem Notifications",
+    };
+  }
 
   it("POST /campaigns -> creates a draft campaign", async () => {
     const payload = {
@@ -296,7 +351,18 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    expect(body.message).toMatch(/launched successfully/);
+    expect(body.message).toMatch(/queued successfully/);
+    expect(queuedCampaignLaunchJobs).toHaveLength(1);
+
+    await handleCampaignLaunchBatch(
+      {
+        queue: "reachdem-campaign-launch-queue",
+        messages: queuedCampaignLaunchJobs
+          .splice(0)
+          .map((job) => createEnvelope(job)),
+      } satisfies MessageBatch<CampaignLaunchJob>,
+      createWorkerEnv()
+    );
 
     // Verify DB State
     const campaign = await prisma.campaign.findUnique({
@@ -417,6 +483,17 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       params: Promise.resolve({ id: testEmailCampaignId }),
     });
     expect(launchRes.status).toBe(200);
+    expect(queuedCampaignLaunchJobs).toHaveLength(1);
+
+    await handleCampaignLaunchBatch(
+      {
+        queue: "reachdem-campaign-launch-queue",
+        messages: queuedCampaignLaunchJobs
+          .splice(0)
+          .map((job) => createEnvelope(job)),
+      } satisfies MessageBatch<CampaignLaunchJob>,
+      createWorkerEnv()
+    );
 
     const emailTarget = await prisma.campaignTarget.findFirst({
       where: { campaignId: testEmailCampaignId },
