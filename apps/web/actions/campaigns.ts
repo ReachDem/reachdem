@@ -7,15 +7,14 @@ import {
   CampaignService,
   GroupService,
   SegmentService,
-  LaunchCampaignUseCase,
+  RequestCampaignLaunchUseCase,
 } from "@reachdem/core";
 import type {
   CreateCampaignDto,
   UpdateCampaignDto,
   CampaignResponse,
 } from "@reachdem/shared";
-import { publishEmailJob } from "@/lib/publish-email-job";
-import { publishSmsJob } from "@/lib/publish-sms-job";
+import { publishCampaignLaunchJob } from "@/lib/publish-campaign-launch-job";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -183,11 +182,10 @@ export async function deleteCampaign(id: string) {
 
 export async function launchCampaign(id: string) {
   const { organizationId } = await getOrganizationId();
-  await LaunchCampaignUseCase.execute(
+  await RequestCampaignLaunchUseCase.execute(
     organizationId,
     id,
-    publishSmsJob,
-    publishEmailJob
+    publishCampaignLaunchJob
   );
   revalidatePath("/campaigns");
   revalidatePath(`/campaigns/${id}/edit`);

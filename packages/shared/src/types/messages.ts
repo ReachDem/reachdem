@@ -49,6 +49,11 @@ export interface EmailExecutionJob {
   delivery_cycle: number;
 }
 
+export interface CampaignLaunchJob {
+  campaign_id: string;
+  organization_id: string;
+}
+
 export type MessageExecutionJob = SmsExecutionJob | EmailExecutionJob;
 
 export interface ListMessagesOptions {

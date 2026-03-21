@@ -10,28 +10,83 @@
   },
   "queues": {
     "producers": [
+      {
+        "binding": "CAMPAIGN_LAUNCH_QUEUE",
+        "queue": "reachdem-campaign-launch-queue"
+      },
       { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
       { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
     ],
     "consumers": [
       {
+        "queue": "reachdem-campaign-launch-queue",
+        "max_batch_size": 5,
+        "max_batch_timeout": 2,
+        "max_concurrency": 2,
+        "max_retries": 5
+      },
+      {
         "queue": "reachdem-sms-queue",
         "max_batch_size": 50,
         "max_batch_timeout": 2,
         "max_concurrency": 10,
-        "max_retries": 0
+        "max_retries": 5
       },
       {
         "queue": "reachdem-email-queue",
-        "max_batch_size": 50,
+        "max_batch_size": 20,
         "max_batch_timeout": 2,
-        "max_concurrency": 10,
-        "max_retries": 0
+        "max_concurrency": 5,
+        "max_retries": 5
       }
     ]
   },
   "vars": {
     "ENVIRONMENT": "development",
     "API_BASE_URL": "http://localhost:3000"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        "ENVIRONMENT": "production",
+        // TODO: replace with the real public URL of the deployed web app
+        // before deploying the production worker. The scheduled worker calls
+        // the internal web API through this base URL.
+        "API_BASE_URL": "https://replace-me-with-your-web-app.example.com"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue"
+          },
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
+          { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-campaign-launch-queue",
+            "max_batch_size": 5,
+            "max_batch_timeout": 2,
+            "max_concurrency": 2,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-sms-queue",
+            "max_batch_size": 50,
+            "max_batch_timeout": 2,
+            "max_concurrency": 10,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-email-queue",
+            "max_batch_size": 20,
+            "max_batch_timeout": 2,
+            "max_concurrency": 5,
+            "max_retries": 5
+          }
+        ]
+      }
+    }
   }
 }

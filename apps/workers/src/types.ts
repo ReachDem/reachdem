@@ -1,4 +1,8 @@
-import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
+import type {
+  CampaignLaunchJob,
+  EmailExecutionJob,
+  SmsExecutionJob,
+} from "@reachdem/shared";
 
 export interface QueueProducer<T> {
   send(message: T): Promise<void>;
@@ -25,6 +29,7 @@ export interface ScheduledController {
 }
 
 export interface Env {
+  CAMPAIGN_LAUNCH_QUEUE: QueueProducer<CampaignLaunchJob>;
   SMS_QUEUE: QueueProducer<SmsExecutionJob>;
   EMAIL_QUEUE: QueueProducer<EmailExecutionJob>;
   ENVIRONMENT: string;
@@ -41,3 +46,4 @@ export interface Env {
 
 export type SmsMessage = SmsExecutionJob;
 export type EmailMessage = EmailExecutionJob;
+export type CampaignLaunchMessage = CampaignLaunchJob;

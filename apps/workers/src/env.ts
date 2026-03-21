@@ -1,0 +1,50 @@
+import type { Env } from "./types";
+
+function isMissing(value: string | undefined): boolean {
+  return !value || value.trim().length === 0;
+}
+
+function requireKeys(scope: string, env: Env, keys: Array<keyof Env>): void {
+  const missing = keys.filter((key) => {
+    const value = env[key];
+    return typeof value !== "string" || isMissing(value);
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[Env:${scope}] Missing required environment variable(s): ${missing.join(", ")}`
+    );
+  }
+}
+
+export function requireBaseWorkerEnv(env: Env): void {
+  requireKeys("base", env, ["ENVIRONMENT"]);
+}
+
+export function requireCampaignWorkerEnv(env: Env): void {
+  requireBaseWorkerEnv(env);
+}
+
+export function requireSmsWorkerEnv(env: Env): void {
+  requireBaseWorkerEnv(env);
+}
+
+export function requireEmailWorkerEnv(env: Env): void {
+  requireKeys("email", env, [
+    "ENVIRONMENT",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
+    "SMTP_SECURE",
+    "SENDER_EMAIL",
+  ]);
+}
+
+export function requireScheduledWorkerEnv(env: Env): void {
+  requireKeys("scheduled", env, [
+    "ENVIRONMENT",
+    "API_BASE_URL",
+    "INTERNAL_API_SECRET",
+  ]);
+}
