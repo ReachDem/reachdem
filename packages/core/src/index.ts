@@ -11,6 +11,8 @@ export * from "./services/segment.service";
 export * from "./services/activity-logger.service";
 export * from "./services/campaign.service";
 export * from "./services/launch-campaign.usecase";
+export * from "./services/request-campaign-launch.usecase";
+export * from "./services/process-campaign-launch-job.usecase";
 export * from "./services/send-sms.usecase";
 export * from "./services/composite-sms-sender";
 export * from "./services/message.service";

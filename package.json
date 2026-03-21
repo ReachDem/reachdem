@@ -6,10 +6,10 @@
   "scripts": {
     "sync-env": "node sync-env.js",
     "predev": "pnpm sync-env",
-    "dev": "pnpm --filter web dev",
+    "dev": "pnpm --filter reachdem-main dev",
     "dev:links": "pnpm --filter links dev",
-    "dev:all": "pnpm --filter web --filter links dev",
-    "build": "pnpm --filter web build",
+    "dev:all": "pnpm --filter reachdem-main --filter links dev",
+    "build": "pnpm --filter reachdem-main build",
     "build:links": "pnpm --filter links build",
     "db:generate": "pnpm --filter @reachdem/database db:generate",
     "db:push": "pnpm --filter @reachdem/database db:push",

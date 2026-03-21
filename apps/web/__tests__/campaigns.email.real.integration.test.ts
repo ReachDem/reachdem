@@ -1,9 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { prisma } from "@reachdem/database";
+import type { CampaignLaunchJob } from "@reachdem/shared";
 import { POST as createCampaignHandler } from "../app/api/v1/campaigns/route";
 import { POST as setAudienceHandler } from "../app/api/v1/campaigns/[id]/audience/route";
 import { POST as launchCampaignHandler } from "../app/api/v1/campaigns/[id]/launch/route";
+import { handleCampaignLaunchBatch } from "../../workers/src/campaign-launch";
 import { handleEmailBatch } from "../../workers/src/queue-email";
 import type {
   EmailMessage,
@@ -65,6 +67,9 @@ function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
 
 function createWorkerEnv(): Env {
   return {
+    CAMPAIGN_LAUNCH_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     SMS_QUEUE: {
       send: vi.fn().mockResolvedValue(undefined),
     },
@@ -86,6 +91,7 @@ function createWorkerEnv(): Env {
 
 describe("Campaigns Email - REAL WORKER INTEGRATION", () => {
   let testGroupId: string;
+  const queuedCampaignLaunchJobs: CampaignLaunchJob[] = [];
   const workerBaseUrl =
     process.env.EMAIL_WORKER_BASE_URL ??
     process.env.CLOUDFLARE_WORKER_BASE_URL ??
@@ -127,6 +133,15 @@ describe("Campaigns Email - REAL WORKER INTEGRATION", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url === `${workerBaseUrl}/queue/campaign-launch` && init?.body) {
+          queuedCampaignLaunchJobs.push(
+            JSON.parse(String(init.body)) as CampaignLaunchJob
+          );
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         if (url === `${workerBaseUrl}/queue/email`) {
           return new Response(JSON.stringify({ success: true }), {
             status: 200,
@@ -163,6 +178,7 @@ describe("Campaigns Email - REAL WORKER INTEGRATION", () => {
   }
 
   it("launches and delivers an email campaign through the real worker email queue", async () => {
+    const env = createWorkerEnv();
     const createReq = new NextRequest("http://localhost/api/v1/campaigns", {
       method: "POST",
       body: JSON.stringify({
@@ -208,8 +224,18 @@ describe("Campaigns Email - REAL WORKER INTEGRATION", () => {
       params: Promise.resolve({ id: campaign.id }),
     });
     expect(launchRes.status).toBe(200);
+    expect(queuedCampaignLaunchJobs).toHaveLength(1);
 
-    const env = createWorkerEnv();
+    await handleCampaignLaunchBatch(
+      {
+        queue: "reachdem-campaign-launch-queue",
+        messages: queuedCampaignLaunchJobs
+          .splice(0)
+          .map((job) => createEnvelope(job)),
+      } satisfies MessageBatch<CampaignLaunchJob>,
+      env
+    );
+
     const targets = await prisma.campaignTarget.findMany({
       where: { campaignId: campaign.id },
       orderBy: { createdAt: "asc" },
