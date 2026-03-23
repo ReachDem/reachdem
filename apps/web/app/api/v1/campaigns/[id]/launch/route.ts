@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   CampaignInvalidStatusError,
   CampaignNotFoundError,
-  RequestCampaignLaunchUseCase,
+  CampaignStatsService,
+  LaunchCampaignUseCase,
 } from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
 import { publishCampaignLaunchJob } from "../../../../../../lib/publish-campaign-launch-job";
@@ -17,6 +18,7 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
       id,
       publishCampaignLaunchJob
     );
+    await CampaignStatsService.invalidate(id);
 
     return NextResponse.json(
       { message: "Campaign launch queued successfully" },

@@ -1,27 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { createRequire } from "node:module";
-import { PrismaNeonHttp } from "@prisma/adapter-neon";
-
-function getNodeRequire(): ((id: string) => unknown) | null {
-  const moduleUrl =
-    typeof import.meta !== "undefined" &&
-    typeof import.meta.url === "string" &&
-    import.meta.url.length > 0
-      ? import.meta.url
-      : null;
-
-  if (!moduleUrl) {
-    return null;
-  }
-
-  try {
-    return createRequire(moduleUrl);
-  } catch {
-    return null;
-  }
-}
-
-const require = getNodeRequire();
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -42,68 +21,35 @@ function createClientOptions(): Prisma.PrismaClientOptions & {
     } as Prisma.PrismaClientOptions & { accelerateUrl: string };
   }
 
-  const workerRuntime =
-    typeof (globalThis as typeof globalThis & { WebSocketPair?: unknown })
-      .WebSocketPair !== "undefined";
-
-  if (process.env.DATABASE_URL && workerRuntime) {
-    // TODO: keep this worker-safe path in sync with the production worker
-    // runtime. It lets Cloudflare Workers use Prisma without the Node pg pool.
-
-    return {
-      log,
-      adapter: new PrismaNeonHttp(process.env.DATABASE_URL, {}),
-    };
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "Missing DATABASE_URL. Provide DATABASE_URL or PRISMA_ACCELERATE_URL."
+    );
   }
 
-  try {
-    if (!require) {
-      return { log };
-    }
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-    const { Pool } = require("pg") as {
-      Pool: new (options: { connectionString?: string }) => unknown;
-    };
-    const { PrismaPg } = require("@prisma/adapter-pg") as {
-      PrismaPg: new (pool: unknown) => Prisma.PrismaClientOptions["adapter"];
-    };
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
-    return {
-      log,
-      adapter: new PrismaPg(pool),
-    };
-  } catch {
-    // Fallback for environments that haven't installed driver adapter deps yet.
-    return { log };
-  }
+  return {
+    log,
+    adapter: new PrismaPg(pool),
+  };
 }
 
-function getOrCreatePrismaClient(): PrismaClient {
-  if (globalForPrisma.prisma) {
-    return globalForPrisma.prisma;
-  }
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient(createClientOptions() as Prisma.PrismaClientOptions);
 
-  // TODO: keep Prisma initialization lazy. Cloudflare validates worker bundles
-  // before runtime secrets are injected, so eager construction breaks deploys.
-  const client = new PrismaClient(
-    createClientOptions() as Prisma.PrismaClientOptions
-  );
-  globalForPrisma.prisma = client;
-  return client;
-}
+// const hasRequiredDelegates = (client: PrismaClient) =>
+//     Boolean((client as any).group && (client as any).contact && (client as any).organization)
 
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop, receiver) {
-    const client = getOrCreatePrismaClient() as unknown as Record<
-      PropertyKey,
-      unknown
-    >;
-    const value = Reflect.get(client, prop, receiver);
+// const existingClient = globalForPrisma.prisma
 
-    return typeof value === "function" ? value.bind(client) : value;
-  },
-}) as PrismaClient;
+// export const prisma =
+//     existingClient && hasRequiredDelegates(existingClient)
+//         ? existingClient
+//         : createPrismaClient()
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export { Prisma, PrismaClient, Gender, ContactFieldType } from "@prisma/client";
 export type * from "@prisma/client";

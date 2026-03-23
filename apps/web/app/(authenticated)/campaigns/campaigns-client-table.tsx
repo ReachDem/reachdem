@@ -112,9 +112,7 @@ export function CampaignsClientTable({
         );
       case "running":
         return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600">
-            Running
-          </Badge>
+          <Badge className="bg-emerald-500 hover:bg-emerald-600">Running</Badge>
         );
       case "partial":
         return (
@@ -128,11 +126,7 @@ export function CampaignsClientTable({
       case "completed":
         return <Badge variant="secondary">Completed</Badge>;
       case "failed":
-        return (
-          <Badge variant="destructive">
-            Failed
-          </Badge>
-        );
+        return <Badge variant="destructive">Failed</Badge>;
       default:
         return (
           <Badge variant="outline" className="capitalize">

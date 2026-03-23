@@ -129,3 +129,12 @@ export interface CampaignAudienceResponse {
   sourceId: string;
   createdAt: Date;
 }
+
+export interface CampaignStatsResponse {
+  campaignId: string;
+  audienceSize: number;
+  sentCount: number;
+  failedCount: number;
+  clickCount: number;
+  uniqueClickCount: number;
+}

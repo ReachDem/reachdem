@@ -596,6 +596,27 @@ paths:
         "404":
           description: Campaign not found
 
+  /campaigns/{id}/stats:
+    get:
+      summary: Get Campaign Stats
+      description: Returns minimal delivery and click stats for a campaign. Delivery stats come from campaign targets, click stats come from tracked links.
+      tags: [Campaigns]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignStatsResponse"
+        "404":
+          description: Campaign not found
+
   /links:
     get:
       summary: List Tracked Links
@@ -1371,6 +1392,23 @@ components:
           type: string
           format: date-time
 
+    CampaignStatsResponse:
+      type: object
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        audienceSize:
+          type: integer
+        sentCount:
+          type: integer
+        failedCount:
+          type: integer
+        clickCount:
+          type: integer
+        uniqueClickCount:
+          type: integer
+
     CreateTrackedLinkDto:
       type: object
       required:
@@ -1405,6 +1443,7 @@ components:
 
     UpdateTrackedLinkDto:
       type: object
+      minProperties: 1
       properties:
         targetUrl:
           type: string
