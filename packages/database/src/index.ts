@@ -1,7 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -22,23 +21,18 @@ function createClientOptions(): Prisma.PrismaClientOptions & {
     } as Prisma.PrismaClientOptions & { accelerateUrl: string };
   }
 
-  try {
-    const { Pool } = require("pg") as {
-      Pool: new (options: { connectionString?: string }) => unknown;
-    };
-    const { PrismaPg } = require("@prisma/adapter-pg") as {
-      PrismaPg: new (pool: unknown) => Prisma.PrismaClientOptions["adapter"];
-    };
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
-    return {
-      log,
-      adapter: new PrismaPg(pool),
-    };
-  } catch {
-    // Fallback for environments that haven't installed driver adapter deps yet.
-    return { log };
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "Missing DATABASE_URL. Provide DATABASE_URL or PRISMA_ACCELERATE_URL."
+    );
   }
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  return {
+    log,
+    adapter: new PrismaPg(pool),
+  };
 }
 
 export const prisma =
