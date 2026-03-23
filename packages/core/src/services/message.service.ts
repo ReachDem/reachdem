@@ -85,6 +85,72 @@ export class MessageService {
     });
   }
 
+  static async claimScheduledMessages(input: {
+    until: Date;
+    smsLimit: number;
+    emailLimit: number;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const smsMessages = await tx.message.findMany({
+        where: {
+          status: "scheduled",
+          channel: "sms",
+          scheduledAt: {
+            not: null,
+            lte: input.until,
+          },
+        },
+        orderBy: { scheduledAt: "asc" },
+        take: input.smsLimit,
+        select: {
+          id: true,
+          organizationId: true,
+          channel: true,
+        },
+      });
+
+      const emailMessages = await tx.message.findMany({
+        where: {
+          status: "scheduled",
+          channel: "email",
+          scheduledAt: {
+            not: null,
+            lte: input.until,
+          },
+        },
+        orderBy: { scheduledAt: "asc" },
+        take: input.emailLimit,
+        select: {
+          id: true,
+          organizationId: true,
+          channel: true,
+        },
+      });
+
+      const selectedMessages = [...smsMessages, ...emailMessages];
+      const selectedIds = selectedMessages.map((message) => message.id);
+
+      if (selectedIds.length === 0) {
+        return { updated: 0, items: [] as typeof selectedMessages };
+      }
+
+      await tx.message.updateMany({
+        where: {
+          id: { in: selectedIds },
+          status: "scheduled",
+        },
+        data: {
+          status: "queued",
+        },
+      });
+
+      return {
+        updated: selectedIds.length,
+        items: selectedMessages,
+      };
+    });
+  }
+
   static async updateMessageStatuses(ids: string[], status: MessageStatus) {
     if (ids.length === 0) return { count: 0, ids: [] as string[] };
 

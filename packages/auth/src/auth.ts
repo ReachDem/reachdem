@@ -92,7 +92,9 @@ export const auth = betterAuth({
     organization({
       ac,
       roles: { owner, admin, member },
-      allowUserToCreateOrganization: true,
+      allowUserToCreateOrganization: async (user) => {
+        return user.emailVerified === true;
+      },
       creatorRole: "owner",
       async sendInvitationEmail(data) {
         // TODO: Wire to your email provider (Resend / Alibaba DM)

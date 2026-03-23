@@ -8,12 +8,16 @@ import type {
 } from "../src/types";
 
 const mockedFns = vi.hoisted(() => ({
+  processCampaignLaunchExecuteMock: vi.fn(),
   processSmsExecuteMock: vi.fn(),
   processEmailExecuteMock: vi.fn(),
   sendMailMock: vi.fn(),
 }));
 
 vi.mock("@reachdem/core", () => ({
+  ProcessCampaignLaunchJobUseCase: {
+    execute: mockedFns.processCampaignLaunchExecuteMock,
+  },
   ProcessSmsMessageJobUseCase: {
     execute: mockedFns.processSmsExecuteMock,
   },
@@ -32,12 +36,16 @@ vi.mock("nodemailer", () => ({
 }));
 
 import worker from "../src/index";
+import { handleCampaignLaunchBatch } from "../src/campaign-launch";
 import { handleSmsBatch } from "../src/queue-sms";
 import { handleEmailBatch } from "../src/queue-email";
 import { handleScheduled } from "../src/scheduled";
 
 function createEnv(): Env {
   return {
+    CAMPAIGN_LAUNCH_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     SMS_QUEUE: {
       send: vi.fn().mockResolvedValue(undefined),
     },
@@ -101,6 +109,50 @@ describe("Worker queue and scheduled flows", () => {
     expect(env.SMS_QUEUE.send).toHaveBeenCalledWith(job);
   });
 
+  it("queues a campaign launch job through the worker fetch endpoint", async () => {
+    const env = createEnv();
+    const job = {
+      campaign_id: "campaign_1",
+      organization_id: "org_1",
+    };
+
+    const response = await worker.fetch(
+      new Request("http://localhost/queue/campaign-launch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job),
+      }),
+      env,
+      { waitUntil: vi.fn() }
+    );
+
+    expect(response.status).toBe(200);
+    expect(env.CAMPAIGN_LAUNCH_QUEUE.send).toHaveBeenCalledWith(job);
+  });
+
+  it("processes a campaign launch job and acknowledges it", async () => {
+    const env = createEnv();
+    const job = {
+      campaign_id: "campaign_2",
+      organization_id: "org_1",
+    };
+    const envelope = createEnvelope(job);
+    const batch: MessageBatch<typeof job> = {
+      queue: "reachdem-campaign-launch-queue",
+      messages: [envelope],
+    };
+
+    mockedFns.processCampaignLaunchExecuteMock.mockResolvedValueOnce(
+      "processed"
+    );
+
+    await handleCampaignLaunchBatch(batch, env);
+
+    expect(mockedFns.processCampaignLaunchExecuteMock).toHaveBeenCalledTimes(1);
+    expect(envelope.ack).toHaveBeenCalledTimes(1);
+    expect(envelope.retry).not.toHaveBeenCalled();
+  });
+
   it("processes an SMS queue message and acknowledges it", async () => {
     const env = createEnv();
     const job: SmsExecutionJob = {
@@ -128,6 +180,30 @@ describe("Worker queue and scheduled flows", () => {
     );
     expect(envelope.ack).toHaveBeenCalledTimes(1);
     expect(envelope.retry).not.toHaveBeenCalled();
+  });
+
+  it("retries an SMS queue message on technical failure", async () => {
+    const env = createEnv();
+    const job: SmsExecutionJob = {
+      message_id: "msg_sms_retry",
+      organization_id: "org_1",
+      channel: "sms",
+      delivery_cycle: 1,
+    };
+    const envelope = createEnvelope(job);
+    const batch: MessageBatch<SmsExecutionJob> = {
+      queue: "reachdem-sms-queue",
+      messages: [envelope],
+    };
+
+    mockedFns.processSmsExecuteMock.mockRejectedValueOnce(
+      new Error("database unavailable")
+    );
+
+    await handleSmsBatch(batch, env);
+
+    expect(envelope.ack).not.toHaveBeenCalled();
+    expect(envelope.retry).toHaveBeenCalledTimes(1);
   });
 
   it("processes an email queue message and acknowledges it", async () => {
@@ -160,6 +236,30 @@ describe("Worker queue and scheduled flows", () => {
     expect(envelope.retry).not.toHaveBeenCalled();
   });
 
+  it("retries an email queue message on technical failure", async () => {
+    const env = createEnv();
+    const job: EmailExecutionJob = {
+      message_id: "msg_email_retry",
+      organization_id: "org_1",
+      channel: "email",
+      delivery_cycle: 1,
+    };
+    const envelope = createEnvelope(job);
+    const batch: MessageBatch<EmailExecutionJob> = {
+      queue: "reachdem-email-queue",
+      messages: [envelope],
+    };
+
+    mockedFns.processEmailExecuteMock.mockRejectedValueOnce(
+      new Error("smtp init failed")
+    );
+
+    await handleEmailBatch(batch, env);
+
+    expect(envelope.ack).not.toHaveBeenCalled();
+    expect(envelope.retry).toHaveBeenCalledTimes(1);
+  });
+
   it("scheduled handler claims scheduled messages and queues SMS and email jobs", async () => {
     const env = createEnv();
     const controller: ScheduledController = {
@@ -167,48 +267,35 @@ describe("Worker queue and scheduled flows", () => {
       scheduledTime: Date.parse("2026-03-14T10:00:00.000Z"),
     };
 
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            items: [
-              {
-                id: "msg_scheduled_sms",
-                organizationId: "org_1",
-                channel: "sms",
-              },
-              {
-                id: "msg_scheduled_email",
-                organizationId: "org_1",
-                channel: "email",
-              },
-            ],
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          updated: 2,
+          items: [
+            {
+              id: "msg_scheduled_sms",
+              organizationId: "org_1",
+              channel: "sms",
+            },
+            {
+              id: "msg_scheduled_email",
+              organizationId: "org_1",
+              channel: "email",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            updated: 2,
-            ids: ["msg_scheduled_sms", "msg_scheduled_email"],
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      );
+    );
 
     vi.stubGlobal("fetch", fetchMock);
 
     await handleScheduled(controller, env);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(env.SMS_QUEUE.send).toHaveBeenCalledWith({
       message_id: "msg_scheduled_sms",
       organization_id: "org_1",

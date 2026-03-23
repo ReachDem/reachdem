@@ -6,31 +6,22 @@ import {
   LaunchCampaignUseCase,
 } from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
-import { publishEmailJob } from "../../../../../../lib/publish-email-job";
-import { publishSmsJob } from "../../../../../../lib/publish-sms-job";
+import { publishCampaignLaunchJob } from "../../../../../../lib/publish-campaign-launch-job";
 
 // Launch Campaign
 export const POST = withWorkspace(async ({ req, organizationId, params }) => {
   try {
     const id = params.id as string;
 
-    // Async launch process (Fire and forget from the client's perspective for large audiences)
-    // Since this is MVP, we execute it directly, but for thousands of contacts,
-    // this should ideally be pushed to a queue (e.g. Cloudflare Queues).
-    // For now, we await it or execute it unawaited based on typical vercel timeout limits.
-    // We will await it to ensure we can catch immediate validation errors (like Not Draft).
-
-    // If we don't await, serverless might kill the function before it finishes sending SMS.
-    await LaunchCampaignUseCase.execute(
+    await RequestCampaignLaunchUseCase.execute(
       organizationId,
       id,
-      publishSmsJob,
-      publishEmailJob
+      publishCampaignLaunchJob
     );
     await CampaignStatsService.invalidate(id);
 
     return NextResponse.json(
-      { message: "Campaign launched successfully" },
+      { message: "Campaign launch queued successfully" },
       { status: 200 }
     );
   } catch (error: any) {

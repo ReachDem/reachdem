@@ -1,7 +1,14 @@
 import type { MessageExecutionJob } from "@reachdem/shared";
+import {
+  emailWorkerConfig,
+  scheduledWorkerConfig,
+  smsWorkerConfig,
+} from "./config";
+import { requireScheduledWorkerEnv } from "./env";
 import type { Env, ScheduledController } from "./types";
 
 interface ScheduledMessageResponse {
+  updated?: number;
   items: Array<{
     id: string;
     organizationId: string;
@@ -13,6 +20,7 @@ export async function handleScheduled(
   controller: ScheduledController,
   env: Env
 ): Promise<void> {
+  requireScheduledWorkerEnv(env);
   const scheduledTime = new Date(controller.scheduledTime);
 
   console.log(
@@ -20,7 +28,7 @@ export async function handleScheduled(
   );
 
   switch (controller.cron) {
-    case "* * * * *":
+    case scheduledWorkerConfig.cron:
       await handleScheduledMessages(env, scheduledTime);
       break;
     default:
@@ -33,11 +41,18 @@ async function handleScheduledMessages(
   scheduledTime: Date
 ): Promise<void> {
   const response = await fetch(
-    `${env.API_BASE_URL}/api/internal/messages/scheduled?until=${encodeURIComponent(scheduledTime.toISOString())}`,
+    `${env.API_BASE_URL}/api/internal/messages/scheduled`,
     {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         "x-internal-secret": env.INTERNAL_API_SECRET,
       },
+      body: JSON.stringify({
+        until: scheduledTime.toISOString(),
+        smsLimit: scheduledWorkerConfig.smsClaimBatchSize,
+        emailLimit: scheduledWorkerConfig.emailClaimBatchSize,
+      }),
     }
   );
 
@@ -48,42 +63,15 @@ async function handleScheduledMessages(
   }
 
   const payload = (await response.json()) as ScheduledMessageResponse;
-  console.log(`[Cron] Found ${payload.items.length} scheduled message(s)`);
+  console.log(
+    `[Cron] Claimed ${payload.updated ?? payload.items.length} scheduled message(s)`
+  );
 
   if (payload.items.length === 0) {
     return;
   }
 
-  const updateResponse = await fetch(
-    `${env.API_BASE_URL}/api/internal/messages/status`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": env.INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify({
-        ids: payload.items.map((item) => item.id),
-        status: "queued",
-      }),
-    }
-  );
-
-  if (!updateResponse.ok) {
-    throw new Error(
-      `Failed to update scheduled message statuses: HTTP ${updateResponse.status}`
-    );
-  }
-
-  const updatedPayload = (await updateResponse.json()) as {
-    updated: number;
-    ids: string[];
-  };
-  const queueableIds = new Set(updatedPayload.ids);
-
   for (const item of payload.items) {
-    if (!queueableIds.has(item.id)) continue;
-
     const job: MessageExecutionJob =
       item.channel === "sms"
         ? {
@@ -100,11 +88,17 @@ async function handleScheduledMessages(
           };
 
     if (job.channel === "sms") {
+      console.log(
+        `[Cron] Publishing scheduled SMS message ${job.message_id} to ${smsWorkerConfig.queueName}`
+      );
       await env.SMS_QUEUE.send(job);
     } else {
+      console.log(
+        `[Cron] Publishing scheduled email message ${job.message_id} to ${emailWorkerConfig.queueName}`
+      );
       await env.EMAIL_QUEUE.send(job);
     }
   }
 
-  console.log(`[Cron] Queued ${updatedPayload.updated} scheduled message(s)`);
+  console.log(`[Cron] Queued ${payload.items.length} scheduled message(s)`);
 }

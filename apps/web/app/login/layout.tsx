@@ -1,28 +1,16 @@
-import { auth } from "@reachdem/auth";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@reachdem/database";
+
+import { getAuthFlowState } from "@/lib/auth-flow";
 
 export default async function LoginLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const flow = await getAuthFlowState();
 
-  if (session) {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { defaultOrganizationId: true },
-    });
-
-    if (dbUser?.defaultOrganizationId) {
-      redirect("/dashboard");
-    } else {
-      redirect("/signup");
-    }
+  if (flow.hasSession) {
+    redirect(flow.nextPath);
   }
 
   return <>{children}</>;

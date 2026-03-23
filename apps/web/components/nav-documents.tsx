@@ -6,6 +6,7 @@ import {
   IconMessage,
   type Icon,
 } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
 
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ export function NavDocuments({
     name: string;
     url: string;
     icon: Icon;
+    badge?: string;
   }[];
   label?: string;
 }) {
@@ -46,6 +48,14 @@ export function NavDocuments({
               <a href={item.url}>
                 <item.icon />
                 <span>{item.name}</span>
+                {item.badge ? (
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto px-1.5 py-0 text-[10px]"
+                  >
+                    {item.badge}
+                  </Badge>
+                ) : null}
               </a>
             </SidebarMenuButton>
             <DropdownMenu>

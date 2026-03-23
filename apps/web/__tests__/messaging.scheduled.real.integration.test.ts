@@ -67,6 +67,9 @@ function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
 
 function createWorkerEnv(smsJobs: SmsMessage[]): Env {
   return {
+    CAMPAIGN_LAUNCH_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     SMS_QUEUE: {
       send: vi.fn(async (job: SmsMessage) => {
         smsJobs.push(job);

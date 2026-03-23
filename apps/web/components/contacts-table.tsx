@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import {
   IconChevronDown,
   IconDotsVertical,
@@ -24,11 +25,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { NumberTicker } from "@/components/ui/number-ticker";
 
 import { ContactImportDialog } from "@/components/contact-import-dialog";
 import { AddContactDrawer } from "@/components/add-contact-drawer";
+import { deleteContacts } from "@/app/actions/contacts";
 import {
   type ContactRow,
   buildContactColumns,
@@ -49,9 +61,23 @@ export function ContactsTable({
 }) {
   // Read contacts and loading state from the Zustand store
   const storeContacts = useContactsStore((s) => s.contacts);
-  const contacts =
-    storeContacts.length > 0 ? storeContacts : (initialContacts ?? []);
+  const hasHydrated = useContactsStore((s) => s.hasHydrated);
+  const contacts = hasHydrated ? storeContacts : (initialContacts ?? []);
   const isLoading = useContactsStore((s) => s.isLoading);
+  const removeContacts = useContactsStore((s) => s.removeContacts);
+  const [deleteState, setDeleteState] = React.useState<{
+    ids: string[];
+    label: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState("");
+  const requiredDeletePhrase = "delete these contacts";
+
+  const openDeleteDialog = React.useCallback((ids: string[], label: string) => {
+    if (ids.length === 0) return;
+    setDeleteConfirmation("");
+    setDeleteState({ ids, label });
+  }, []);
 
   // Build columns with default actions dropdown
 
@@ -59,7 +85,7 @@ export function ContactsTable({
     () =>
       buildContactColumns(contacts, {
         showSelect: true,
-        renderActions: () => (
+        renderActions: (row) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -81,7 +107,10 @@ export function ContactsTable({
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => openDeleteDialog([row.id], row.name)}
+              >
                 <IconTrash className="mr-2 size-4" />
                 Delete
               </DropdownMenuItem>
@@ -90,7 +119,7 @@ export function ContactsTable({
         ),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contacts]
+    [contacts, openDeleteDialog]
   );
 
   const initialVisibility = React.useMemo(
@@ -106,7 +135,39 @@ export function ContactsTable({
     "contacts"
   );
 
+  const handleDeleteContacts = React.useCallback(async () => {
+    if (!deleteState || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteContacts(deleteState.ids);
+
+      if (result.count === 0) {
+        toast.error("No contacts were deleted.");
+        return;
+      }
+
+      removeContacts(deleteState.ids);
+      table.resetRowSelection();
+      toast.success(
+        result.count === 1
+          ? "Contact deleted."
+          : `${result.count} contacts deleted.`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete contacts."
+      );
+    } finally {
+      setIsDeleting(false);
+      setDeleteState(null);
+    }
+  }, [deleteState, isDeleting, removeContacts, table]);
+
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const selectedIds = table
+    .getFilteredSelectedRowModel()
+    .rows.map((row) => row.original.id);
 
   const toolbar = (
     <div className="flex items-center justify-between gap-4 px-4 lg:px-6">
@@ -130,6 +191,15 @@ export function ContactsTable({
               variant="outline"
               size="sm"
               className="text-destructive hover:text-destructive"
+              disabled={isDeleting}
+              onClick={() =>
+                openDeleteDialog(
+                  selectedIds,
+                  selectedCount === 1
+                    ? "this contact"
+                    : `${selectedCount} selected contacts`
+                )
+              }
             >
               <IconTrash className="size-4" />
               <span className="hidden lg:inline">Delete</span>
@@ -202,12 +272,72 @@ export function ContactsTable({
   );
 
   return (
-    <ContactDataTable
-      table={table}
-      columnCount={columns.length}
-      toolbar={toolbar}
-      footer={footer}
-      isLoading={isLoading}
-    />
+    <>
+      <ContactDataTable
+        table={table}
+        columnCount={columns.length}
+        toolbar={toolbar}
+        footer={footer}
+        isLoading={isLoading}
+      />
+
+      <AlertDialog
+        open={!!deleteState}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setDeleteState(null);
+            setDeleteConfirmation("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Do you really want to delete
+              {deleteState?.ids.length === 1
+                ? " this contact?"
+                : " these contacts?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteState?.ids.length === 1
+                ? `This action is irreversible. It will permanently remove ${deleteState.label} from your contacts list.`
+                : `This action is irreversible. It will permanently remove ${deleteState?.label} from your contacts list.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              Type <span className="font-semibold">{requiredDeletePhrase}</span>{" "}
+              to confirm.
+            </p>
+            <Input
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder={requiredDeletePhrase}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeleting}
+              onClick={() => setDeleteConfirmation("")}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContacts}
+              disabled={
+                isDeleting || deleteConfirmation.trim() !== requiredDeletePhrase
+              }
+              variant="destructive"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
