@@ -3,7 +3,7 @@ import {
   CampaignInvalidStatusError,
   CampaignNotFoundError,
   CampaignStatsService,
-  LaunchCampaignUseCase,
+  RequestCampaignLaunchUseCase,
 } from "@reachdem/core";
 import { withWorkspace } from "@reachdem/auth/guards";
 import { publishCampaignLaunchJob } from "../../../../../../lib/publish-campaign-launch-job";
