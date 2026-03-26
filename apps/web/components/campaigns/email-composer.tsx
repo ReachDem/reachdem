@@ -2,10 +2,16 @@
 
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { FocusPosition } from "@tiptap/core";
-import { Code2, FileCode2, Loader2 } from "lucide-react";
+import { Code2, FileCode2, Loader2, Variable } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
@@ -26,6 +32,16 @@ const MailyEditor = lazy(() =>
 type MailyEditor = any;
 
 export type EmailMode = "visual" | "html" | "react";
+
+// Common variables
+const COMMON_VARIABLES = [
+  { label: "First Name", value: "{{contact.firstName}}" },
+  { label: "Last Name", value: "{{contact.lastName}}" },
+  { label: "Full Name", value: "{{contact.name}}" },
+  { label: "Email", value: "{{contact.email}}" },
+  { label: "Phone", value: "{{contact.phone}}" },
+  { label: "Company", value: "{{contact.company}}" },
+];
 
 export interface EmailContent {
   subject: string;
@@ -154,6 +170,12 @@ export function EmailComposer({
     });
   };
 
+  const insertVariableInEditor = (variable: string) => {
+    if (editor && value.mode === "visual") {
+      editor.chain().focus().insertContent(variable).run();
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-4">
       {/* Subject Field */}
@@ -194,6 +216,42 @@ export function EmailComposer({
               HTML
             </ToggleGroupItem>
           </ToggleGroup>
+
+          {value.mode === "visual" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-2"
+                  disabled={disabled}
+                >
+                  <Variable className="h-4 w-4" />
+                  Insert Variable
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Insert Variable</p>
+                  <div className="grid gap-2">
+                    {COMMON_VARIABLES.map((variable) => (
+                      <Button
+                        key={variable.value}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start font-mono text-xs"
+                        onClick={() => insertVariableInEditor(variable.value)}
+                      >
+                        {variable.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <div className="flex">

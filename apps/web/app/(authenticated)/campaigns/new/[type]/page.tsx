@@ -17,9 +17,9 @@ import {
   type EmailContent,
 } from "@/components/campaigns/email-composer";
 import {
-  SmsComposer,
+  SmsComposerNew as SmsComposer,
   type SmsContent,
-} from "@/components/campaigns/sms-composer";
+} from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
 import { useSegments } from "@/lib/hooks/use-segments";
 import { useGroups } from "@/lib/hooks/use-groups";
