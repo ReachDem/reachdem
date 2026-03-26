@@ -8,7 +8,6 @@ import {
   SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { addDays, format, startOfToday, isPast } from "date-fns";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import {
   type SmsContent,
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
+import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
 import { useSegments } from "@/lib/hooks/use-segments";
 import { useGroups } from "@/lib/hooks/use-groups";
 import { Calendar } from "@/components/ui/calendar";
@@ -214,11 +214,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   }, [params, router]);
 
   if (isLoadingCampaign || !type) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <CampaignFormSkeleton />;
   }
 
   const handleSaveDraft = async () => {
@@ -739,14 +735,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                       onClick={handleSchedule}
                       disabled={isLoading}
                     >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          SCHEDULING...
-                        </>
-                      ) : (
-                        "Schedule Campaign"
-                      )}
+                      {isLoading ? "SCHEDULING..." : "Schedule Campaign"}
                     </Button>
                   </div>
                 </PopoverContent>
@@ -757,14 +746,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                 onClick={handleLaunch}
                 disabled={isLoading}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    LAUNCHING...
-                  </>
-                ) : (
-                  "Launch"
-                )}
+                {isLoading ? "LAUNCHING..." : "Launch"}
               </Button>
             </div>
           </div>

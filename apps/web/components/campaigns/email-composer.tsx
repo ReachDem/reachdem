@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { FocusPosition } from "@tiptap/core";
-import { Code2, FileCode2, Loader2, Variable } from "lucide-react";
+import { Code2, FileCode2, Variable } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
 import { FontSelector } from "./font-selector";
+import { EmailEditorSkeleton } from "./email-editor-skeleton";
 
 // Import editor and default commands
 import {
@@ -277,18 +278,8 @@ export function EmailComposer({
       <div className="mt-2">
         {value.mode === "visual" && (
           <div className="rounded-lg">
-            {isEditorLoading && (
-              <div className="flex w-full items-center justify-center py-10">
-                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-              </div>
-            )}
-            <Suspense
-              fallback={
-                <div className="flex w-full items-center justify-center py-10">
-                  <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-                </div>
-              }
-            >
+            {isEditorLoading && <EmailEditorSkeleton />}
+            <Suspense fallback={<EmailEditorSkeleton />}>
               <MailyEditor
                 blocks={DEFAULT_SLASH_COMMANDS}
                 config={{
