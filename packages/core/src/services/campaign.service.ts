@@ -22,7 +22,17 @@ export class CampaignService {
     channel: "sms" | "email";
     content: unknown;
   }): SmsCampaignContent | EmailCampaignContent {
-    return parseCampaignContent(campaign.channel, campaign.content);
+    try {
+      return parseCampaignContent(campaign.channel, campaign.content);
+    } catch (error) {
+      if (campaign.channel === "sms") {
+        return { text: "Error loading content" } as SmsCampaignContent;
+      }
+      return {
+        subject: "Error loading content",
+        html: "<p>Error loading content</p>",
+      } as EmailCampaignContent;
+    }
   }
 
   /**
@@ -51,7 +61,7 @@ export class CampaignService {
     }
 
     return {
-      items: campaigns.map(this.mapToResponse),
+      items: campaigns.map((campaign) => this.mapToResponse(campaign)),
       nextCursor,
     };
   }
@@ -304,7 +314,9 @@ export class CampaignService {
       description: campaign.description,
       channel: campaign.channel,
       status: campaign.status,
-      content: this.getCampaignContent(campaign as any) as CampaignContent,
+      content: CampaignService.getCampaignContent(
+        campaign as any
+      ) as CampaignContent,
       scheduledAt: campaign.scheduledAt,
       createdBy: campaign.createdBy,
       createdAt: campaign.createdAt,

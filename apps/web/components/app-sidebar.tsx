@@ -186,7 +186,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem className="mb-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="w-full data-[slot=sidebar-menu-button]:!p-1.5">
+                <SidebarMenuButton
+                  id="workspace-switcher-trigger"
+                  className="w-full data-[slot=sidebar-menu-button]:!p-1.5"
+                >
                   <div
                     className="flex flex-1 items-center gap-2"
                     aria-busy={isOrgLoading}

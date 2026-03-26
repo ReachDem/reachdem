@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, AlertCircle } from "lucide-react";
 
 import { getCampaigns } from "@/actions/campaigns";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,32 @@ export default async function CampaignsPage() {
 }
 
 async function CampaignsLoader() {
-  const campaigns = await getCampaigns();
-  return <CampaignsClientTable initialCampaigns={campaigns} />;
+  try {
+    const campaigns = await getCampaigns();
+    return <CampaignsClientTable initialCampaigns={campaigns} />;
+  } catch (error) {
+    return <ErrorState error={error} />;
+  }
+}
+
+function ErrorState({ error }: { error: unknown }) {
+  const message =
+    error instanceof Error ? error.message : "An unexpected error occurred";
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 p-12">
+      <div className="bg-destructive/10 text-destructive rounded-full p-3">
+        <AlertCircle className="h-6 w-6" />
+      </div>
+      <div className="text-center">
+        <h3 className="text-lg font-semibold">Failed to load campaigns</h3>
+        <p className="text-muted-foreground mt-1 text-sm">{message}</p>
+      </div>
+      <Button variant="outline" onClick={() => window.location.reload()}>
+        Try again
+      </Button>
+    </div>
+  );
 }
 
 function TableSkeleton() {
