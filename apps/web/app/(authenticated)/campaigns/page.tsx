@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CampaignsClientTable } from "./campaigns-client-table";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Campaigns | ReachDem",
   description: "Manage your marketing campaigns.",
