@@ -33,17 +33,73 @@ export type Campaign = CampaignResponse & {
   audienceSegments: string[];
 };
 
-export async function getCampaigns(): Promise<Campaign[]> {
-  const { organizationId } = await getOrganizationId();
-  const response = await CampaignService.listCampaigns(organizationId);
+export interface ListCampaignsOptions {
+  limit?: number;
+  cursor?: string;
+}
 
-  return response.items.map((c) => ({
-    ...c,
-    audienceGroups: [],
-    audienceSegments: [],
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-  }));
+export interface ListCampaignsResult {
+  items: Campaign[];
+  nextCursor?: string | null;
+}
+
+export async function getCampaigns(): Promise<Campaign[]> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await CampaignService.listCampaigns(organizationId);
+
+    return response.items.map((c) => ({
+      ...c,
+      audienceGroups: [],
+      audienceSegments: [],
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+  } catch (error) {
+    console.error("[getCampaigns] Error loading campaigns:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to load campaigns. Please try again."
+    );
+  }
+}
+
+/**
+ * List campaigns with pagination support
+ * @param options - Pagination options (limit, cursor)
+ * @returns Paginated list of campaigns with nextCursor
+ */
+export async function listCampaigns(
+  options: ListCampaignsOptions = {}
+): Promise<ListCampaignsResult> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await CampaignService.listCampaigns(
+      organizationId,
+      options
+    );
+
+    const items = response.items.map((c) => ({
+      ...c,
+      audienceGroups: [],
+      audienceSegments: [],
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+
+    return {
+      items,
+      nextCursor: response.nextCursor,
+    };
+  } catch (error) {
+    console.error("[listCampaigns] Error loading campaigns:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to load campaigns. Please try again."
+    );
+  }
 }
 
 export async function getCampaignById(id: string): Promise<Campaign | null> {
