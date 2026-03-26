@@ -44,8 +44,7 @@ export function SinglePlanPricing({
       <Head />
       <Body>
         <Preview>
-          Exclusive Offer Just For You: Unlock Premium Features at ${price}/
-          {period}
+          {`Exclusive Offer Just For You: Unlock Premium Features at $${price}/${period}`}
         </Preview>
         <Container className="mx-auto max-w-[500px] rounded-[12px] bg-white p-[24px]">
           <Section className="mb-0 w-full rounded-[12px] border border-solid border-gray-300 bg-white p-[28px] text-left text-gray-600">

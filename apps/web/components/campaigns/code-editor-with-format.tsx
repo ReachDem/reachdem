@@ -5,7 +5,11 @@ import Editor, { type Monaco } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Wand2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import type { editor } from "monaco-editor";
+
+// Type for Monaco editor instance
+type MonacoEditor = Parameters<
+  NonNullable<React.ComponentProps<typeof Editor>["onMount"]>
+>[0];
 
 interface CodeEditorWithFormatProps {
   value: string;
@@ -24,13 +28,10 @@ export function CodeEditorWithFormat({
 }: CodeEditorWithFormatProps) {
   const [isFormatting, setIsFormatting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<MonacoEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
 
-  const handleEditorDidMount = (
-    editor: editor.IStandaloneCodeEditor,
-    monaco: Monaco
-  ) => {
+  const handleEditorDidMount = (editor: MonacoEditor, monaco: Monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
   };

@@ -1,6 +1,4 @@
 import type { JSONContent } from "@tiptap/core";
-import { Maily } from "@maily-to/render";
-import type { RendererThemeOptions, FontFormat } from "@maily-to/shared";
 
 export interface RenderEmailOptions {
   content: JSONContent;
@@ -44,50 +42,6 @@ function generatePreloadLinks(imageUrls: string[]): string {
 }
 
 /**
- * Renders email content to proper HTML using Maily renderer
- */
-export async function renderEmail({
-  content,
-  previewText = "",
-  fontFamily = "Inter",
-  fontWeights = [400, 600, 700],
-}: RenderEmailOptions): Promise<string> {
-  try {
-    // Create Maily instance
-    const maily = new Maily(content);
-
-    // Set preview text if provided
-    if (previewText) {
-      maily.setPreviewText(previewText);
-    }
-
-    // Build theme with font configuration matching DEFAULT_RENDERER_THEME structure
-    const theme: Partial<RendererThemeOptions> = {
-      font: {
-        fontFamily: fontFamily,
-        fallbackFontFamily: "sans-serif",
-        webFont: {
-          url: getGoogleFontWoff2Url(fontFamily, getFirstWeight(fontWeights)),
-          format: getFontFormat(),
-        },
-      },
-    };
-
-    // Set theme - this should work now with the correct structure
-    maily.setTheme(theme);
-
-    // Render to HTML
-    const html = await maily.render({ pretty: false });
-
-    return html;
-  } catch (error) {
-    console.error("Error rendering email with Maily:", error);
-    // Fallback to simple wrapper
-    return generateBaseHtmlStructure(fontFamily);
-  }
-}
-
-/**
  * Generates Google Fonts URL for given font family and weights
  */
 export function getGoogleFontsUrl(
@@ -98,33 +52,6 @@ export function getGoogleFontsUrl(
   const weightsStr = weights.join(";");
 
   return `https://fonts.googleapis.com/css2?family=${family}:wght@${weightsStr}&display=swap`;
-}
-
-/**
- * Gets the first weight from the weights array for webFont
- */
-function getFirstWeight(weights: number[] = [400, 600, 700]): number {
-  return weights[0] || 400;
-}
-
-/**
- * Generates webFont URL for Google Fonts (WOFF2 format)
- * Note: This is a simplified version. In production, you'd want to fetch the actual WOFF2 URL from Google Fonts API
- */
-function getGoogleFontWoff2Url(
-  fontFamily: string,
-  weight: number = 400
-): string {
-  // For now, we'll use the Google Fonts CSS URL
-  // In a real implementation, you'd parse the CSS to get the actual WOFF2 URL
-  return getGoogleFontsUrl(fontFamily, [weight]);
-}
-
-/**
- * Gets the font format for webFont
- */
-function getFontFormat(): FontFormat {
-  return "woff2";
 }
 
 /**

@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CampaignTypeSelector } from "./campaign-type-selector";
-import { SMSComposer } from "./sms-composer";
+import { SmsComposer } from "./sms-composer";
 import { EmailComposer, type EmailContent } from "./email-composer";
 
 // Form validation schema
@@ -37,7 +37,7 @@ const formSchema = z.object({
     .object({
       subject: z.string(),
       body: z.string(),
-      mode: z.enum(["rich", "html", "react-email"]),
+      mode: z.enum(["visual", "html", "react"]),
     })
     .optional(),
   audienceGroups: z.array(z.string()),
@@ -97,12 +97,12 @@ export function CampaignForm({
           ? {
               subject: initialData.content?.subject || "",
               body: initialData.content?.html || "",
-              mode: "rich" as const,
+              mode: "visual" as const,
             }
           : {
               subject: "",
               body: "",
-              mode: "rich" as const,
+              mode: "visual" as const,
             },
       audienceGroups: initialData?.audienceGroups || [],
       audienceSegments: initialData?.audienceSegments || [],
@@ -318,9 +318,9 @@ export function CampaignForm({
                   name="smsContent"
                   control={control}
                   render={({ field }) => (
-                    <SMSComposer
-                      value={field.value || ""}
-                      onChange={field.onChange}
+                    <SmsComposer
+                      value={{ text: field.value || "" }}
+                      onChange={(value) => field.onChange(value.text)}
                       disabled={
                         mode === "edit" && initialData?.status !== "draft"
                       }
@@ -336,7 +336,7 @@ export function CampaignForm({
                   render={({ field }) => (
                     <EmailComposer
                       value={
-                        field.value || { subject: "", body: "", mode: "rich" }
+                        field.value || { subject: "", body: "", mode: "visual" }
                       }
                       onChange={field.onChange}
                       disabled={

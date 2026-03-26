@@ -62,11 +62,7 @@ export function AudienceTargetSelector({
   };
 
   return (
-    <div className="space-y-3">
-      <label className="text-muted-foreground text-xs font-medium">
-        Target audience
-      </label>
-
+    <div className="flex flex-col items-end space-y-3">
       <div className="bg-background inline-flex rounded-lg border">
         {/* Segments Dropdown */}
         <DropdownMenu>
