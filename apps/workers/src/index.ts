@@ -10,6 +10,9 @@ import type {
 import {
   campaignWorkerConfig,
   emailWorkerConfig,
+  getCampaignLaunchQueueName,
+  getEmailQueueName,
+  getSmsQueueName,
   smsWorkerConfig,
 } from "./config";
 import { handleCampaignLaunchBatch } from "./campaign-launch";
@@ -17,18 +20,60 @@ import { handleSmsBatch } from "./queue-sms";
 import { handleEmailBatch } from "./queue-email";
 import { handleScheduled } from "./scheduled";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return { message: String(error) };
+}
+
+function workerRuntimeSummary(env: Env) {
+  return {
+    environment: env.ENVIRONMENT,
+    queues: {
+      campaignLaunch: getCampaignLaunchQueueName(env.ENVIRONMENT),
+      sms: getSmsQueueName(env.ENVIRONMENT),
+      email: getEmailQueueName(env.ENVIRONMENT),
+    },
+  };
+}
+
+function configureWorkerDatabase(env: Env) {
+  if (env.DATABASE_URL) {
+    process.env.DATABASE_URL = env.DATABASE_URL;
+  }
+
+  if (env.PRISMA_ACCELERATE_URL) {
+    process.env.PRISMA_ACCELERATE_URL = env.PRISMA_ACCELERATE_URL;
+  }
+
+  process.env.PRISMA_DB_DRIVER = "neon";
+}
+
 export default {
   async fetch(
     request: Request,
     env: Env,
     _ctx: ExecutionContext
   ): Promise<Response> {
+    configureWorkerDatabase(env);
     const url = new URL(request.url);
+    console.log("[Worker Fetch] Incoming request", {
+      method: request.method,
+      pathname: url.pathname,
+      ...workerRuntimeSummary(env),
+    });
 
     if (url.pathname === "/health") {
       return Response.json({
         status: "ok",
         timestamp: new Date().toISOString(),
+        ...workerRuntimeSummary(env),
       });
     }
 
@@ -50,14 +95,18 @@ export default {
     if (url.pathname === "/queue/status") {
       return Response.json({
         queues: [
-          campaignWorkerConfig.queueName,
-          smsWorkerConfig.queueName,
-          emailWorkerConfig.queueName,
+          getCampaignLaunchQueueName(env.ENVIRONMENT),
+          getSmsQueueName(env.ENVIRONMENT),
+          getEmailQueueName(env.ENVIRONMENT),
         ],
         environment: env.ENVIRONMENT,
       });
     }
 
+    console.warn("[Worker Fetch] Unknown route", {
+      method: request.method,
+      pathname: url.pathname,
+    });
     return Response.json({ error: "Not found" }, { status: 404 });
   },
 
@@ -66,23 +115,31 @@ export default {
     env: Env,
     _ctx: ExecutionContext
   ): Promise<void> {
-    console.log(`[Queue] Received batch from queue: ${batch.queue}`);
+    configureWorkerDatabase(env);
+    console.log("[Queue] Received batch", {
+      queue: batch.queue,
+      size: batch.messages.length,
+      ...workerRuntimeSummary(env),
+    });
 
     switch (batch.queue) {
-      case campaignWorkerConfig.queueName:
+      case getCampaignLaunchQueueName(env.ENVIRONMENT):
         await handleCampaignLaunchBatch(
           batch as MessageBatch<CampaignLaunchMessage>,
           env
         );
         break;
-      case smsWorkerConfig.queueName:
+      case getSmsQueueName(env.ENVIRONMENT):
         await handleSmsBatch(batch as MessageBatch<SmsMessage>, env);
         break;
-      case emailWorkerConfig.queueName:
+      case getEmailQueueName(env.ENVIRONMENT):
         await handleEmailBatch(batch as MessageBatch<EmailMessage>, env);
         break;
       default:
-        console.error(`[Queue] Unknown queue: ${batch.queue}`);
+        console.error("[Queue] Unknown queue", {
+          queue: batch.queue,
+          size: batch.messages.length,
+        });
         for (const msg of batch.messages) {
           msg.ack();
         }
@@ -94,6 +151,12 @@ export default {
     env: Env,
     _ctx: ExecutionContext
   ): Promise<void> {
+    configureWorkerDatabase(env);
+    console.log("[Worker Scheduled] Trigger received", {
+      cron: controller.cron,
+      scheduledTime: new Date(controller.scheduledTime).toISOString(),
+      ...workerRuntimeSummary(env),
+    });
     await handleScheduled(controller, env);
   },
 };
@@ -112,16 +175,26 @@ async function handleEnqueueSms(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    console.log(
-      `[Queue API] Enqueueing SMS message ${body.message_id} cycle ${body.delivery_cycle} into ${smsWorkerConfig.queueName}`
-    );
+    console.log("[Queue API] Enqueueing SMS job", {
+      messageId: body.message_id,
+      organizationId: body.organization_id,
+      channel: body.channel,
+      deliveryCycle: body.delivery_cycle,
+      queue: smsWorkerConfig.queueName,
+      resolvedQueue: getSmsQueueName(env.ENVIRONMENT),
+      environment: env.ENVIRONMENT,
+    });
     await env.SMS_QUEUE.send(body);
     return Response.json({
       success: true,
       message: "SMS job queued",
       job: body,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[Queue API] Failed to enqueue SMS job",
+      serializeError(error)
+    );
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 }
@@ -142,16 +215,24 @@ async function handleEnqueueCampaignLaunch(
       );
     }
 
-    console.log(
-      `[Queue API] Enqueueing campaign launch ${body.campaign_id} into ${campaignWorkerConfig.queueName}`
-    );
+    console.log("[Queue API] Enqueueing campaign launch job", {
+      campaignId: body.campaign_id,
+      organizationId: body.organization_id,
+      queue: campaignWorkerConfig.queueName,
+      resolvedQueue: getCampaignLaunchQueueName(env.ENVIRONMENT),
+      environment: env.ENVIRONMENT,
+    });
     await env.CAMPAIGN_LAUNCH_QUEUE.send(body);
     return Response.json({
       success: true,
       message: "Campaign launch job queued",
       job: body,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[Queue API] Failed to enqueue campaign launch job",
+      serializeError(error)
+    );
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 }
@@ -173,16 +254,26 @@ async function handleEnqueueEmail(
       );
     }
 
-    console.log(
-      `[Queue API] Enqueueing email message ${body.message_id} cycle ${body.delivery_cycle} into ${emailWorkerConfig.queueName}`
-    );
+    console.log("[Queue API] Enqueueing email job", {
+      messageId: body.message_id,
+      organizationId: body.organization_id,
+      channel: body.channel,
+      deliveryCycle: body.delivery_cycle,
+      queue: emailWorkerConfig.queueName,
+      resolvedQueue: getEmailQueueName(env.ENVIRONMENT),
+      environment: env.ENVIRONMENT,
+    });
     await env.EMAIL_QUEUE.send(body);
     return Response.json({
       success: true,
       message: "Email job queued",
       job: body,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[Queue API] Failed to enqueue email job",
+      serializeError(error)
+    );
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 }

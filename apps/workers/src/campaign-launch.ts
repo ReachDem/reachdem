@@ -2,6 +2,8 @@ import { ProcessCampaignLaunchJobUseCase } from "@reachdem/core";
 import {
   campaignWorkerConfig,
   emailWorkerConfig,
+  getEmailQueueName,
+  getSmsQueueName,
   smsWorkerConfig,
 } from "./config";
 import { requireCampaignWorkerEnv } from "./env";
@@ -12,43 +14,57 @@ export async function handleCampaignLaunchBatch(
   env: Env
 ): Promise<void> {
   requireCampaignWorkerEnv(env);
-  console.log(
-    `[Campaign Launch Queue] Processing batch of ${batch.messages.length} jobs from ${batch.queue} in ${env.ENVIRONMENT}`
-  );
+  console.log("[Campaign Launch Queue] Processing batch", {
+    queue: batch.queue,
+    size: batch.messages.length,
+    environment: env.ENVIRONMENT,
+    smsQueue: getSmsQueueName(env.ENVIRONMENT),
+    emailQueue: getEmailQueueName(env.ENVIRONMENT),
+  });
 
   for (const message of batch.messages) {
     const job = message.body;
 
     try {
-      console.log(
-        `[Campaign Launch Queue] Starting campaign ${job.campaign_id} for organization ${job.organization_id}`
-      );
+      console.log("[Campaign Launch Queue] Starting campaign job", {
+        campaignId: job.campaign_id,
+        organizationId: job.organization_id,
+      });
 
       const outcome = await ProcessCampaignLaunchJobUseCase.execute(
         job,
         async (smsJob) => {
-          console.log(
-            `[Campaign Launch Queue] Publishing SMS message ${smsJob.message_id} to ${smsWorkerConfig.queueName}`
-          );
+          console.log("[Campaign Launch Queue] Publishing SMS child job", {
+            campaignId: job.campaign_id,
+            messageId: smsJob.message_id,
+            queue: getSmsQueueName(env.ENVIRONMENT),
+          });
           await env.SMS_QUEUE.send(smsJob);
         },
         async (emailJob) => {
-          console.log(
-            `[Campaign Launch Queue] Publishing email message ${emailJob.message_id} to ${emailWorkerConfig.queueName}`
-          );
+          console.log("[Campaign Launch Queue] Publishing email child job", {
+            campaignId: job.campaign_id,
+            messageId: emailJob.message_id,
+            queue: getEmailQueueName(env.ENVIRONMENT),
+          });
           await env.EMAIL_QUEUE.send(emailJob);
         }
       );
 
       message.ack();
-      console.log(
-        `[Campaign Launch Queue] Completed campaign ${job.campaign_id} with outcome ${outcome}; acked successfully`
-      );
+      console.log("[Campaign Launch Queue] Completed campaign job", {
+        campaignId: job.campaign_id,
+        organizationId: job.organization_id,
+        outcome,
+        acked: true,
+      });
     } catch (error) {
-      console.error(
-        `[Campaign Launch Queue] Technical failure for campaign ${job.campaign_id}; scheduling queue retry`,
-        error
-      );
+      console.error("[Campaign Launch Queue] Technical failure", {
+        campaignId: job.campaign_id,
+        organizationId: job.organization_id,
+        retrying: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
       message.retry();
     }
   }

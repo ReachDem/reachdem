@@ -8,36 +8,47 @@ export async function handleSmsBatch(
   env: Env
 ): Promise<void> {
   requireSmsWorkerEnv(env);
-  console.log(
-    `[SMS Queue] Processing batch of ${batch.messages.length} messages from ${batch.queue} in ${env.ENVIRONMENT}`
-  );
+  console.log("[SMS Queue] Processing batch", {
+    queue: batch.queue,
+    size: batch.messages.length,
+    environment: env.ENVIRONMENT,
+  });
 
   for (const message of batch.messages) {
     const job = message.body;
 
     try {
-      console.log(
-        `[SMS Queue] Starting message ${job.message_id} cycle ${job.delivery_cycle}/${smsWorkerConfig.execution.maxDeliveryCycles}`
-      );
+      console.log("[SMS Queue] Starting message job", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        deliveryCycle: job.delivery_cycle,
+        maxDeliveryCycles: smsWorkerConfig.execution.maxDeliveryCycles,
+      });
 
       const outcome = await ProcessSmsMessageJobUseCase.execute(job, {
         republish: async (nextJob) => {
-          console.log(
-            `[SMS Queue] Requeueing message ${nextJob.message_id} for delivery cycle ${nextJob.delivery_cycle}`
-          );
+          console.log("[SMS Queue] Requeueing message job", {
+            messageId: nextJob.message_id,
+            deliveryCycle: nextJob.delivery_cycle,
+          });
           await env.SMS_QUEUE.send(nextJob);
         },
       });
 
       message.ack();
-      console.log(
-        `[SMS Queue] Completed message ${job.message_id} with outcome ${outcome}; acked successfully`
-      );
+      console.log("[SMS Queue] Completed message job", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        outcome,
+        acked: true,
+      });
     } catch (error) {
-      console.error(
-        `[SMS Queue] Technical failure for message ${job.message_id}; scheduling queue retry`,
-        error
-      );
+      console.error("[SMS Queue] Technical failure", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        retrying: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
       message.retry();
     }
   }

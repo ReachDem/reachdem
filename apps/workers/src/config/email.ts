@@ -10,3 +10,9 @@ export const emailWorkerConfig = {
     maxDeliveryCycles: 3,
   },
 } as const;
+
+export function getEmailQueueName(environment?: string): string {
+  return environment === "production"
+    ? `${emailWorkerConfig.queueName}-production`
+    : emailWorkerConfig.queueName;
+}

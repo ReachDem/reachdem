@@ -9,9 +9,14 @@ export async function handleEmailBatch(
   env: Env
 ): Promise<void> {
   requireEmailWorkerEnv(env);
-  console.log(
-    `[Email Queue] Processing batch of ${batch.messages.length} messages from ${batch.queue} in ${env.ENVIRONMENT}`
-  );
+  console.log("[Email Queue] Processing batch", {
+    queue: batch.queue,
+    size: batch.messages.length,
+    environment: env.ENVIRONMENT,
+    smtpHost: env.SMTP_HOST,
+    smtpPort: env.SMTP_PORT,
+    senderEmail: env.SENDER_EMAIL,
+  });
 
   const transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,
@@ -28,22 +33,31 @@ export async function handleEmailBatch(
     const job = message.body;
 
     try {
-      console.log(
-        `[Email Queue] Starting message ${job.message_id} cycle ${job.delivery_cycle}/${emailWorkerConfig.execution.maxDeliveryCycles}`
-      );
+      console.log("[Email Queue] Starting message job", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        deliveryCycle: job.delivery_cycle,
+        maxDeliveryCycles: emailWorkerConfig.execution.maxDeliveryCycles,
+      });
 
       const outcome = await ProcessEmailMessageJobUseCase.execute(job, {
         republish: async (nextJob) => {
-          console.log(
-            `[Email Queue] Requeueing message ${nextJob.message_id} for delivery cycle ${nextJob.delivery_cycle}`
-          );
+          console.log("[Email Queue] Requeueing message job", {
+            messageId: nextJob.message_id,
+            deliveryCycle: nextJob.delivery_cycle,
+          });
           await env.EMAIL_QUEUE.send(nextJob);
         },
         sendEmail: async ({ to, subject, html, from }) => {
           const startedAt = Date.now();
-          console.log(
-            `[Email Queue] Sending SMTP email for message ${job.message_id} to ${to}`
-          );
+          console.log("[Email Queue] Sending SMTP email", {
+            messageId: job.message_id,
+            to,
+            fromName: from,
+            smtpHost: env.SMTP_HOST,
+            subjectPreview: subject.slice(0, 80),
+            htmlLength: html.length,
+          });
           try {
             const info = await transporter.sendMail({
               from: `"${from}" <${env.SENDER_EMAIL}>`,
@@ -54,7 +68,10 @@ export async function handleEmailBatch(
 
             const previewUrl = nodemailer.getTestMessageUrl(info);
             if (previewUrl) {
-              console.log(`[Email Queue] Preview: ${previewUrl}`);
+              console.log("[Email Queue] Preview URL generated", {
+                messageId: job.message_id,
+                previewUrl,
+              });
             }
 
             return {
@@ -77,14 +94,19 @@ export async function handleEmailBatch(
       });
 
       message.ack();
-      console.log(
-        `[Email Queue] Completed message ${job.message_id} with outcome ${outcome}; acked successfully`
-      );
+      console.log("[Email Queue] Completed message job", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        outcome,
+        acked: true,
+      });
     } catch (error) {
-      console.error(
-        `[Email Queue] Technical failure for message ${job.message_id}; scheduling queue retry`,
-        error
-      );
+      console.error("[Email Queue] Technical failure", {
+        messageId: job.message_id,
+        organizationId: job.organization_id,
+        retrying: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
       message.retry();
     }
   }

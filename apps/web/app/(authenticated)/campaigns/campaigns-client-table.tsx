@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
+  Activity,
+  CheckCircle2,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Play,
+  RefreshCw,
   Search,
   Trash2,
   Plus,
   Megaphone,
+  WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +56,21 @@ interface CampaignsClientTableProps {
   initialCampaigns: Campaign[];
 }
 
+interface CampaignStatsSnapshot {
+  audienceSize: number;
+  sentCount: number;
+  failedCount: number;
+}
+
+interface WorkerStatusSnapshot {
+  reachable: boolean;
+  healthy: boolean;
+  environment?: string;
+  queues?: string[];
+  error?: string;
+  checkedAt: string;
+}
+
 export function CampaignsClientTable({
   initialCampaigns,
 }: CampaignsClientTableProps) {
@@ -68,6 +88,13 @@ export function CampaignsClientTable({
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatusSnapshot | null>(
+    null
+  );
+  const [campaignStats, setCampaignStats] = useState<
+    Record<string, CampaignStatsSnapshot>
+  >({});
 
   // Filter and paginated logic
   const filteredCampaigns = initialCampaigns.filter((c) =>
@@ -79,6 +106,76 @@ export function CampaignsClientTable({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  const activeCampaigns = initialCampaigns.filter(
+    (campaign) => campaign.status === "running"
+  );
+
+  async function refreshCampaignSignals(showSpinner = false) {
+    if (showSpinner) {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const nonDraftCampaigns = paginatedCampaigns.filter(
+        (campaign) => campaign.status !== "draft"
+      );
+
+      const [workerResponse, ...statsResponses] = await Promise.all([
+        fetch("/api/v1/workers/status", { cache: "no-store" }),
+        ...nonDraftCampaigns.map((campaign) =>
+          fetch(`/api/v1/campaigns/${campaign.id}/stats`, {
+            cache: "no-store",
+          })
+        ),
+      ]);
+
+      const workerPayload =
+        (await workerResponse.json()) as WorkerStatusSnapshot;
+      setWorkerStatus(workerPayload);
+
+      const nextStats: Record<string, CampaignStatsSnapshot> = {};
+      await Promise.all(
+        statsResponses.map(async (response, index) => {
+          if (!response.ok) return;
+          const stats = (await response.json()) as CampaignStatsSnapshot;
+          nextStats[nonDraftCampaigns[index].id] = stats;
+        })
+      );
+
+      if (Object.keys(nextStats).length > 0) {
+        setCampaignStats((current) => ({ ...current, ...nextStats }));
+      }
+    } catch {
+      // Keep current UI state if a polling cycle fails.
+    } finally {
+      if (showSpinner) {
+        setIsRefreshing(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    void refreshCampaignSignals();
+  }, [currentPage, search]);
+
+  useEffect(() => {
+    if (activeCampaigns.length === 0) return;
+
+    const intervalId = window.setInterval(() => {
+      router.refresh();
+      void refreshCampaignSignals();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeCampaigns.length, router, currentPage, search]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refreshCampaignSignals();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentPage, search]);
 
   const handleDelete = async () => {
     if (!campaignToDelete) return;
@@ -102,6 +199,7 @@ export function CampaignsClientTable({
       await launchCampaign(campaignToLaunch.id);
       toast.success("Campaign launched successfully");
       router.refresh();
+      void refreshCampaignSignals(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to launch campaign");
     } finally {
@@ -182,6 +280,61 @@ export function CampaignsClientTable({
     }
   };
 
+  const getWorkerBadge = () => {
+    if (!workerStatus) {
+      return (
+        <Badge variant="outline" className="gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Checking worker
+        </Badge>
+      );
+    }
+
+    if (!workerStatus.reachable || !workerStatus.healthy) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <WifiOff className="h-3 w-3" />
+          Worker unreachable
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge className="gap-1 bg-emerald-500 hover:bg-emerald-600">
+        <CheckCircle2 className="h-3 w-3" />
+        Worker connected
+      </Badge>
+    );
+  };
+
+  const getDeliverySummary = (campaign: Campaign) => {
+    if (campaign.status === "draft") {
+      return (
+        <span className="text-muted-foreground text-xs">Not launched yet</span>
+      );
+    }
+
+    const stats = campaignStats[campaign.id];
+    if (!stats) {
+      return (
+        <span className="text-muted-foreground text-xs">
+          Waiting for stats...
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1 text-xs">
+        <span className="font-medium">
+          {stats.sentCount} sent / {stats.failedCount} failed
+        </span>
+        <span className="text-muted-foreground">
+          Audience {stats.audienceSize}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full">
       {/* Show empty state if no campaigns at all */}
@@ -189,6 +342,46 @@ export function CampaignsClientTable({
         <EmptyState />
       ) : (
         <>
+          <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {getWorkerBadge()}
+              <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                <Activity className="h-3.5 w-3.5" />
+                {activeCampaigns.length > 0
+                  ? "Auto-refresh active every 15s while campaigns are running"
+                  : "Worker and delivery status checked automatically"}
+              </div>
+              {workerStatus?.error && (
+                <div className="text-muted-foreground text-xs">
+                  {workerStatus.error}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {workerStatus?.environment && (
+                <span className="text-muted-foreground text-xs">
+                  {workerStatus.environment}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  router.refresh();
+                  void refreshCampaignSignals(true);
+                }}
+                disabled={isRefreshing}
+              >
+                <RefreshCw
+                  className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
           <div className="flex items-center border-b p-4">
             <div className="relative w-full max-w-sm">
               <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
@@ -211,6 +404,7 @@ export function CampaignsClientTable({
                   <TableHead className="w-[30%] min-w-[200px]">Name</TableHead>
                   <TableHead>Channel</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Delivery</TableHead>
                   <TableHead>Updated at</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -219,7 +413,7 @@ export function CampaignsClientTable({
                 {paginatedCampaigns.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-muted-foreground h-32 text-center"
                     >
                       No campaigns found matching &quot;{search}&quot;.
@@ -245,6 +439,7 @@ export function CampaignsClientTable({
                       </TableCell>
                       <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                      <TableCell>{getDeliverySummary(campaign)}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
                       </TableCell>

@@ -1,6 +1,8 @@
 import type { MessageExecutionJob } from "@reachdem/shared";
 import {
   emailWorkerConfig,
+  getEmailQueueName,
+  getSmsQueueName,
   scheduledWorkerConfig,
   smsWorkerConfig,
 } from "./config";
@@ -26,6 +28,12 @@ export async function handleScheduled(
   console.log(
     `[Cron] Triggered: "${controller.cron}" at ${scheduledTime.toISOString()}`
   );
+  console.log("[Cron] Runtime context", {
+    environment: env.ENVIRONMENT,
+    apiBaseUrl: env.API_BASE_URL,
+    smsQueue: getSmsQueueName(env.ENVIRONMENT),
+    emailQueue: getEmailQueueName(env.ENVIRONMENT),
+  });
 
   switch (controller.cron) {
     case scheduledWorkerConfig.cron:
@@ -57,6 +65,10 @@ async function handleScheduledMessages(
   );
 
   if (!response.ok) {
+    console.error("[Cron] Scheduled message claim failed", {
+      apiBaseUrl: env.API_BASE_URL,
+      status: response.status,
+    });
     throw new Error(
       `Failed to fetch scheduled messages: HTTP ${response.status}`
     );
@@ -66,6 +78,11 @@ async function handleScheduledMessages(
   console.log(
     `[Cron] Claimed ${payload.updated ?? payload.items.length} scheduled message(s)`
   );
+  console.log("[Cron] Claim payload summary", {
+    updated: payload.updated,
+    itemCount: payload.items.length,
+    channels: payload.items.map((item) => item.channel),
+  });
 
   if (payload.items.length === 0) {
     return;
@@ -89,12 +106,12 @@ async function handleScheduledMessages(
 
     if (job.channel === "sms") {
       console.log(
-        `[Cron] Publishing scheduled SMS message ${job.message_id} to ${smsWorkerConfig.queueName}`
+        `[Cron] Publishing scheduled SMS message ${job.message_id} to ${getSmsQueueName(env.ENVIRONMENT)}`
       );
       await env.SMS_QUEUE.send(job);
     } else {
       console.log(
-        `[Cron] Publishing scheduled email message ${job.message_id} to ${emailWorkerConfig.queueName}`
+        `[Cron] Publishing scheduled email message ${job.message_id} to ${getEmailQueueName(env.ENVIRONMENT)}`
       );
       await env.EMAIL_QUEUE.send(job);
     }

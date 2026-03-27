@@ -5,6 +5,21 @@
   "compatibility_date": "2025-03-01",
   "compatibility_flags": ["nodejs_compat"],
   "find_additional_modules": true,
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  },
   "triggers": {
     "crons": ["* * * * *"]
   },
@@ -49,41 +64,37 @@
     "production": {
       "vars": {
         "ENVIRONMENT": "production",
-        // TODO: replace with the real public URL of the deployed web app
-        // before deploying the production worker. The scheduled worker calls
-        // the internal web API through this base URL.
-        "API_BASE_URL": "https://replace-me-with-your-web-app.example.com"
+        "API_BASE_URL": "https://develop.reachdem.cc"
       },
       "queues": {
-        // TODO: if production and non-production workers share the same
-        // Cloudflare account, give each environment its own consumer queues or
-        // deploy only one active consumer per queue. Cloudflare rejects a
-        // second consumer on the same queue.
         "producers": [
           {
             "binding": "CAMPAIGN_LAUNCH_QUEUE",
-            "queue": "reachdem-campaign-launch-queue"
+            "queue": "reachdem-campaign-launch-queue-production"
           },
-          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
-          { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-production" },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-production"
+          }
         ],
         "consumers": [
           {
-            "queue": "reachdem-campaign-launch-queue",
+            "queue": "reachdem-campaign-launch-queue-production",
             "max_batch_size": 5,
             "max_batch_timeout": 2,
             "max_concurrency": 2,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-sms-queue",
+            "queue": "reachdem-sms-queue-production",
             "max_batch_size": 50,
             "max_batch_timeout": 2,
             "max_concurrency": 10,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-email-queue",
+            "queue": "reachdem-email-queue-production",
             "max_batch_size": 20,
             "max_batch_timeout": 2,
             "max_concurrency": 5,
