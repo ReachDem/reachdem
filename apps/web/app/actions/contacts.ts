@@ -237,6 +237,57 @@ export async function getContacts() {
 }
 
 /**
+ * Update a single contact for the active organization.
+ */
+export async function updateContact(
+  contactId: string,
+  data: {
+    name?: string;
+    email?: string | null;
+    phoneE164?: string | null;
+    gender?: string;
+    birthdate?: Date | null;
+    address?: string | null;
+    work?: string | null;
+    enterprise?: string | null;
+    customFields?: Record<string, unknown>;
+  }
+) {
+  try {
+    const organizationId = await getOrganizationId();
+
+    // Verify the contact belongs to this organization
+    const existing = await prisma.contact.findFirst({
+      where: {
+        id: contactId,
+        organizationId,
+        deletedAt: null,
+      },
+    });
+
+    if (!existing) {
+      return { success: false, error: "Contact not found" };
+    }
+
+    // Update the contact
+    const updateData: any = {
+      ...data,
+      email: data.email ? data.email.toLowerCase().trim() : null,
+    };
+
+    const updated = await prisma.contact.update({
+      where: { id: contactId },
+      data: updateData,
+    });
+
+    return { success: true, contact: updated };
+  } catch (error) {
+    console.error("Error updating contact:", error);
+    return { success: false, error: "Failed to update contact" };
+  }
+}
+
+/**
  * Soft-delete one or more contacts for the active organization.
  */
 export async function deleteContacts(ids: string[]) {

@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaNeon } from "@prisma/adapter-neon";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -27,6 +28,13 @@ function createClientOptions(): Prisma.PrismaClientOptions & {
     );
   }
 
+  if (process.env.PRISMA_DB_DRIVER === "neon") {
+    return {
+      log,
+      adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL }),
+    };
+  }
+
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   return {
@@ -35,21 +43,36 @@ function createClientOptions(): Prisma.PrismaClientOptions & {
   };
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient(createClientOptions() as Prisma.PrismaClientOptions);
+function createPrismaClient(): PrismaClient {
+  return new PrismaClient(createClientOptions() as Prisma.PrismaClientOptions);
+}
 
-// const hasRequiredDelegates = (client: PrismaClient) =>
-//     Boolean((client as any).group && (client as any).contact && (client as any).organization)
+let prismaInstance: PrismaClient | undefined;
 
-// const existingClient = globalForPrisma.prisma
+function getPrismaClient(): PrismaClient {
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
 
-// export const prisma =
-//     existingClient && hasRequiredDelegates(existingClient)
-//         ? existingClient
-//         : createPrismaClient()
+  if (!prismaInstance) {
+    prismaInstance = createPrismaClient();
+  }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = prismaInstance;
+  }
+
+  return prismaInstance;
+}
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property, receiver) {
+    return Reflect.get(getPrismaClient(), property, receiver);
+  },
+  set(_target, property, value, receiver) {
+    return Reflect.set(getPrismaClient(), property, value, receiver);
+  },
+}) as PrismaClient;
 
 export { Prisma, PrismaClient, Gender, ContactFieldType } from "@prisma/client";
 export type * from "@prisma/client";

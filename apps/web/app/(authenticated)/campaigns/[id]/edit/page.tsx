@@ -67,6 +67,41 @@ function getPresetDate(preset: (typeof SCHEDULE_PRESETS)[number]) {
   }
 }
 
+function buildEmailCampaignContent(content: EmailContent) {
+  return {
+    subject: content.subject || "Untitled Email",
+    html: content.body || "<p>Empty email</p>",
+    bodyJson: content.bodyJson,
+    mode: content.mode,
+    fontFamily: content.fontFamily,
+    fontWeights: content.fontWeights,
+  };
+}
+
+function buildSmsCampaignContent(content: SmsContent) {
+  return {
+    text: content.text || "Empty SMS",
+    from: content.senderId || undefined,
+    senderId: content.senderId,
+  };
+}
+
+function buildAudiencePayload(
+  selectedSegmentId: string,
+  selectedGroupId: string
+) {
+  return {
+    audiences: [
+      ...(selectedSegmentId
+        ? [{ sourceType: "segment" as const, sourceId: selectedSegmentId }]
+        : []),
+      ...(selectedGroupId
+        ? [{ sourceType: "group" as const, sourceId: selectedGroupId }]
+        : []),
+    ],
+  };
+}
+
 export default function EditCampaignPage({ params }: EditCampaignPageProps) {
   return <EditCampaignClient params={params} />;
 }
@@ -161,14 +196,15 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
           setEmailContent({
             subject: data.content?.subject || "",
             body: data.content?.html || "",
-            mode: "visual",
+            bodyJson: data.content?.bodyJson,
+            mode: data.content?.mode || "visual",
             fontFamily: data.content?.fontFamily,
             fontWeights: data.content?.fontWeights,
           });
         } else if (data.channel === "sms") {
           setSmsContent({
             text: data.content?.text || "",
-            senderId: data.content?.senderId,
+            senderId: data.content?.senderId || data.content?.from,
           });
         }
 
@@ -232,20 +268,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       }
 
       // Prepare content based on type
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject || "Untitled Email",
-          html: emailContent.body || "<p>Empty email</p>",
-          fontFamily: emailContent.fontFamily,
-          fontWeights: emailContent.fontWeights,
-        };
-      } else {
-        content = {
-          text: smsContent.text || "Empty SMS",
-          senderId: smsContent.senderId,
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent(emailContent)
+          : buildSmsCampaignContent(smsContent);
 
       // Prepare payload
       const payload = {
@@ -273,6 +299,29 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
       const result = await response.json();
       console.log("[Edit Campaign] Draft saved successfully:", result);
+
+      const audiencePayload = buildAudiencePayload(
+        selectedSegmentId,
+        selectedGroupId
+      );
+
+      const audienceResponse = await fetch(
+        `/api/v1/campaigns/${campaignId}/audience`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(audiencePayload),
+        }
+      );
+
+      if (!audienceResponse.ok) {
+        const errorData = await audienceResponse.json().catch(() => null);
+        throw new Error(
+          errorData?.error ||
+            errorData?.details ||
+            "Failed to save campaign audience"
+        );
+      }
 
       toast.success("Draft saved successfully");
       router.push("/campaigns");
@@ -332,20 +381,16 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       scheduledDateTime.setHours(hours, minutes, 0, 0);
 
       // Prepare content
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject.trim(),
-          html: emailContent.body,
-          fontFamily: emailContent.fontFamily,
-          fontWeights: emailContent.fontWeights,
-        };
-      } else {
-        content = {
-          text: smsContent.text.trim(),
-          senderId: smsContent.senderId,
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent({
+              ...emailContent,
+              subject: emailContent.subject.trim(),
+            })
+          : buildSmsCampaignContent({
+              ...smsContent,
+              text: smsContent.text.trim(),
+            });
 
       // If failed campaign, create new one
       if (isFailedCampaign) {
@@ -370,15 +415,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
         const newCampaign = await createResponse.json();
 
-        // Set audience
-        const audiencePayload = {
-          audiences: [
-            {
-              sourceType: selectedSegmentId ? "segment" : "group",
-              sourceId: selectedSegmentId || selectedGroupId,
-            },
-          ],
-        };
+        const audiencePayload = buildAudiencePayload(
+          selectedSegmentId,
+          selectedGroupId
+        );
 
         const audienceResponse = await fetch(
           `/api/v1/campaigns/${newCampaign.id}/audience`,
@@ -394,10 +434,9 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         }
 
         toast.success(
-          `New campaign scheduled for ${format(scheduledDate, "PPP")} at ${scheduledTime}`
+          `New campaign scheduled for ${format(scheduledDateTime, "dd.MM.yyyy")} at ${format(scheduledDateTime, "HH:mm")}`
         );
       } else {
-        // Update existing draft
         const updatePayload = {
           name: campaignTitle.trim(),
           description: campaignDescription.trim() || null,
@@ -416,15 +455,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
           throw new Error(errorData.error || "Failed to update campaign");
         }
 
-        // Update audience
-        const audiencePayload = {
-          audiences: [
-            {
-              sourceType: selectedSegmentId ? "segment" : "group",
-              sourceId: selectedSegmentId || selectedGroupId,
-            },
-          ],
-        };
+        const audiencePayload = buildAudiencePayload(
+          selectedSegmentId,
+          selectedGroupId
+        );
 
         const audienceResponse = await fetch(
           `/api/v1/campaigns/${campaignId}/audience`,
@@ -440,7 +474,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         }
 
         toast.success(
-          `Campaign scheduled for ${format(scheduledDate, "PPP")} at ${scheduledTime}`
+          `Campaign scheduled for ${format(scheduledDateTime, "dd.MM.yyyy")} at ${format(scheduledDateTime, "HH:mm")}`
         );
       }
 
@@ -490,20 +524,16 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
     try {
       // Prepare content
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject.trim(),
-          html: emailContent.body,
-          fontFamily: emailContent.fontFamily,
-          fontWeights: emailContent.fontWeights,
-        };
-      } else {
-        content = {
-          text: smsContent.text.trim(),
-          senderId: smsContent.senderId,
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent({
+              ...emailContent,
+              subject: emailContent.subject.trim(),
+            })
+          : buildSmsCampaignContent({
+              ...smsContent,
+              text: smsContent.text.trim(),
+            });
 
       let campaignIdToLaunch = campaignId;
 
@@ -535,6 +565,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
           name: campaignTitle.trim(),
           description: campaignDescription.trim() || null,
           content,
+          scheduledAt: null,
         };
 
         const updateResponse = await fetch(`/api/v1/campaigns/${campaignId}`, {
@@ -550,14 +581,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       }
 
       // Set audience
-      const audiencePayload = {
-        audiences: [
-          {
-            sourceType: selectedSegmentId ? "segment" : "group",
-            sourceId: selectedSegmentId || selectedGroupId,
-          },
-        ],
-      };
+      const audiencePayload = buildAudiencePayload(
+        selectedSegmentId,
+        selectedGroupId
+      );
 
       const audienceResponse = await fetch(
         `/api/v1/campaigns/${campaignIdToLaunch}/audience`,
@@ -601,6 +628,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   const scheduleSummary = scheduledDate
     ? `${format(scheduledDate, "EEE, MMM d")} at ${scheduledTime}`
     : "Pick date and time";
+  const scheduledButtonLabel = scheduledDate ? "Scheduled at" : "Schedule";
+  const scheduledButtonHover = scheduledDate
+    ? `${format(scheduledDate, "dd.MM.yyyy")} at ${scheduledTime.replace(":", "h")}`
+    : undefined;
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -676,11 +707,16 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                 <PopoverTrigger asChild>
                   <Button
                     variant="secondary"
-                    className="h-11 rounded-none border-r px-5"
+                    className={cn(
+                      "h-11 rounded-none border-r px-5",
+                      scheduledDate &&
+                        "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                    )}
                     disabled={isLoading}
+                    title={scheduledButtonHover}
                   >
                     <CalendarDaysIcon className="h-4 w-4" />
-                    Schedule
+                    {scheduledButtonLabel}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-[360px] p-0">

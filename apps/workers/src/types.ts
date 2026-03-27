@@ -32,9 +32,16 @@ export interface Env {
   CAMPAIGN_LAUNCH_QUEUE: QueueProducer<CampaignLaunchJob>;
   SMS_QUEUE: QueueProducer<SmsExecutionJob>;
   EMAIL_QUEUE: QueueProducer<EmailExecutionJob>;
+  DATABASE_URL?: string;
+  PRISMA_ACCELERATE_URL?: string;
   ENVIRONMENT: string;
   API_BASE_URL: string;
   INTERNAL_API_SECRET: string;
+  ALIBABA_ACCESS_KEY_ID?: string;
+  ALIBABA_ACCESS_KEY_SECRET?: string;
+  ALIBABA_REGION?: string;
+  ALIBABA_SENDER_EMAIL?: string;
+  ALIBABA_SENDER_NAME?: string;
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_USER: string;

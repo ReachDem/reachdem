@@ -51,6 +51,14 @@ interface CampaignsClientTableProps {
   initialCampaigns: Campaign[];
 }
 
+function isScheduledCampaign(campaign: Campaign) {
+  return (
+    campaign.status === "draft" &&
+    Boolean(campaign.scheduledAt) &&
+    new Date(campaign.scheduledAt as Date | string).getTime() > Date.now()
+  );
+}
+
 export function CampaignsClientTable({
   initialCampaigns,
 }: CampaignsClientTableProps) {
@@ -110,8 +118,16 @@ export function CampaignsClientTable({
     }
   };
 
-  const getStatusBadge = (status: Campaign["status"]) => {
-    switch (status) {
+  const getStatusBadge = (campaign: Campaign) => {
+    if (isScheduledCampaign(campaign)) {
+      return (
+        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+          Scheduled
+        </Badge>
+      );
+    }
+
+    switch (campaign.status) {
       case "draft":
         return (
           <Badge variant="outline" className="text-slate-500">
@@ -138,7 +154,7 @@ export function CampaignsClientTable({
       default:
         return (
           <Badge variant="outline" className="capitalize">
-            {status}
+            {campaign.status}
           </Badge>
         );
     }
@@ -244,9 +260,26 @@ export function CampaignsClientTable({
                         </div>
                       </TableCell>
                       <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
-                      <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                      <TableCell>{getStatusBadge(campaign)}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
+                        <div className="flex flex-col gap-1">
+                          <span>
+                            {format(
+                              new Date(campaign.updatedAt),
+                              "MMM d, yyyy"
+                            )}
+                          </span>
+                          {isScheduledCampaign(campaign) &&
+                            campaign.scheduledAt && (
+                              <span className="text-xs text-blue-700">
+                                Scheduled for{" "}
+                                {format(
+                                  new Date(campaign.scheduledAt),
+                                  "dd.MM.yyyy 'at' HH:mm"
+                                )}
+                              </span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -283,25 +316,30 @@ export function CampaignsClientTable({
                               </Link>
                             </DropdownMenuItem>
 
-                            {campaign.status === "draft" && (
-                              <>
-                                <DropdownMenuItem
-                                  className="cursor-pointer text-emerald-600 focus:text-emerald-700"
-                                  onClick={() => setCampaignToLaunch(campaign)}
-                                >
-                                  <Play className="mr-2 h-4 w-4" />
-                                  Launch
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive cursor-pointer"
-                                  onClick={() => setCampaignToDelete(campaign)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>
-                            )}
+                            {campaign.status === "draft" &&
+                              !isScheduledCampaign(campaign) && (
+                                <>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                    onClick={() =>
+                                      setCampaignToLaunch(campaign)
+                                    }
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Launch
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                    onClick={() =>
+                                      setCampaignToDelete(campaign)
+                                    }
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

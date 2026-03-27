@@ -66,6 +66,49 @@ export class CampaignService {
     };
   }
 
+  static async claimScheduledCampaigns(input: { until: Date; limit: number }) {
+    const campaigns = await prisma.campaign.findMany({
+      where: {
+        status: "draft",
+        scheduledAt: {
+          not: null,
+          lte: input.until,
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+      take: input.limit,
+      select: {
+        id: true,
+        organizationId: true,
+        channel: true,
+        scheduledAt: true,
+      },
+    });
+
+    const claimed: typeof campaigns = [];
+
+    for (const campaign of campaigns) {
+      const result = await prisma.campaign.updateMany({
+        where: {
+          id: campaign.id,
+          status: "draft",
+        },
+        data: {
+          status: "running",
+        },
+      });
+
+      if (result.count === 1) {
+        claimed.push(campaign);
+      }
+    }
+
+    return {
+      updated: claimed.length,
+      items: claimed,
+    };
+  }
+
   /**
    * Get a single campaign
    */

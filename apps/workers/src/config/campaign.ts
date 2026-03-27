@@ -10,3 +10,9 @@ export const campaignWorkerConfig = {
   targetInsertBatchSize: 500,
   messagePublishBatchSize: 100,
 } as const;
+
+export function getCampaignLaunchQueueName(environment?: string): string {
+  return environment === "production"
+    ? `${campaignWorkerConfig.queueName}-production`
+    : campaignWorkerConfig.queueName;
+}
