@@ -15,6 +15,7 @@
     "test:remote:all": "node ./scripts/test-remote-all.mjs"
   },
   "dependencies": {
+    "@reachdem/database": "workspace:*",
     "@reachdem/core": "workspace:*",
     "@reachdem/shared": "workspace:*",
     "nodemailer": "^8.0.1"

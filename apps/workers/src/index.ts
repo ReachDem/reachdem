@@ -7,6 +7,7 @@ import type {
   ScheduledController,
   SmsMessage,
 } from "./types";
+import { resetPrismaClient } from "../../../packages/database/src/index";
 import {
   campaignWorkerConfig,
   emailWorkerConfig,
@@ -44,6 +45,8 @@ function workerRuntimeSummary(env: Env) {
 }
 
 function configureWorkerDatabase(env: Env) {
+  resetPrismaClient();
+
   if (env.DATABASE_URL) {
     process.env.DATABASE_URL = env.DATABASE_URL;
   }

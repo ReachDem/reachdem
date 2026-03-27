@@ -134,8 +134,15 @@ export function CampaignsTable({
               </TableCell>
               <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
               <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="text-sm">
+                    {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {format(new Date(campaign.updatedAt), "HH:mm")}
+                  </span>
+                </div>
               </TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>

@@ -52,6 +52,13 @@ export class MboaSmsAdapter implements SmsSender {
             data.id ?? data.messageId ?? data.reference ?? "mboasms_ok"
           ),
           durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            id: data.id ?? null,
+            messageId: data.messageId ?? null,
+            reference: data.reference ?? null,
+            message: data.message ?? null,
+          },
         };
       }
 
@@ -67,6 +74,14 @@ export class MboaSmsAdapter implements SmsSender {
         errorMessage,
         retryable: classifyError(errorCode) === "retryable",
         durationMs,
+        httpStatus: res.status,
+        responseMeta: {
+          code: data.code ?? null,
+          errorCode: data.errorCode ?? null,
+          message: data.message ?? null,
+          error: data.error ?? null,
+          success: data.success ?? null,
+        },
       };
     } catch (err: any) {
       const durationMs = Date.now() - start;
@@ -78,6 +93,9 @@ export class MboaSmsAdapter implements SmsSender {
         errorMessage: err?.message ?? "Network error",
         retryable: true,
         durationMs,
+        responseMeta: {
+          errorName: err?.name ?? null,
+        },
       };
     }
   }

@@ -9,6 +9,7 @@ import { MboaSmsAdapter } from "../adapters/sms/mboa-sms.adapter";
 import { StubAdapter } from "../adapters/sms/stub.adapter";
 import type { SmsProvider } from "@reachdem/database";
 import { getCameroonProviderRoute } from "../utils/cameroon-mobile-routing";
+import { redactMeta } from "../utils/pii-scrubber";
 
 interface SendWithFallbackResult {
   success: boolean;
@@ -23,10 +24,14 @@ interface SendWithFallbackResult {
     errorCode?: string;
     errorMessage?: string;
     retryable?: boolean;
+    httpStatus?: number;
+    responseMeta?: Record<string, unknown>;
   }>;
   providerMessageId?: string;
   errorCode?: string;
   errorMessage?: string;
+  httpStatus?: number;
+  responseMeta?: Record<string, unknown>;
 }
 
 interface AdapterExecutionPlan {
@@ -167,6 +172,23 @@ export class CompositeSmseSender {
       });
 
       const result = await adapter.send(current.payload);
+      const safeResponseMeta = result.responseMeta
+        ? redactMeta(result.responseMeta)
+        : null;
+
+      console.log("[SMS Provider] Response", {
+        provider: adapter.providerName,
+        attemptNo,
+        success: result.success,
+        retryable: result.success ? null : result.retryable,
+        httpStatus: result.httpStatus ?? null,
+        providerMessageId: result.success
+          ? result.providerMessageId
+          : undefined,
+        errorCode: result.success ? null : result.errorCode,
+        errorMessage: result.success ? null : result.errorMessage,
+        responseMeta: safeResponseMeta,
+      });
 
       if (result.success) {
         attempts.push({
@@ -175,6 +197,8 @@ export class CompositeSmseSender {
           durationMs: result.durationMs,
           success: true,
           providerMessageId: result.providerMessageId,
+          httpStatus: result.httpStatus,
+          responseMeta: safeResponseMeta ?? undefined,
         });
         await ActivityLogger.log({
           organizationId,
@@ -185,7 +209,12 @@ export class CompositeSmseSender {
           severity: "info",
           status: "success",
           durationMs: result.durationMs,
-          meta: { providerMessageId: result.providerMessageId, attemptNo },
+          meta: {
+            providerMessageId: result.providerMessageId,
+            attemptNo,
+            httpStatus: result.httpStatus ?? null,
+            responseMeta: safeResponseMeta,
+          },
         });
 
         return {
@@ -194,6 +223,8 @@ export class CompositeSmseSender {
           senderUsed: current.payload.from,
           attempts,
           providerMessageId: result.providerMessageId,
+          httpStatus: result.httpStatus,
+          responseMeta: safeResponseMeta ?? undefined,
         };
       }
 
@@ -208,6 +239,8 @@ export class CompositeSmseSender {
         errorCode: result.errorCode,
         errorMessage: result.errorMessage,
         retryable: result.retryable,
+        httpStatus: result.httpStatus,
+        responseMeta: safeResponseMeta ?? undefined,
       });
 
       await ActivityLogger.log({
@@ -224,6 +257,8 @@ export class CompositeSmseSender {
           errorMessage: result.errorMessage,
           retryable: result.retryable,
           attemptNo,
+          httpStatus: result.httpStatus ?? null,
+          responseMeta: safeResponseMeta,
         },
       });
 
@@ -240,6 +275,8 @@ export class CompositeSmseSender {
       attempts,
       errorCode: lastErrorCode,
       errorMessage: lastErrorMessage,
+      httpStatus: attempts.at(-1)?.httpStatus,
+      responseMeta: attempts.at(-1)?.responseMeta,
     };
   }
 }

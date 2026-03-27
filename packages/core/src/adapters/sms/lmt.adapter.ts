@@ -6,16 +6,8 @@ import type {
 import { classifyError } from "./error-classifier";
 
 /**
- * LMT Group SMS adapter — REST API v1.
+ * LMT Group SMS adapter - REST API v1.
  * Docs: https://sms.lmtgroup.com/
- *
- * Auth :  X-Api-Key  +  X-Secret  headers
- * Push :  POST https://sms.lmtgroup.com/api/v1/pushes
- * Body :  { message, senderId, msisdn: string[], flag? }
- *
- * HTTP 201 → success   { id: string, … }
- * HTTP 400 → bad request
- * HTTP 401 → invalid credentials
  */
 export class LmtAdapter implements SmsSender {
   readonly providerName = "lmt";
@@ -42,7 +34,6 @@ export class LmtAdapter implements SmsSender {
         body: JSON.stringify({
           message: payload.text,
           senderId: payload.from,
-          // LMT n'accepte pas le + en préfixe E.164
           msisdn: [payload.to.replace(/^\+/, "")],
         }),
         signal: AbortSignal.timeout(15_000),
@@ -50,29 +41,41 @@ export class LmtAdapter implements SmsSender {
 
       const durationMs = Date.now() - start;
 
-      // 401 → bad credentials (final, no fallback)
       if (res.status === 401) {
         return {
           success: false,
           errorCode: "lmt_unauthorized",
           errorMessage:
-            "LMT authentication failed — check X-Api-Key / X-Secret",
+            "LMT authentication failed - check X-Api-Key / X-Secret",
           retryable: false,
           durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            status: res.status,
+          },
         };
       }
 
       const data = (await res.json().catch(() => ({}))) as Record<string, any>;
 
-      // 201 → success
       if (res.status === 201) {
         const providerMessageId = String(
           data.id ?? data.pushId ?? data.messageId ?? "lmt_ok"
         );
-        return { success: true, providerMessageId, durationMs };
+
+        return {
+          success: true,
+          providerMessageId,
+          durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            id: data.id ?? null,
+            pushId: data.pushId ?? null,
+            messageId: data.messageId ?? null,
+          },
+        };
       }
 
-      // 400 → bad request (typically invalid number, wrong senderId, etc.)
       const errorCode = String(
         data.code ?? data.errorCode ?? `lmt_http_${res.status}`
       );
@@ -85,16 +88,27 @@ export class LmtAdapter implements SmsSender {
         errorMessage,
         retryable: classifyError(errorCode) === "retryable",
         durationMs,
+        httpStatus: res.status,
+        responseMeta: {
+          code: data.code ?? null,
+          errorCode: data.errorCode ?? null,
+          message: data.message ?? null,
+          error: data.error ?? null,
+        },
       };
     } catch (err: any) {
       const durationMs = Date.now() - start;
       const isTimeout = err?.name === "TimeoutError";
+
       return {
         success: false,
         errorCode: isTimeout ? "timeout" : "network_error",
         errorMessage: err?.message ?? "Network error",
         retryable: true,
         durationMs,
+        responseMeta: {
+          errorName: err?.name ?? null,
+        },
       };
     }
   }

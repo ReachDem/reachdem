@@ -42,7 +42,18 @@ export class TwilioAdapter implements SmsSender {
       const data = (await res.json()) as any;
 
       if (res.ok && data.sid) {
-        return { success: true, providerMessageId: data.sid, durationMs };
+        return {
+          success: true,
+          providerMessageId: data.sid,
+          durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            sid: data.sid ?? null,
+            status: data.status ?? null,
+            code: data.code ?? null,
+            message: data.message ?? null,
+          },
+        };
       }
 
       const errorCode = String(data.code ?? `http_${res.status}`);
@@ -53,6 +64,13 @@ export class TwilioAdapter implements SmsSender {
         errorMessage,
         retryable: classifyError(errorCode) === "retryable",
         durationMs,
+        httpStatus: res.status,
+        responseMeta: {
+          code: data.code ?? null,
+          message: data.message ?? null,
+          status: data.status ?? null,
+          moreInfo: data.more_info ?? null,
+        },
       };
     } catch (err: any) {
       const durationMs = Date.now() - start;
@@ -63,6 +81,9 @@ export class TwilioAdapter implements SmsSender {
         errorMessage: err?.message ?? "Network error",
         retryable: true,
         durationMs,
+        responseMeta: {
+          errorName: err?.name ?? null,
+        },
       };
     }
   }

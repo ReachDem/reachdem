@@ -44,6 +44,11 @@ export function configureDatabaseRuntime(input: {
   };
 }
 
+export function resetPrismaClient() {
+  prismaInstance = undefined;
+  globalForPrisma.prisma = undefined;
+}
+
 function createClientOptions(): Prisma.PrismaClientOptions & {
   accelerateUrl?: string;
 } {

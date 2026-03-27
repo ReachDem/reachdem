@@ -456,12 +456,18 @@ export function CampaignsClientTable({
                       <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
                       <TableCell>{getStatusBadge(campaign)}</TableCell>
                       <TableCell>{getDeliverySummary(campaign)}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        <div className="flex flex-col gap-1">
-                          <span>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm">
                             {format(
                               new Date(campaign.updatedAt),
                               "MMM d, yyyy"
+                            )}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {format(
+                              new Date(campaign.updatedAt),
+                              "HH:mm:ss zzz"
                             )}
                           </span>
                           {isScheduledCampaign(campaign) &&
