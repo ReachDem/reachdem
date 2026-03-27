@@ -261,3 +261,138 @@ export async function getAudienceSegments() {
   });
   return segments.items.map((s) => ({ id: s.id, name: s.name }));
 }
+
+/**
+ * Get campaign statistics
+ */
+export async function getCampaignStats(campaignId: string) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/v1/campaigns/${campaignId}/stats`,
+      {
+        headers: {
+          "x-organization-id": organizationId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch campaign stats");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[getCampaignStats] Error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get tracked links for a campaign
+ */
+export async function getCampaignLinks(campaignId: string) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/v1/links?campaignId=${campaignId}`,
+      {
+        headers: {
+          "x-organization-id": organizationId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch campaign links");
+    }
+
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("[getCampaignLinks] Error:", error);
+    return [];
+  }
+}
+
+/**
+ * Get campaign targets (messages sent to contacts)
+ */
+export async function getCampaignTargets(
+  campaignId: string,
+  options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}
+) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const { page = 1, pageSize = 50, search = "" } = options;
+
+    // Using Prisma directly for now since there's no service method
+    const { prisma } = await import("@reachdem/database");
+
+    const where: any = {
+      campaignId,
+      organizationId,
+    };
+
+    if (search) {
+      where.contact = {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phoneE164: { contains: search } },
+        ],
+      };
+    }
+
+    const [targets, totalCount] = await Promise.all([
+      prisma.campaignTarget.findMany({
+        where,
+        include: {
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phoneE164: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.campaignTarget.count({ where }),
+    ]);
+
+    return {
+      targets: targets.map((t) => ({
+        id: t.id,
+        contactId: t.contactId,
+        contactName: t.contact.name,
+        contactEmail: t.contact.email,
+        contactPhone: t.contact.phoneE164,
+        resolvedTo: t.resolvedTo,
+        status: t.status,
+        messageId: t.messageId,
+        createdAt: t.createdAt,
+      })),
+      totalCount,
+      page,
+      pageSize,
+    };
+  } catch (error) {
+    console.error("[getCampaignTargets] Error:", error);
+    return {
+      targets: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 50,
+    };
+  }
+}

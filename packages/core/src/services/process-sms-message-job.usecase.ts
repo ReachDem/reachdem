@@ -4,6 +4,7 @@ import { truncate } from "../utils/pii-scrubber";
 import type { SmsExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignStatsService } from "./campaign-stats.service";
+import { personalizeTemplate } from "../utils/message-personalization";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
@@ -73,13 +74,36 @@ export class ProcessSmsMessageJobUseCase {
     }
 
     const baseAttemptNo = message.attempts.length;
+    const campaignTarget = await prisma.campaignTarget.findFirst({
+      where: {
+        organizationId: job.organization_id,
+        messageId: message.id,
+      },
+      include: {
+        contact: {
+          select: {
+            name: true,
+            email: true,
+            phoneE164: true,
+            work: true,
+            enterprise: true,
+            address: true,
+            customFields: true,
+          },
+        },
+      },
+    });
+    const personalizedText = personalizeTemplate(
+      message.text,
+      campaignTarget?.contact ?? null
+    );
 
     const result = await CompositeSmseSender.send(
       job.organization_id,
       message.correlationId,
       {
         to: message.toE164,
-        text: message.text,
+        text: personalizedText,
         from: message.from,
       }
     );

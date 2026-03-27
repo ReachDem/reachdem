@@ -3,6 +3,7 @@ import type { EmailExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { truncate } from "../utils/pii-scrubber";
 import { CampaignStatsService } from "./campaign-stats.service";
+import { personalizeTemplate } from "../utils/message-personalization";
 
 export interface EmailSendResult {
   success: boolean;
@@ -87,10 +88,40 @@ export class ProcessEmailMessageJobUseCase {
     }
 
     const attemptNo = message.attempts.length + 1;
+    const campaignTarget = await prisma.campaignTarget.findFirst({
+      where: {
+        organizationId: job.organization_id,
+        messageId: message.id,
+      },
+      include: {
+        contact: {
+          select: {
+            name: true,
+            email: true,
+            phoneE164: true,
+            work: true,
+            enterprise: true,
+            address: true,
+            customFields: true,
+          },
+        },
+      },
+    });
+
+    const personalizedSubject = personalizeTemplate(
+      message.subject,
+      campaignTarget?.contact ?? null
+    );
+    const personalizedHtml = personalizeTemplate(
+      message.html,
+      campaignTarget?.contact ?? null,
+      { html: true }
+    );
+
     const result = await options.sendEmail({
       to: message.toEmail,
-      subject: message.subject,
-      html: message.html,
+      subject: personalizedSubject,
+      html: personalizedHtml,
       from: message.from,
     });
 

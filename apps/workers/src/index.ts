@@ -55,6 +55,40 @@ function configureWorkerDatabase(env: Env) {
     process.env.PRISMA_ACCELERATE_URL = env.PRISMA_ACCELERATE_URL;
   }
 
+  // Mirror Cloudflare secrets into process.env for shared core adapters
+  // that still read provider credentials from Node-style env access.
+  const secretEnvMappings = {
+    LMT_API_KEY: env.LMT_API_KEY,
+    LMT_SECRET: env.LMT_SECRET,
+    AVLYTEXT_API_KEY: env.AVLYTEXT_API_KEY,
+    MBOA_SMS_USERID: env.MBOA_SMS_USERID,
+    MBOA_SMS_API_PASSWORD: env.MBOA_SMS_API_PASSWORD,
+    TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+    INFOBIP_API_KEY: env.INFOBIP_API_KEY,
+    INFOBIP_BASE_URL: env.INFOBIP_BASE_URL,
+    ALIBABA_ACCESS_KEY_ID: env.ALIBABA_ACCESS_KEY_ID,
+    ALIBABA_ACCESS_KEY_SECRET: env.ALIBABA_ACCESS_KEY_SECRET,
+    ALIBABA_REGION: env.ALIBABA_REGION,
+    ALIBABA_SENDER_EMAIL: env.ALIBABA_SENDER_EMAIL,
+    ALIBABA_SENDER_NAME: env.ALIBABA_SENDER_NAME,
+    SMTP_HOST: env.SMTP_HOST,
+    SMTP_PORT: env.SMTP_PORT,
+    SMTP_USER: env.SMTP_USER,
+    SMTP_PASSWORD: env.SMTP_PASSWORD,
+    SMTP_SECURE: env.SMTP_SECURE,
+    SENDER_EMAIL: env.SENDER_EMAIL,
+    SENDER_NAME: env.SENDER_NAME,
+  } satisfies Record<string, string | undefined>;
+
+  for (const [key, value] of Object.entries(secretEnvMappings)) {
+    if (typeof value === "string" && value.length > 0) {
+      process.env[key] = value;
+    } else {
+      delete process.env[key];
+    }
+  }
+
   process.env.PRISMA_DB_DRIVER = "neon";
 
   const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -71,6 +105,13 @@ function configureWorkerDatabase(env: Env) {
     databaseUrlHasWhitespace: /\s/.test(databaseUrl),
     hasAccelerateUrl: Boolean(process.env.PRISMA_ACCELERATE_URL),
     driver: process.env.PRISMA_DB_DRIVER,
+    smsSecrets: {
+      hasAvlytext: Boolean(process.env.AVLYTEXT_API_KEY),
+      hasMboaUser: Boolean(process.env.MBOA_SMS_USERID),
+      hasMboaPassword: Boolean(process.env.MBOA_SMS_API_PASSWORD),
+      hasLmtKey: Boolean(process.env.LMT_API_KEY),
+      hasLmtSecret: Boolean(process.env.LMT_SECRET),
+    },
   });
 }
 

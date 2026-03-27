@@ -42,6 +42,15 @@ export interface Env {
   ALIBABA_REGION?: string;
   ALIBABA_SENDER_EMAIL?: string;
   ALIBABA_SENDER_NAME?: string;
+  LMT_API_KEY?: string;
+  LMT_SECRET?: string;
+  AVLYTEXT_API_KEY?: string;
+  MBOA_SMS_USERID?: string;
+  MBOA_SMS_API_PASSWORD?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  INFOBIP_API_KEY?: string;
+  INFOBIP_BASE_URL?: string;
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_USER: string;

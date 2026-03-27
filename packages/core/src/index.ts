@@ -29,6 +29,7 @@ export * from "./integrations/redis-cache.client";
 export * from "./utils/segment-compiler";
 export * from "./utils/pii-scrubber";
 export * from "./utils/cameroon-mobile-routing";
+export * from "./utils/message-personalization";
 export * from "./ports/sms-sender.port";
 export * from "./adapters/sms/stub.adapter";
 export * from "./adapters/sms/twilio.adapter";

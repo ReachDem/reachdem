@@ -26,7 +26,12 @@ export function requireCampaignWorkerEnv(env: Env): void {
 }
 
 export function requireSmsWorkerEnv(env: Env): void {
-  requireBaseWorkerEnv(env);
+  requireKeys("sms", env, [
+    "ENVIRONMENT",
+    "AVLYTEXT_API_KEY",
+    "MBOA_SMS_USERID",
+    "MBOA_SMS_API_PASSWORD",
+  ]);
 }
 
 export function requireEmailWorkerEnv(env: Env): void {
