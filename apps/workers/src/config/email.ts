@@ -1,7 +1,7 @@
 export const emailWorkerConfig = {
   queueName: "reachdem-email-queue",
   consumer: {
-    maxBatchSize: 20,
+    maxBatchSize: 40,
     maxBatchTimeoutSeconds: 2,
     maxConcurrency: 5,
     infraMaxRetries: 5,

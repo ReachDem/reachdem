@@ -32,12 +32,8 @@ export function requireSmsWorkerEnv(env: Env): void {
 export function requireEmailWorkerEnv(env: Env): void {
   requireKeys("email", env, [
     "ENVIRONMENT",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASSWORD",
-    "SMTP_SECURE",
-    "SENDER_EMAIL",
+    "API_BASE_URL",
+    "INTERNAL_API_SECRET",
   ]);
 }
 

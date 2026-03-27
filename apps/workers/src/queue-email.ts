@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import { ProcessEmailMessageJobUseCase } from "@reachdem/core";
 import { emailWorkerConfig } from "./config";
 import { requireEmailWorkerEnv } from "./env";
@@ -13,20 +12,7 @@ export async function handleEmailBatch(
     queue: batch.queue,
     size: batch.messages.length,
     environment: env.ENVIRONMENT,
-    smtpHost: env.SMTP_HOST,
-    smtpPort: env.SMTP_PORT,
-    senderEmail: env.SENDER_EMAIL,
-  });
-
-  const transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: parseInt(env.SMTP_PORT || "465", 10),
-    secure: env.SMTP_SECURE === "true",
-    authMethod: "LOGIN",
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASSWORD,
-    },
+    apiBaseUrl: env.API_BASE_URL,
   });
 
   for (const message of batch.messages) {
@@ -54,30 +40,44 @@ export async function handleEmailBatch(
             messageId: job.message_id,
             to,
             fromName: from,
-            smtpHost: env.SMTP_HOST,
+            apiBaseUrl: env.API_BASE_URL,
             subjectPreview: subject.slice(0, 80),
             htmlLength: html.length,
           });
           try {
-            const info = await transporter.sendMail({
-              from: `"${from}" <${env.SENDER_EMAIL}>`,
-              to,
-              subject,
-              html,
-            });
+            const response = await fetch(
+              `${env.API_BASE_URL}/api/internal/messages/email-send`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-internal-secret": env.INTERNAL_API_SECRET,
+                },
+                body: JSON.stringify({
+                  to,
+                  subject,
+                  html,
+                  fromName: from,
+                }),
+              }
+            );
 
-            const previewUrl = nodemailer.getTestMessageUrl(info);
-            if (previewUrl) {
-              console.log("[Email Queue] Preview URL generated", {
-                messageId: job.message_id,
-                previewUrl,
-              });
+            if (!response.ok) {
+              const errorText = await response.text().catch(() => "");
+              throw new Error(
+                `Email send API failed (HTTP ${response.status})${errorText ? `: ${errorText}` : ""}`
+              );
             }
+
+            const result = (await response.json()) as {
+              providerName?: string;
+              providerMessageId?: string | null;
+            };
 
             return {
               success: true,
-              providerName: "smtp",
-              providerMessageId: info.messageId,
+              providerName: result.providerName ?? "smtp",
+              providerMessageId: result.providerMessageId ?? null,
               durationMs: Date.now() - startedAt,
             };
           } catch (error) {

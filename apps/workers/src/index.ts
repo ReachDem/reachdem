@@ -53,6 +53,22 @@ function configureWorkerDatabase(env: Env) {
   }
 
   process.env.PRISMA_DB_DRIVER = "neon";
+
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+  console.log("[Worker DB] Runtime database configuration", {
+    hasDatabaseUrl: databaseUrl.length > 0,
+    databaseUrlLength: databaseUrl.length,
+    databaseUrlProtocol: databaseUrl.includes("://")
+      ? databaseUrl.split("://")[0]
+      : "missing",
+    databaseUrlStartsWithQuote:
+      databaseUrl.startsWith('"') || databaseUrl.startsWith("'"),
+    databaseUrlEndsWithQuote:
+      databaseUrl.endsWith('"') || databaseUrl.endsWith("'"),
+    databaseUrlHasWhitespace: /\s/.test(databaseUrl),
+    hasAccelerateUrl: Boolean(process.env.PRISMA_ACCELERATE_URL),
+    driver: process.env.PRISMA_DB_DRIVER,
+  });
 }
 
 export default {
