@@ -32,8 +32,8 @@ export function requireSmsWorkerEnv(env: Env): void {
 export function requireEmailWorkerEnv(env: Env): void {
   requireKeys("email", env, [
     "ENVIRONMENT",
-    "API_BASE_URL",
-    "INTERNAL_API_SECRET",
+    "ALIBABA_ACCESS_KEY_ID",
+    "ALIBABA_ACCESS_KEY_SECRET",
   ]);
 }
 

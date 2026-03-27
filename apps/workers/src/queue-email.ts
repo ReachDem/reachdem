@@ -1,6 +1,7 @@
 import { ProcessEmailMessageJobUseCase } from "@reachdem/core";
 import { emailWorkerConfig } from "./config";
 import { requireEmailWorkerEnv } from "./env";
+import { sendAlibabaDirectMail } from "./alibaba-direct-mail";
 import type { Env, EmailMessage, MessageBatch } from "./types";
 
 export async function handleEmailBatch(
@@ -12,7 +13,7 @@ export async function handleEmailBatch(
     queue: batch.queue,
     size: batch.messages.length,
     environment: env.ENVIRONMENT,
-    apiBaseUrl: env.API_BASE_URL,
+    region: env.ALIBABA_REGION ?? "eu-central-1",
   });
 
   for (const message of batch.messages) {
@@ -36,57 +37,41 @@ export async function handleEmailBatch(
         },
         sendEmail: async ({ to, subject, html, from }) => {
           const startedAt = Date.now();
-          console.log("[Email Queue] Sending SMTP email", {
+          console.log("[Email Queue] Sending Alibaba Direct Mail email", {
             messageId: job.message_id,
             to,
             fromName: from,
-            apiBaseUrl: env.API_BASE_URL,
+            provider: "alibaba-direct-mail",
+            region: env.ALIBABA_REGION ?? "eu-central-1",
             subjectPreview: subject.slice(0, 80),
             htmlLength: html.length,
           });
           try {
-            const response = await fetch(
-              `${env.API_BASE_URL}/api/internal/messages/email-send`,
+            const result = await sendAlibabaDirectMail(
               {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-internal-secret": env.INTERNAL_API_SECRET,
-                },
-                body: JSON.stringify({
-                  to,
-                  subject,
-                  html,
-                  fromName: from,
-                }),
-              }
+                to,
+                subject,
+                html,
+                fromName: from,
+              },
+              env
             );
-
-            if (!response.ok) {
-              const errorText = await response.text().catch(() => "");
-              throw new Error(
-                `Email send API failed (HTTP ${response.status})${errorText ? `: ${errorText}` : ""}`
-              );
-            }
-
-            const result = (await response.json()) as {
-              providerName?: string;
-              providerMessageId?: string | null;
-            };
 
             return {
               success: true,
-              providerName: result.providerName ?? "smtp",
+              providerName: result.providerName,
               providerMessageId: result.providerMessageId ?? null,
               durationMs: Date.now() - startedAt,
             };
           } catch (error) {
             return {
               success: false,
-              providerName: "smtp",
-              errorCode: "SMTP_SEND_FAILED",
+              providerName: "alibaba-direct-mail",
+              errorCode: "ALIBABA_DIRECT_MAIL_FAILED",
               errorMessage:
-                error instanceof Error ? error.message : "Unknown SMTP error",
+                error instanceof Error
+                  ? error.message
+                  : "Unknown Alibaba Direct Mail error",
               durationMs: Date.now() - startedAt,
             };
           }

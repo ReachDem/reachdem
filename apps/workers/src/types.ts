@@ -37,6 +37,11 @@ export interface Env {
   ENVIRONMENT: string;
   API_BASE_URL: string;
   INTERNAL_API_SECRET: string;
+  ALIBABA_ACCESS_KEY_ID?: string;
+  ALIBABA_ACCESS_KEY_SECRET?: string;
+  ALIBABA_REGION?: string;
+  ALIBABA_SENDER_EMAIL?: string;
+  ALIBABA_SENDER_NAME?: string;
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_USER: string;
