@@ -67,6 +67,41 @@ function getPresetDate(preset: (typeof SCHEDULE_PRESETS)[number]) {
   }
 }
 
+function buildEmailCampaignContent(content: EmailContent) {
+  return {
+    subject: content.subject || "Untitled Email",
+    html: content.body || "<p>Empty email</p>",
+    bodyJson: content.bodyJson,
+    mode: content.mode,
+    fontFamily: content.fontFamily,
+    fontWeights: content.fontWeights,
+  };
+}
+
+function buildSmsCampaignContent(content: SmsContent) {
+  return {
+    text: content.text || "Empty SMS",
+    from: content.senderId || undefined,
+    senderId: content.senderId,
+  };
+}
+
+function buildAudiencePayload(
+  selectedSegmentId: string,
+  selectedGroupId: string
+) {
+  return {
+    audiences: [
+      ...(selectedSegmentId
+        ? [{ sourceType: "segment" as const, sourceId: selectedSegmentId }]
+        : []),
+      ...(selectedGroupId
+        ? [{ sourceType: "group" as const, sourceId: selectedGroupId }]
+        : []),
+    ],
+  };
+}
+
 export default function NewCampaignTypePage({
   params,
 }: NewCampaignTypePageProps) {
@@ -166,17 +201,10 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       }
 
       // Prepare content based on type
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject || "Untitled Email",
-          html: emailContent.body || "<p>Empty email</p>",
-        };
-      } else {
-        content = {
-          text: smsContent.text || "Empty SMS",
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent(emailContent)
+          : buildSmsCampaignContent(smsContent);
 
       // Prepare payload
       const payload = {
@@ -188,7 +216,6 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
       console.log("[Campaign] Saving draft with payload:", payload);
 
-      // Create campaign as draft
       const response = await fetch("/api/v1/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,6 +232,31 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
       const result = await response.json();
       console.log("[Campaign] Draft saved successfully:", result);
+
+      const audiencePayload = buildAudiencePayload(
+        selectedSegmentId,
+        selectedGroupId
+      );
+
+      if (audiencePayload.audiences.length > 0) {
+        const audienceResponse = await fetch(
+          `/api/v1/campaigns/${result.id}/audience`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(audiencePayload),
+          }
+        );
+
+        if (!audienceResponse.ok) {
+          const errorData = await audienceResponse.json().catch(() => null);
+          throw new Error(
+            errorData?.error ||
+              errorData?.details ||
+              "Failed to save campaign audience"
+          );
+        }
+      }
 
       toast.success("Draft saved successfully");
       console.log("[Campaign] Draft save completed");
@@ -283,18 +335,16 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         scheduledDateTime.toISOString()
       );
 
-      // Step 1: Create campaign with scheduled date
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject.trim(),
-          html: emailContent.body,
-        };
-      } else {
-        content = {
-          text: smsContent.text.trim(),
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent({
+              ...emailContent,
+              subject: emailContent.subject.trim(),
+            })
+          : buildSmsCampaignContent({
+              ...smsContent,
+              text: smsContent.text.trim(),
+            });
 
       const campaignPayload = {
         name: campaignTitle.trim(),
@@ -326,15 +376,10 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       const campaign = await createResponse.json();
       console.log("[Campaign] Created successfully:", campaign);
 
-      // Step 2: Set audience
-      const audiencePayload = {
-        audiences: [
-          {
-            sourceType: selectedSegmentId ? "segment" : "group",
-            sourceId: selectedSegmentId || selectedGroupId,
-          },
-        ],
-      };
+      const audiencePayload = buildAudiencePayload(
+        selectedSegmentId,
+        selectedGroupId
+      );
 
       console.log("[Campaign] Setting audience with payload:", audiencePayload);
 
@@ -359,7 +404,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       console.log("[Campaign] Audience set successfully:", audiences);
 
       toast.success(
-        `Campaign scheduled for ${format(scheduledDate, "PPP")} at ${scheduledTime}`
+        `Campaign scheduled for ${format(scheduledDateTime, "dd.MM.yyyy")} at ${format(scheduledDateTime, "HH:mm")}`
       );
       console.log("[Campaign] Schedule completed");
       setIsScheduleOpen(false);
@@ -428,17 +473,16 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
     try {
       // Step 1: Create campaign
-      let content;
-      if (type === "email") {
-        content = {
-          subject: emailContent.subject.trim(),
-          html: emailContent.body,
-        };
-      } else {
-        content = {
-          text: smsContent.text.trim(),
-        };
-      }
+      const content =
+        type === "email"
+          ? buildEmailCampaignContent({
+              ...emailContent,
+              subject: emailContent.subject.trim(),
+            })
+          : buildSmsCampaignContent({
+              ...smsContent,
+              text: smsContent.text.trim(),
+            });
 
       const campaignPayload = {
         name: campaignTitle.trim(),
@@ -543,6 +587,10 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
   const scheduleSummary = scheduledDate
     ? `${format(scheduledDate, "EEE, MMM d")} at ${scheduledTime}`
     : "Pick date and time";
+  const scheduledButtonLabel = scheduledDate ? "Scheduled at" : "Schedule";
+  const scheduledButtonHover = scheduledDate
+    ? `${format(scheduledDate, "dd.MM.yyyy")} at ${scheduledTime.replace(":", "h")}`
+    : undefined;
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -612,11 +660,16 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
                 <PopoverTrigger asChild>
                   <Button
                     variant="secondary"
-                    className="h-11 rounded-none border-r px-5"
+                    className={cn(
+                      "h-11 rounded-none border-r px-5",
+                      scheduledDate &&
+                        "bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                    )}
                     disabled={isLoading}
+                    title={scheduledButtonHover}
                   >
                     <CalendarDaysIcon className="h-4 w-4" />
-                    Schedule
+                    {scheduledButtonLabel}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-[360px] p-0">

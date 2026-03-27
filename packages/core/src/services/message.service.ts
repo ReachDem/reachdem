@@ -90,53 +90,49 @@ export class MessageService {
     smsLimit: number;
     emailLimit: number;
   }) {
-    return prisma.$transaction(async (tx) => {
-      const smsMessages = await tx.message.findMany({
+    const smsMessages = await prisma.message.findMany({
+      where: {
+        status: "scheduled",
+        channel: "sms",
+        scheduledAt: {
+          not: null,
+          lte: input.until,
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+      take: input.smsLimit,
+      select: {
+        id: true,
+        organizationId: true,
+        channel: true,
+      },
+    });
+
+    const emailMessages = await prisma.message.findMany({
+      where: {
+        status: "scheduled",
+        channel: "email",
+        scheduledAt: {
+          not: null,
+          lte: input.until,
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+      take: input.emailLimit,
+      select: {
+        id: true,
+        organizationId: true,
+        channel: true,
+      },
+    });
+
+    const selectedMessages = [...smsMessages, ...emailMessages];
+    const claimed: typeof selectedMessages = [];
+
+    for (const message of selectedMessages) {
+      const result = await prisma.message.updateMany({
         where: {
-          status: "scheduled",
-          channel: "sms",
-          scheduledAt: {
-            not: null,
-            lte: input.until,
-          },
-        },
-        orderBy: { scheduledAt: "asc" },
-        take: input.smsLimit,
-        select: {
-          id: true,
-          organizationId: true,
-          channel: true,
-        },
-      });
-
-      const emailMessages = await tx.message.findMany({
-        where: {
-          status: "scheduled",
-          channel: "email",
-          scheduledAt: {
-            not: null,
-            lte: input.until,
-          },
-        },
-        orderBy: { scheduledAt: "asc" },
-        take: input.emailLimit,
-        select: {
-          id: true,
-          organizationId: true,
-          channel: true,
-        },
-      });
-
-      const selectedMessages = [...smsMessages, ...emailMessages];
-      const selectedIds = selectedMessages.map((message) => message.id);
-
-      if (selectedIds.length === 0) {
-        return { updated: 0, items: [] as typeof selectedMessages };
-      }
-
-      await tx.message.updateMany({
-        where: {
-          id: { in: selectedIds },
+          id: message.id,
           status: "scheduled",
         },
         data: {
@@ -144,34 +140,35 @@ export class MessageService {
         },
       });
 
-      return {
-        updated: selectedIds.length,
-        items: selectedMessages,
-      };
-    });
+      if (result.count === 1) {
+        claimed.push(message);
+      }
+    }
+
+    return {
+      updated: claimed.length,
+      items: claimed,
+    };
   }
 
   static async updateMessageStatuses(ids: string[], status: MessageStatus) {
     if (ids.length === 0) return { count: 0, ids: [] as string[] };
 
     if (status === "queued") {
-      return prisma.$transaction(async (tx) => {
-        const scheduledMessages = await tx.message.findMany({
-          where: {
-            id: { in: ids },
-            status: "scheduled",
-          },
-          select: { id: true },
-        });
+      const scheduledMessages = await prisma.message.findMany({
+        where: {
+          id: { in: ids },
+          status: "scheduled",
+        },
+        select: { id: true },
+      });
 
-        const scheduledIds = scheduledMessages.map((message) => message.id);
-        if (scheduledIds.length === 0) {
-          return { count: 0, ids: [] as string[] };
-        }
+      const claimedIds: string[] = [];
 
-        await tx.message.updateMany({
+      for (const message of scheduledMessages) {
+        const result = await prisma.message.updateMany({
           where: {
-            id: { in: scheduledIds },
+            id: message.id,
             status: "scheduled",
           },
           data: {
@@ -179,8 +176,12 @@ export class MessageService {
           },
         });
 
-        return { count: scheduledIds.length, ids: scheduledIds };
-      });
+        if (result.count === 1) {
+          claimedIds.push(message.id);
+        }
+      }
+
+      return { count: claimedIds.length, ids: claimedIds };
     }
 
     const result = await prisma.message.updateMany({

@@ -40,6 +40,7 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 
 import { ContactImportDialog } from "@/components/contact-import-dialog";
 import { AddContactDrawer } from "@/components/add-contact-drawer";
+import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { deleteContacts } from "@/app/actions/contacts";
 import {
   type ContactRow,
@@ -65,10 +66,12 @@ export function ContactsTable({
   const contacts = hasHydrated ? storeContacts : (initialContacts ?? []);
   const isLoading = useContactsStore((s) => s.isLoading);
   const removeContacts = useContactsStore((s) => s.removeContacts);
+  const refreshContacts = useContactsStore((s) => s.refreshContacts);
   const [deleteState, setDeleteState] = React.useState<{
     ids: string[];
     label: string;
   } | null>(null);
+  const [editContact, setEditContact] = React.useState<ContactRow | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState("");
   const requiredDeletePhrase = "delete these contacts";
@@ -98,7 +101,7 @@ export function ContactsTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setEditContact(row)}>
                 <IconEdit className="mr-2 size-4" />
                 Edit
               </DropdownMenuItem>
@@ -280,6 +283,19 @@ export function ContactsTable({
         footer={footer}
         isLoading={isLoading}
       />
+
+      {editContact && (
+        <EditContactDialog
+          contact={editContact}
+          open={!!editContact}
+          onOpenChange={(open) => {
+            if (!open) setEditContact(null);
+          }}
+          onSuccess={() => {
+            refreshContacts();
+          }}
+        />
+      )}
 
       <AlertDialog
         open={!!deleteState}
