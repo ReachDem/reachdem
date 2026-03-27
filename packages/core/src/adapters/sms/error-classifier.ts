@@ -20,6 +20,11 @@ const FINAL_ERROR_CODES = new Set([
   "EC_0004", // Number on blocklist
 ]);
 
+/** Errors that should trigger fallback instead of stopping the delivery flow */
+const RETRYABLE_ERROR_CODES = new Set([
+  "BAL01", // LMT insufficient balance / recharge required
+]);
+
 /**
  * Returns "retryable" for network/5xx/rate-limit errors.
  * Returns "final" for invalid number, opt-out, policy violations.
@@ -27,10 +32,12 @@ const FINAL_ERROR_CODES = new Set([
 export function classifyError(errorCode: string): "retryable" | "final" {
   // Check Set first without lowercasing (Infobip codes are uppercase: EC_0002)
   if (FINAL_ERROR_CODES.has(errorCode)) return "final";
+  if (RETRYABLE_ERROR_CODES.has(errorCode)) return "retryable";
 
   const code = errorCode.toLowerCase().trim();
   // Also check lowercase version for generic semantic codes
   if (FINAL_ERROR_CODES.has(code)) return "final";
+  if (RETRYABLE_ERROR_CODES.has(code.toUpperCase())) return "retryable";
   if (code.startsWith("rate")) return "retryable";
   if (code.startsWith("timeout")) return "retryable";
   if (code.startsWith("network")) return "retryable";

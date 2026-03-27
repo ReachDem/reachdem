@@ -79,8 +79,12 @@ export class LmtAdapter implements SmsSender {
       const errorCode = String(
         data.code ?? data.errorCode ?? `lmt_http_${res.status}`
       );
-      const errorMessage =
+      const providerMessage =
         data.message ?? data.error ?? `LMT error (HTTP ${res.status})`;
+      const errorMessage =
+        errorCode === "BAL01"
+          ? "LMT insufficient balance. Please recharge the account."
+          : providerMessage;
 
       return {
         success: false,
@@ -94,6 +98,8 @@ export class LmtAdapter implements SmsSender {
           errorCode: data.errorCode ?? null,
           message: data.message ?? null,
           error: data.error ?? null,
+          normalizedReason:
+            errorCode === "BAL01" ? "insufficient_balance" : null,
         },
       };
     } catch (err: any) {
