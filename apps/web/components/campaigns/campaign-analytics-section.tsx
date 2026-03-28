@@ -184,8 +184,8 @@ export function CampaignAnalyticsSection({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-      <Card className="lg:col-span-3">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <Card className="lg:col-span-2">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -196,7 +196,7 @@ export function CampaignAnalyticsSection({
               value={barSegment}
               onValueChange={(v: any) => setBarSegment(v)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[120px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -255,13 +255,13 @@ export function CampaignAnalyticsSection({
 
       <Card className="lg:col-span-1">
         <CardHeader>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Visitors</CardTitle>
             <Select
               value={pieSegment}
               onValueChange={(v: any) => setPieSegment(v)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-[120px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
