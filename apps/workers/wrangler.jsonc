@@ -2,11 +2,16 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "reachdem-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-03-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
   "find_additional_modules": true,
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": [
+      "* * * * *"
+    ]
   },
   "queues": {
     "producers": [
@@ -14,8 +19,14 @@
         "binding": "CAMPAIGN_LAUNCH_QUEUE",
         "queue": "reachdem-campaign-launch-queue"
       },
-      { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
-      { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
+      {
+        "binding": "SMS_QUEUE",
+        "queue": "reachdem-sms-queue"
+      },
+      {
+        "binding": "EMAIL_QUEUE",
+        "queue": "reachdem-email-queue"
+      }
     ],
     "consumers": [
       {
@@ -49,41 +60,51 @@
     "production": {
       "vars": {
         "ENVIRONMENT": "production",
-        // TODO: replace with the real public URL of the deployed web app
-        // before deploying the production worker. The scheduled worker calls
-        // the internal web API through this base URL.
-        "API_BASE_URL": "https://replace-me-with-your-web-app.example.com"
+        "API_BASE_URL": "https://reachdem-iota.vercel.app",
+        "SMTP_HOST": "smtpdm-eu-central-1.aliyuncs.com",
+        "SMTP_PORT": "465",
+        "SMTP_USER": "messages@mail.rcdm.ink",
+        "SMTP_SECURE": "true",
+        "SENDER_EMAIL": "messages@mail.rcdm.ink",
+        "SENDER_NAME": "ReachDem"
+      },
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
       },
       "queues": {
-        // TODO: if production and non-production workers share the same
-        // Cloudflare account, give each environment its own consumer queues or
-        // deploy only one active consumer per queue. Cloudflare rejects a
-        // second consumer on the same queue.
         "producers": [
           {
             "binding": "CAMPAIGN_LAUNCH_QUEUE",
-            "queue": "reachdem-campaign-launch-queue"
+            "queue": "reachdem-campaign-launch-queue-prod"
           },
-          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
-          { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
+          {
+            "binding": "SMS_QUEUE",
+            "queue": "reachdem-sms-queue-prod"
+          },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-prod"
+          }
         ],
         "consumers": [
           {
-            "queue": "reachdem-campaign-launch-queue",
+            "queue": "reachdem-campaign-launch-queue-prod",
             "max_batch_size": 5,
             "max_batch_timeout": 2,
             "max_concurrency": 2,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-sms-queue",
+            "queue": "reachdem-sms-queue-prod",
             "max_batch_size": 50,
             "max_batch_timeout": 2,
             "max_concurrency": 10,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-email-queue",
+            "queue": "reachdem-email-queue-prod",
             "max_batch_size": 20,
             "max_batch_timeout": 2,
             "max_concurrency": 5,

@@ -26,6 +26,8 @@ model User {
   sessions    Session[]
   members     Member[]
   invitations Invitation[]
+  paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
+  paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
 
   @@map("user")
 }
@@ -103,6 +105,9 @@ model Organization {
   messages       Message[]
   campaigns      Campaign[]
   trackedLinks   TrackedLink[]
+  paymentSessions     PaymentSession[]
+  paymentTransactions PaymentTransaction[]
+  billingState   WorkspaceBillingState?
 
   @@map("organization")
 }
@@ -472,6 +477,36 @@ enum TrackedLinkStatus {
   disabled
 }
 
+enum PaymentKind {
+  subscription
+  creditPurchase
+}
+
+enum PaymentProvider {
+  flutterwave
+  stripe
+}
+
+enum PaymentSessionStatus {
+  pending
+  providerRedirected
+  processing
+  succeeded
+  failed
+  cancelled
+  expired
+}
+
+enum PaymentTransactionStatus {
+  initiated
+  pending
+  processing
+  succeeded
+  failed
+  cancelled
+  refunded
+}
+
 enum AudienceSourceType {
   group
   segment
@@ -578,4 +613,106 @@ model TrackedLink {
   @@index([organizationId, messageId])
   @@index([organizationId, contactId])
   @@map("tracked_link")
+}
+
+model PaymentSession {
+  id                  String               @id @default(uuid())
+  organizationId      String
+  initiatedByUserId   String
+  kind                PaymentKind
+  providerPrimary     PaymentProvider
+  providerSelected    PaymentProvider?
+  status              PaymentSessionStatus @default(pending)
+  currency            String
+  amountMinor         Int
+  planCode            String?
+  creditsQuantity     Int?
+  providerCheckoutUrl String?
+  providerSessionId   String?
+  providerReference   String?
+  metadata            Json?
+  activatedAt         DateTime?
+  failedAt            DateTime?
+  cancelledAt         DateTime?
+  expiredAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy  User                  @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  transactions PaymentTransaction[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, kind, createdAt])
+  @@index([organizationId, initiatedByUserId])
+  @@index([providerSelected, status])
+  @@map("payment_session")
+}
+
+model PaymentTransaction {
+  id                    String                   @id @default(uuid())
+  paymentSessionId      String
+  organizationId        String
+  initiatedByUserId     String?
+  provider              PaymentProvider
+  status                PaymentTransactionStatus @default(initiated)
+  amountMinor           Int
+  currency              String
+  providerTransactionId String?
+  providerSessionId     String?
+  providerReference     String?
+  providerEventId       String?
+  rawStatus             String?
+  rawPayload            Json?
+  confirmedAt           DateTime?
+  failedAt              DateTime?
+  cancelledAt           DateTime?
+  refundedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  paymentSession PaymentSession @relation(fields: [paymentSessionId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy    User?          @relation("PaymentTransactionInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([paymentSessionId, createdAt])
+  @@index([organizationId, provider, status])
+  @@index([provider, providerReference])
+  @@index([provider, providerTransactionId])
+  @@index([provider, providerEventId])
+  @@map("payment_transaction")
+}
+
+model PaymentWebhookEvent {
+  id                String          @id @default(uuid())
+  provider          PaymentProvider
+  providerEventId   String?
+  providerReference String?
+  providerSignature String?
+  signatureValid    Boolean         @default(false)
+  processed         Boolean         @default(false)
+  processedAt       DateTime?
+  rawPayload        Json
+  receivedAt        DateTime        @default(now())
+
+  @@index([provider, providerReference])
+  @@index([provider, receivedAt])
+  @@index([provider, processed])
+  @@unique([provider, providerEventId])
+  @@map("payment_webhook_event")
+}
+
+model WorkspaceBillingState {
+  id                   String   @id @default(uuid())
+  organizationId       String   @unique
+  currentPlanCode      String?
+  creditsBalance       Int      @default(0)
+  lastPaymentSessionId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, currentPlanCode])
+  @@map("workspace_billing_state")
 }
