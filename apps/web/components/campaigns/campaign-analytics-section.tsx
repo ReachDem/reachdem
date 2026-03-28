@@ -219,12 +219,12 @@ export function CampaignAnalyticsSection({
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={12}
                   tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                  tickLine={false}
+                  tickFormatter={(value) => {
+                    return new Date(value).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    });
+                  }}
                   axisLine={false}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
