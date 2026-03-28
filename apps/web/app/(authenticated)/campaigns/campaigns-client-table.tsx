@@ -1,10 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { MoreHorizontal, Pencil, Play, Search, Trash2 } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Play,
+  RefreshCw,
+  Search,
+  Trash2,
+  Plus,
+  Megaphone,
+  WifiOff,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import type { Campaign } from "@/actions/campaigns";
@@ -43,6 +56,29 @@ interface CampaignsClientTableProps {
   initialCampaigns: Campaign[];
 }
 
+interface CampaignStatsSnapshot {
+  audienceSize: number;
+  sentCount: number;
+  failedCount: number;
+}
+
+interface WorkerStatusSnapshot {
+  reachable: boolean;
+  healthy: boolean;
+  environment?: string;
+  queues?: string[];
+  error?: string;
+  checkedAt: string;
+}
+
+function isScheduledCampaign(campaign: Campaign) {
+  return (
+    campaign.status === "draft" &&
+    Boolean(campaign.scheduledAt) &&
+    new Date(campaign.scheduledAt as Date | string).getTime() > Date.now()
+  );
+}
+
 export function CampaignsClientTable({
   initialCampaigns,
 }: CampaignsClientTableProps) {
@@ -60,6 +96,13 @@ export function CampaignsClientTable({
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatusSnapshot | null>(
+    null
+  );
+  const [campaignStats, setCampaignStats] = useState<
+    Record<string, CampaignStatsSnapshot>
+  >({});
 
   // Filter and paginated logic
   const filteredCampaigns = initialCampaigns.filter((c) =>
@@ -71,6 +114,76 @@ export function CampaignsClientTable({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  const activeCampaigns = initialCampaigns.filter(
+    (campaign) => campaign.status === "running"
+  );
+
+  async function refreshCampaignSignals(showSpinner = false) {
+    if (showSpinner) {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const nonDraftCampaigns = paginatedCampaigns.filter(
+        (campaign) => campaign.status !== "draft"
+      );
+
+      const [workerResponse, ...statsResponses] = await Promise.all([
+        fetch("/api/v1/workers/status", { cache: "no-store" }),
+        ...nonDraftCampaigns.map((campaign) =>
+          fetch(`/api/v1/campaigns/${campaign.id}/stats`, {
+            cache: "no-store",
+          })
+        ),
+      ]);
+
+      const workerPayload =
+        (await workerResponse.json()) as WorkerStatusSnapshot;
+      setWorkerStatus(workerPayload);
+
+      const nextStats: Record<string, CampaignStatsSnapshot> = {};
+      await Promise.all(
+        statsResponses.map(async (response, index) => {
+          if (!response.ok) return;
+          const stats = (await response.json()) as CampaignStatsSnapshot;
+          nextStats[nonDraftCampaigns[index].id] = stats;
+        })
+      );
+
+      if (Object.keys(nextStats).length > 0) {
+        setCampaignStats((current) => ({ ...current, ...nextStats }));
+      }
+    } catch {
+      // Keep current UI state if a polling cycle fails.
+    } finally {
+      if (showSpinner) {
+        setIsRefreshing(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    void refreshCampaignSignals();
+  }, [currentPage, search]);
+
+  useEffect(() => {
+    if (activeCampaigns.length === 0) return;
+
+    const intervalId = window.setInterval(() => {
+      router.refresh();
+      void refreshCampaignSignals();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeCampaigns.length, router, currentPage, search]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refreshCampaignSignals();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentPage, search]);
 
   const handleDelete = async () => {
     if (!campaignToDelete) return;
@@ -94,6 +207,7 @@ export function CampaignsClientTable({
       await launchCampaign(campaignToLaunch.id);
       toast.success("Campaign launched successfully");
       router.refresh();
+      void refreshCampaignSignals(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to launch campaign");
     } finally {
@@ -102,8 +216,16 @@ export function CampaignsClientTable({
     }
   };
 
-  const getStatusBadge = (status: Campaign["status"]) => {
-    switch (status) {
+  const getStatusBadge = (campaign: Campaign) => {
+    if (isScheduledCampaign(campaign)) {
+      return (
+        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+          Scheduled
+        </Badge>
+      );
+    }
+
+    switch (campaign.status) {
       case "draft":
         return (
           <Badge variant="outline" className="text-slate-500">
@@ -130,7 +252,7 @@ export function CampaignsClientTable({
       default:
         return (
           <Badge variant="outline" className="capitalize">
-            {status}
+            {campaign.status}
           </Badge>
         );
     }
@@ -174,137 +296,287 @@ export function CampaignsClientTable({
     }
   };
 
+  const getWorkerBadge = () => {
+    if (!workerStatus) {
+      return (
+        <Badge variant="outline" className="gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Checking worker
+        </Badge>
+      );
+    }
+
+    if (!workerStatus.reachable || !workerStatus.healthy) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <WifiOff className="h-3 w-3" />
+          Worker unreachable
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge className="gap-1 bg-emerald-500 hover:bg-emerald-600">
+        <CheckCircle2 className="h-3 w-3" />
+        Worker connected
+      </Badge>
+    );
+  };
+
+  const getDeliverySummary = (campaign: Campaign) => {
+    if (campaign.status === "draft") {
+      return (
+        <span className="text-muted-foreground text-xs">Not launched yet</span>
+      );
+    }
+
+    const stats = campaignStats[campaign.id];
+    if (!stats) {
+      return (
+        <span className="text-muted-foreground text-xs">
+          Waiting for stats...
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1 text-xs">
+        <span className="font-medium">
+          {stats.sentCount} sent / {stats.failedCount} failed
+        </span>
+        <span className="text-muted-foreground">
+          Audience {stats.audienceSize}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full">
-      <div className="flex items-center border-b p-4">
-        <div className="relative w-full max-w-sm">
-          <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-          <Input
-            placeholder="Search campaigns..."
-            className="bg-muted/50 w-full border-none pl-9"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
-      </div>
+      {/* Show empty state if no campaigns at all */}
+      {initialCampaigns.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <>
+          <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {getWorkerBadge()}
+              <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                <Activity className="h-3.5 w-3.5" />
+                {activeCampaigns.length > 0
+                  ? "Auto-refresh active every 15s while campaigns are running"
+                  : "Worker and delivery status checked automatically"}
+              </div>
+              {workerStatus?.error && (
+                <div className="text-muted-foreground text-xs">
+                  {workerStatus.error}
+                </div>
+              )}
+            </div>
 
-      <div className="w-full max-w-[100vw] overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%] min-w-[200px]">Name</TableHead>
-              <TableHead>Channel</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Updated at</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedCampaigns.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-muted-foreground h-32 text-center"
-                >
-                  No campaigns found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedCampaigns.map((campaign) => (
-                <TableRow key={campaign.id} className="group">
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col gap-1">
-                      <span>{campaign.name}</span>
-                      {campaign.description && (
-                        <span className="text-muted-foreground line-clamp-1 text-xs">
-                          {campaign.description}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
-                  <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[160px]">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/campaigns/${campaign.id}/edit`}
-                            className="cursor-pointer"
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {campaign.status === "draft" ? "Edit" : "View"}
-                          </Link>
-                        </DropdownMenuItem>
+            <div className="flex items-center gap-2">
+              {workerStatus?.environment && (
+                <span className="text-muted-foreground text-xs">
+                  {workerStatus.environment}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  router.refresh();
+                  void refreshCampaignSignals(true);
+                }}
+                disabled={isRefreshing}
+              >
+                <RefreshCw
+                  className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                />
+                Refresh
+              </Button>
+            </div>
+          </div>
 
-                        {campaign.status === "draft" && (
-                          <>
-                            <DropdownMenuItem
-                              className="cursor-pointer text-emerald-600 focus:text-emerald-700"
-                              onClick={() => setCampaignToLaunch(campaign)}
-                            >
-                              <Play className="mr-2 h-4 w-4" />
-                              Launch
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive cursor-pointer"
-                              onClick={() => setCampaignToDelete(campaign)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          <div className="flex items-center border-b p-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+              <Input
+                placeholder="Search campaigns..."
+                className="bg-muted/50 w-full border-none pl-9"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="w-full max-w-[100vw] overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%] min-w-[200px]">Name</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Delivery</TableHead>
+                  <TableHead>Updated at</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {paginatedCampaigns.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-muted-foreground h-32 text-center"
+                    >
+                      No campaigns found matching &quot;{search}&quot;.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedCampaigns.map((campaign) => (
+                    <TableRow key={campaign.id} className="group">
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col gap-1">
+                          <Link
+                            href={`/campaigns/${campaign.id}`}
+                            className="hover:underline"
+                          >
+                            {campaign.name}
+                          </Link>
+                          {campaign.description && (
+                            <span className="text-muted-foreground line-clamp-1 text-xs">
+                              {campaign.description}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
+                      <TableCell>{getStatusBadge(campaign)}</TableCell>
+                      <TableCell>{getDeliverySummary(campaign)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm">
+                            {format(
+                              new Date(campaign.updatedAt),
+                              "MMM d, yyyy"
+                            )}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {format(
+                              new Date(campaign.updatedAt),
+                              "HH:mm:ss zzz"
+                            )}
+                          </span>
+                          {isScheduledCampaign(campaign) &&
+                            campaign.scheduledAt && (
+                              <span className="text-xs text-blue-700">
+                                Scheduled for{" "}
+                                {format(
+                                  new Date(campaign.scheduledAt),
+                                  "dd.MM.yyyy 'at' HH:mm"
+                                )}
+                              </span>
+                            )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-[160px]"
+                          >
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/campaigns/${campaign.id}`}
+                                className="cursor-pointer"
+                              >
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/campaigns/${campaign.id}/edit`}
+                                className="cursor-pointer"
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                {campaign.status === "draft" ? "Edit" : "View"}
+                              </Link>
+                            </DropdownMenuItem>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end space-x-2 border-t p-4 text-sm">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <span className="text-muted-foreground px-2">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </Button>
-        </div>
+                            {campaign.status === "draft" &&
+                              !isScheduledCampaign(campaign) && (
+                                <>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                    onClick={() =>
+                                      setCampaignToLaunch(campaign)
+                                    }
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Launch
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                    onClick={() =>
+                                      setCampaignToDelete(campaign)
+                                    }
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 border-t p-4 text-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-muted-foreground px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation */}
@@ -366,6 +638,29 @@ export function CampaignsClientTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 p-12 py-16">
+      <div className="bg-primary/10 text-primary rounded-full p-4">
+        <Megaphone className="h-8 w-8" />
+      </div>
+      <div className="text-center">
+        <h3 className="text-lg font-semibold">No campaigns yet</h3>
+        <p className="text-muted-foreground mt-1 max-w-md text-sm">
+          Get started by creating your first campaign to reach your audience via
+          SMS or Email.
+        </p>
+      </div>
+      <Link href="/campaigns/new">
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          Create your first campaign
+        </Button>
+      </Link>
     </div>
   );
 }

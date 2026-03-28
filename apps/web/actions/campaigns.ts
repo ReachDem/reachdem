@@ -33,17 +33,73 @@ export type Campaign = CampaignResponse & {
   audienceSegments: string[];
 };
 
-export async function getCampaigns(): Promise<Campaign[]> {
-  const { organizationId } = await getOrganizationId();
-  const response = await CampaignService.listCampaigns(organizationId);
+export interface ListCampaignsOptions {
+  limit?: number;
+  cursor?: string;
+}
 
-  return response.items.map((c) => ({
-    ...c,
-    audienceGroups: [],
-    audienceSegments: [],
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-  }));
+export interface ListCampaignsResult {
+  items: Campaign[];
+  nextCursor?: string | null;
+}
+
+export async function getCampaigns(): Promise<Campaign[]> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await CampaignService.listCampaigns(organizationId);
+
+    return response.items.map((c) => ({
+      ...c,
+      audienceGroups: [],
+      audienceSegments: [],
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+  } catch (error) {
+    console.error("[getCampaigns] Error loading campaigns:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to load campaigns. Please try again."
+    );
+  }
+}
+
+/**
+ * List campaigns with pagination support
+ * @param options - Pagination options (limit, cursor)
+ * @returns Paginated list of campaigns with nextCursor
+ */
+export async function listCampaigns(
+  options: ListCampaignsOptions = {}
+): Promise<ListCampaignsResult> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const response = await CampaignService.listCampaigns(
+      organizationId,
+      options
+    );
+
+    const items = response.items.map((c) => ({
+      ...c,
+      audienceGroups: [],
+      audienceSegments: [],
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+
+    return {
+      items,
+      nextCursor: response.nextCursor,
+    };
+  } catch (error) {
+    console.error("[listCampaigns] Error loading campaigns:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to load campaigns. Please try again."
+    );
+  }
 }
 
 export async function getCampaignById(id: string): Promise<Campaign | null> {
@@ -108,8 +164,57 @@ export async function createCampaign(data: {
     audiences: audiencePayload,
   });
 
+  // Associate existing tracked links with this campaign
+  await associateLinksWithCampaign(
+    organizationId,
+    newCampaign.id,
+    data.content
+  );
+
   revalidatePath("/campaigns");
   return { success: true, data: newCampaign };
+}
+
+// Helper function to associate existing rcdm.ink links with campaign
+async function associateLinksWithCampaign(
+  organizationId: string,
+  campaignId: string,
+  content: any
+): Promise<void> {
+  const { prisma } = await import("@reachdem/database");
+
+  // Extract text content
+  let textContent = "";
+  if (content?.text) {
+    textContent = content.text;
+  } else if (content?.html) {
+    textContent = content.html;
+  }
+
+  if (!textContent) return;
+
+  // Find all rcdm.ink links (already shortened)
+  const rcdmLinkRegex = /rcdm\.ink\/([a-zA-Z0-9]{4})/g;
+  const matches = textContent.matchAll(rcdmLinkRegex);
+
+  for (const match of matches) {
+    const slug = match[1];
+    try {
+      // Update the tracked link to associate it with this campaign
+      await prisma.trackedLink.updateMany({
+        where: {
+          organizationId,
+          slug,
+          campaignId: null, // Only update if not already associated
+        },
+        data: {
+          campaignId,
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to associate link ${slug} with campaign:`, error);
+    }
+  }
 }
 
 export async function updateCampaign(
@@ -138,6 +243,11 @@ export async function updateCampaign(
     id,
     payload
   );
+
+  // Associate existing tracked links with this campaign if content was updated
+  if (data.content) {
+    await associateLinksWithCampaign(organizationId, id, data.content);
+  }
 
   if (data.audienceGroups || data.audienceSegments) {
     const audiences = await CampaignService.getAudiences(organizationId, id);
@@ -204,4 +314,119 @@ export async function getAudienceSegments() {
     limit: 100,
   });
   return segments.items.map((s) => ({ id: s.id, name: s.name }));
+}
+
+/**
+ * Get campaign statistics
+ */
+export async function getCampaignStats(campaignId: string) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const { CampaignStatsService } = await import("@reachdem/core");
+    return await CampaignStatsService.getCampaignStats(
+      organizationId,
+      campaignId
+    );
+  } catch (error) {
+    console.error("[getCampaignStats] Error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get tracked links for a campaign
+ */
+export async function getCampaignLinks(campaignId: string) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const { TrackedLinkService } = await import("@reachdem/core");
+    const result = await TrackedLinkService.listLinks(organizationId, {
+      campaignId,
+      limit: 100,
+    });
+    return result.items;
+  } catch (error) {
+    console.error("[getCampaignLinks] Error:", error);
+    return [];
+  }
+}
+
+/**
+ * Get campaign targets (messages sent to contacts)
+ */
+export async function getCampaignTargets(
+  campaignId: string,
+  options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}
+) {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const { page = 1, pageSize = 50, search = "" } = options;
+
+    // Using Prisma directly for now since there's no service method
+    const { prisma } = await import("@reachdem/database");
+
+    const where: any = {
+      campaignId,
+      organizationId,
+    };
+
+    if (search) {
+      where.contact = {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phoneE164: { contains: search } },
+        ],
+      };
+    }
+
+    const [targets, totalCount] = await Promise.all([
+      prisma.campaignTarget.findMany({
+        where,
+        include: {
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phoneE164: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.campaignTarget.count({ where }),
+    ]);
+
+    return {
+      targets: targets.map((t) => ({
+        id: t.id,
+        contactId: t.contactId,
+        contactName: t.contact.name,
+        contactEmail: t.contact.email,
+        contactPhone: t.contact.phoneE164,
+        resolvedTo: t.resolvedTo,
+        status: t.status,
+        messageId: t.messageId,
+        createdAt: t.createdAt,
+      })),
+      totalCount,
+      page,
+      pageSize,
+    };
+  } catch (error) {
+    console.error("[getCampaignTargets] Error:", error);
+    return {
+      targets: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 50,
+    };
+  }
 }

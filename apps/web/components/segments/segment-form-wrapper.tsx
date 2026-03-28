@@ -13,7 +13,7 @@ import {
 } from "@/lib/api/segments";
 import { useSegmentsStore } from "@/lib/stores/segments-store";
 
-import { IconChevronLeft, IconLoader2 } from "@tabler/icons-react";
+import { IconChevronLeft } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -203,8 +203,7 @@ export function SegmentFormWrapper({
             onClick={handleSave}
             disabled={isPending || !name.trim()}
           >
-            {isPending && <IconLoader2 className="mr-2 size-4 animate-spin" />}
-            Save Segment
+            {isPending ? "Saving..." : "Save Segment"}
           </Button>
         </div>
       </header>
@@ -265,11 +264,7 @@ export function SegmentFormWrapper({
                   variant="secondary"
                   className="gap-2 shadow-sm"
                 >
-                  {isPreviewLoading ? (
-                    <IconLoader2 className="size-4 animate-spin" />
-                  ) : (
-                    "Preview"
-                  )}
+                  {isPreviewLoading ? "Loading..." : "Preview"}
                 </Button>
               </div>
             </div>

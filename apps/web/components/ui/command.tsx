@@ -45,8 +45,10 @@ function CommandDialog({
   return (
     <Dialog {...props}>
       <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        <DialogTitle id="command-dialog-title">{title}</DialogTitle>
+        <DialogDescription id="command-dialog-description">
+          {description}
+        </DialogDescription>
       </DialogHeader>
       <DialogContent
         className={cn("overflow-hidden p-0", className)}

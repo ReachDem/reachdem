@@ -24,6 +24,11 @@ export const smsCampaignContentSchema = z.object({
     .min(1, "Sender ID is required")
     .max(20, "Sender ID cannot exceed 20 characters")
     .optional(),
+  senderId: z
+    .string()
+    .min(1, "Sender ID is required")
+    .max(20, "Sender ID cannot exceed 20 characters")
+    .optional(),
 });
 
 export const emailCampaignContentSchema = z.object({
@@ -36,6 +41,10 @@ export const emailCampaignContentSchema = z.object({
     .min(1, "Email HTML is required")
     .max(200000, "HTML cannot exceed 200000 characters"),
   from: z.string().min(1).max(200).optional(),
+  bodyJson: z.unknown().optional(),
+  mode: z.enum(["visual", "html", "react"]).optional(),
+  fontFamily: z.string().min(1).max(200).optional(),
+  fontWeights: z.array(z.number().int().positive()).max(20).optional(),
 });
 
 export const campaignContentSchema = z.union([

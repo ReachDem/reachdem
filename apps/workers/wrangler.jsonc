@@ -2,12 +2,27 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "reachdem-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-04-01",
+  "compatibility_date": "2025-03-01",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env"
+    "no_handle_cross_request_promise_resolution"
   ],
   "find_additional_modules": true,
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  },
   "triggers": {
     "crons": [
       "* * * * *"
@@ -45,7 +60,7 @@
       },
       {
         "queue": "reachdem-email-queue",
-        "max_batch_size": 20,
+        "max_batch_size": 40,
         "max_batch_timeout": 2,
         "max_concurrency": 5,
         "max_retries": 5
@@ -60,52 +75,41 @@
     "production": {
       "vars": {
         "ENVIRONMENT": "production",
-        "API_BASE_URL": "https://reachdem-iota.vercel.app",
-        "SMTP_HOST": "smtpdm-eu-central-1.aliyuncs.com",
-        "SMTP_PORT": "465",
-        "SMTP_USER": "messages@mail.rcdm.ink",
-        "SMTP_SECURE": "true",
-        "SENDER_EMAIL": "messages@mail.rcdm.ink",
-        "SENDER_NAME": "ReachDem"
-      },
-      "triggers": {
-        "crons": [
-          "* * * * *"
-        ]
+        "API_BASE_URL": "https://develop.reachdem.cc"
       },
       "queues": {
         "producers": [
           {
             "binding": "CAMPAIGN_LAUNCH_QUEUE",
-            "queue": "reachdem-campaign-launch-queue-prod"
+            "queue": "reachdem-campaign-launch-queue-production"
           },
           {
             "binding": "SMS_QUEUE",
-            "queue": "reachdem-sms-queue-prod"
+            "queue": "reachdem-sms-queue-production"
           },
           {
             "binding": "EMAIL_QUEUE",
-            "queue": "reachdem-email-queue-prod"
+            "queue": "reachdem-email-queue-production"
           }
         ],
         "consumers": [
           {
-            "queue": "reachdem-campaign-launch-queue-prod",
+            "queue": "reachdem-campaign-launch-queue-production",
             "max_batch_size": 5,
             "max_batch_timeout": 2,
             "max_concurrency": 2,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-sms-queue-prod",
+            "queue": "reachdem-sms-queue-production",
             "max_batch_size": 50,
             "max_batch_timeout": 2,
             "max_concurrency": 10,
             "max_retries": 5
           },
           {
-            "queue": "reachdem-email-queue-prod",
-            "max_batch_size": 20,
+            "queue": "reachdem-email-queue-production",
+            "max_batch_size": 40,
             "max_batch_timeout": 2,
             "max_concurrency": 5,
             "max_retries": 5

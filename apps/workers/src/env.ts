@@ -26,25 +26,22 @@ export function requireCampaignWorkerEnv(env: Env): void {
 }
 
 export function requireSmsWorkerEnv(env: Env): void {
-  requireBaseWorkerEnv(env);
+  requireKeys("sms", env, [
+    "ENVIRONMENT",
+    "AVLYTEXT_API_KEY",
+    "MBOA_SMS_USERID",
+    "MBOA_SMS_API_PASSWORD",
+  ]);
 }
 
 export function requireEmailWorkerEnv(env: Env): void {
   requireKeys("email", env, [
     "ENVIRONMENT",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASSWORD",
-    "SMTP_SECURE",
-    "SENDER_EMAIL",
+    "ALIBABA_ACCESS_KEY_ID",
+    "ALIBABA_ACCESS_KEY_SECRET",
   ]);
 }
 
 export function requireScheduledWorkerEnv(env: Env): void {
-  requireKeys("scheduled", env, [
-    "ENVIRONMENT",
-    "API_BASE_URL",
-    "INTERNAL_API_SECRET",
-  ]);
+  requireKeys("scheduled", env, ["ENVIRONMENT"]);
 }

@@ -61,6 +61,7 @@ export function NavDocuments({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
+                  id={`nav-doc-action-${item.name.replace(/\s+/g, "-").toLowerCase()}`}
                   showOnHover
                   className="data-[state=open]:bg-accent rounded-sm"
                 >

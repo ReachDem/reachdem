@@ -5,7 +5,6 @@ import { type Contact } from "@/lib/api/segments";
 
 import {
   IconUsers,
-  IconLoader2,
   IconAlertCircle,
   IconSearch as Search,
 } from "@tabler/icons-react";
@@ -36,7 +35,7 @@ export function PreviewPanel({
         {hasPreviewed && !error && (
           <div className="flex items-center gap-2">
             {isLoading ? (
-              <IconLoader2 className="text-muted-foreground size-3.5 animate-spin" />
+              <div className="text-muted-foreground text-xs">Loading...</div>
             ) : (
               <div className="bg-primary/10 text-primary flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold">
                 <span>{total}</span>

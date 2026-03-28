@@ -55,26 +55,7 @@ export function getCameroonProviderRoute(
     return null;
   }
 
-  if (isMTN(payload.to)) {
-    return [
-      {
-        provider: "lmt",
-        payload: {
-          ...payload,
-          from: "ReachDem",
-        },
-      },
-      {
-        provider: "mboaSms",
-        payload: {
-          ...payload,
-          from: "infos",
-        },
-      },
-    ];
-  }
-
-  if (isOrange(payload.to)) {
+  if (isMTN(payload.to) || isOrange(payload.to)) {
     return [
       {
         provider: "avlytext",
@@ -82,7 +63,10 @@ export function getCameroonProviderRoute(
       },
       {
         provider: "mboaSms",
-        payload,
+        payload: {
+          ...payload,
+          from: "infos",
+        },
       },
     ];
   }

@@ -4,6 +4,7 @@ import { truncate } from "../utils/pii-scrubber";
 import type { SmsExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignStatsService } from "./campaign-stats.service";
+import { personalizeTemplate } from "../utils/message-personalization";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
@@ -73,13 +74,36 @@ export class ProcessSmsMessageJobUseCase {
     }
 
     const baseAttemptNo = message.attempts.length;
+    const campaignTarget = await prisma.campaignTarget.findFirst({
+      where: {
+        organizationId: job.organization_id,
+        messageId: message.id,
+      },
+      include: {
+        contact: {
+          select: {
+            name: true,
+            email: true,
+            phoneE164: true,
+            work: true,
+            enterprise: true,
+            address: true,
+            customFields: true,
+          },
+        },
+      },
+    });
+    const personalizedText = personalizeTemplate(
+      message.text,
+      campaignTarget?.contact ?? null
+    );
 
     const result = await CompositeSmseSender.send(
       job.organization_id,
       message.correlationId,
       {
         to: message.toE164,
-        text: message.text,
+        text: personalizedText,
         from: message.from,
       }
     );
@@ -122,6 +146,26 @@ export class ProcessSmsMessageJobUseCase {
     }
 
     if (job.delivery_cycle < 3) {
+      console.warn("[SMS Delivery] Requeue after failed provider attempts", {
+        messageId: message.id,
+        organizationId: job.organization_id,
+        deliveryCycle: job.delivery_cycle,
+        provider: result.providerName,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        httpStatus: result.httpStatus ?? null,
+        responseMeta: result.responseMeta ?? null,
+        attempts: result.attempts.map((attempt) => ({
+          providerName: attempt.providerName,
+          success: attempt.success,
+          errorCode: attempt.errorCode ?? null,
+          errorMessage: attempt.errorMessage ?? null,
+          retryable: attempt.retryable ?? null,
+          httpStatus: attempt.httpStatus ?? null,
+          responseMeta: attempt.responseMeta ?? null,
+        })),
+      });
+
       await prisma.message.update({
         where: { id: message.id },
         data: {
@@ -144,6 +188,8 @@ export class ProcessSmsMessageJobUseCase {
           deliveryCycle: job.delivery_cycle,
           nextDeliveryCycle: job.delivery_cycle + 1,
           provider: result.providerName,
+          httpStatus: result.httpStatus ?? null,
+          responseMeta: result.responseMeta ?? null,
         },
       });
 
@@ -182,7 +228,38 @@ export class ProcessSmsMessageJobUseCase {
         provider: result.providerName,
         errorCode: result.errorCode,
         errorMessage: result.errorMessage,
+        httpStatus: result.httpStatus ?? null,
+        responseMeta: result.responseMeta ?? null,
+        attempts: result.attempts.map((attempt) => ({
+          providerName: attempt.providerName,
+          success: attempt.success,
+          errorCode: attempt.errorCode ?? null,
+          errorMessage: attempt.errorMessage ?? null,
+          retryable: attempt.retryable ?? null,
+          httpStatus: attempt.httpStatus ?? null,
+          responseMeta: attempt.responseMeta ?? null,
+        })),
       },
+    });
+
+    console.error("[SMS Delivery] Final failure after provider attempts", {
+      messageId: message.id,
+      organizationId: job.organization_id,
+      deliveryCycle: job.delivery_cycle,
+      provider: result.providerName,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+      httpStatus: result.httpStatus ?? null,
+      responseMeta: result.responseMeta ?? null,
+      attempts: result.attempts.map((attempt) => ({
+        providerName: attempt.providerName,
+        success: attempt.success,
+        errorCode: attempt.errorCode ?? null,
+        errorMessage: attempt.errorMessage ?? null,
+        retryable: attempt.retryable ?? null,
+        httpStatus: attempt.httpStatus ?? null,
+        responseMeta: attempt.responseMeta ?? null,
+      })),
     });
 
     return "failed";

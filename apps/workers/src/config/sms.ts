@@ -10,3 +10,9 @@ export const smsWorkerConfig = {
     maxDeliveryCycles: 3,
   },
 } as const;
+
+export function getSmsQueueName(environment?: string): string {
+  return environment === "production"
+    ? `${smsWorkerConfig.queueName}-production`
+    : smsWorkerConfig.queueName;
+}

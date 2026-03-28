@@ -9,7 +9,6 @@ import {
   IconFilter,
   IconPencil,
   IconTrash,
-  IconLoader2,
   IconCopy,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -176,10 +175,7 @@ export function SegmentsClient({ initialSegments = [] }: SegmentsClientProps) {
               disabled={isDeleting}
               variant="destructive"
             >
-              {isDeleting && (
-                <IconLoader2 className="mr-2 size-4 animate-spin" />
-              )}
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

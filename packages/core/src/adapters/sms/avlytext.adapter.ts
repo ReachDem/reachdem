@@ -51,6 +51,12 @@ export class AvlytextAdapter implements SmsSender {
           success: true,
           providerMessageId: data.id,
           durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            id: data.id ?? null,
+            cost: data.cost ?? null,
+            parts: data.parts ?? null,
+          },
         };
       }
 
@@ -66,6 +72,13 @@ export class AvlytextAdapter implements SmsSender {
         errorMessage,
         retryable: classifyError(errorCode) === "retryable",
         durationMs,
+        httpStatus: res.status,
+        responseMeta: {
+          code: data.code ?? null,
+          errorCode: data.errorCode ?? null,
+          message: data.message ?? null,
+          error: data.error ?? null,
+        },
       };
     } catch (err: any) {
       const durationMs = Date.now() - start;
@@ -77,6 +90,9 @@ export class AvlytextAdapter implements SmsSender {
         errorMessage: err?.message ?? "Network error",
         retryable: true,
         durationMs,
+        responseMeta: {
+          errorName: err?.name ?? null,
+        },
       };
     }
   }
