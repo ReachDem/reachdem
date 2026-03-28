@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, Variable } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -11,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { UrlHighlightedTextarea } from "./url-highlighted-textarea";
 import { cn } from "@/lib/utils";
 
 export interface SmsContent {
@@ -32,13 +32,23 @@ const AVAILABLE_VARIABLES = [
   { key: "{{phone}}", label: "Phone" },
 ];
 
+// Generate a mock 4-character slug for preview
+function generateMockSlug(): string {
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from(
+    { length: 4 },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
+}
+
 export function SmsComposer({
   value,
   onChange,
   disabled = false,
 }: SmsComposerProps) {
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const textareaRef = useState<HTMLTextAreaElement | null>(null);
+  const [textareaElement, setTextareaElement] =
+    useState<HTMLTextAreaElement | null>(null);
 
   const characterCount = value.text.length;
   const isOverLimit = characterCount > SMS_MAX_LENGTH;
@@ -49,7 +59,10 @@ export function SmsComposer({
   };
 
   const insertVariable = (variable: string) => {
-    const textarea = textareaRef[0];
+    // Find the textarea element
+    const textarea = document.getElementById(
+      "sms-message"
+    ) as HTMLTextAreaElement;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
@@ -118,17 +131,10 @@ export function SmsComposer({
           </div>
         </div>
 
-        <Textarea
+        <UrlHighlightedTextarea
           id="sms-message"
-          ref={(el) => {
-            textareaRef[0] = el;
-          }}
           value={value.text}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onSelect={(e) => {
-            const target = e.target as HTMLTextAreaElement;
-            setCursorPosition(target.selectionStart);
-          }}
+          onChange={(text) => handleTextChange(text)}
           disabled={disabled}
           placeholder="Type your SMS message here..."
           className={cn(
@@ -179,21 +185,38 @@ export function SmsComposer({
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="font-medium">
-                {detectedUrls.length} URL(s) detected in your message
+                {detectedUrls.length} URL(s) detected - will be shortened
+                automatically
               </p>
-              <p className="text-xs">
-                URLs will be automatically shortened and tracked when the
-                campaign is sent.
+              <p className="text-muted-foreground text-xs">
+                Your links will be shortened to rcdm.ink/XXXX format (4
+                characters) and tracked for clicks, devices, and regions.
               </p>
-              <ul className="mt-2 space-y-1">
+              <div className="mt-3 space-y-2">
                 {detectedUrls.map((url, index) => (
-                  <li key={index} className="font-mono text-xs">
-                    • {url}
-                  </li>
+                  <div
+                    key={index}
+                    className="bg-muted/50 flex flex-col gap-1 rounded-md p-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        Original:
+                      </span>
+                      <span className="truncate font-mono text-xs">{url}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        Shortened:
+                      </span>
+                      <span className="font-mono text-xs text-blue-600">
+                        rcdm.ink/{generateMockSlug()}
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </AlertDescription>
         </Alert>

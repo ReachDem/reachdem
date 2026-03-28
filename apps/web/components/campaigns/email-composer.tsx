@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { FocusPosition } from "@tiptap/core";
-import { Code2, FileCode2, Variable } from "lucide-react";
+import { Code2, FileCode2, Variable, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
@@ -43,6 +44,22 @@ const COMMON_VARIABLES = [
   { label: "Phone", value: "{{contact.phone}}" },
   { label: "Company", value: "{{contact.company}}" },
 ];
+
+// Generate a mock 4-character slug for preview
+function generateMockSlug(): string {
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from(
+    { length: 4 },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
+}
+
+// Detect URLs in text
+function detectUrls(text: string): string[] {
+  const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
+  return text.match(urlRegex) || [];
+}
 
 export interface EmailContent {
   subject: string;
@@ -177,6 +194,9 @@ export function EmailComposer({
     }
   };
 
+  // Detect URLs in the email body
+  const detectedUrls = detectUrls(value.body);
+
   return (
     <div className="max-w-4xl space-y-4">
       {/* Subject Field */}
@@ -276,6 +296,55 @@ export function EmailComposer({
 
       {/* Editor Content */}
       <div className="mt-2">
+        {/* URL Detection Info */}
+        {detectedUrls.length > 0 && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                {detectedUrls.length} URL(s) detected - will be tracked
+                automatically
+              </p>
+              <p className="text-muted-foreground text-xs">
+                All links will be shortened to rcdm.ink/XXXX format and tracked
+                for analytics.
+              </p>
+              <div className="mt-3 space-y-2">
+                {detectedUrls.slice(0, 3).map((url, index) => (
+                  <div
+                    key={index}
+                    className="bg-background/80 flex flex-col gap-1 rounded-md p-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        Original:
+                      </span>
+                      <span className="max-w-[400px] truncate font-mono text-xs">
+                        {url}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        Tracked:
+                      </span>
+                      <span className="font-mono text-xs text-blue-600">
+                        rcdm.ink/{generateMockSlug()}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        (preview)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {detectedUrls.length > 3 && (
+                  <p className="text-muted-foreground text-xs">
+                    +{detectedUrls.length - 3} more link(s) will be tracked
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {value.mode === "visual" && (
           <div className="rounded-lg">
             {isEditorLoading && <EmailEditorSkeleton />}

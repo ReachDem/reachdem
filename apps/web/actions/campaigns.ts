@@ -164,8 +164,57 @@ export async function createCampaign(data: {
     audiences: audiencePayload,
   });
 
+  // Associate existing tracked links with this campaign
+  await associateLinksWithCampaign(
+    organizationId,
+    newCampaign.id,
+    data.content
+  );
+
   revalidatePath("/campaigns");
   return { success: true, data: newCampaign };
+}
+
+// Helper function to associate existing rcdm.ink links with campaign
+async function associateLinksWithCampaign(
+  organizationId: string,
+  campaignId: string,
+  content: any
+): Promise<void> {
+  const { prisma } = await import("@reachdem/database");
+
+  // Extract text content
+  let textContent = "";
+  if (content?.text) {
+    textContent = content.text;
+  } else if (content?.html) {
+    textContent = content.html;
+  }
+
+  if (!textContent) return;
+
+  // Find all rcdm.ink links (already shortened)
+  const rcdmLinkRegex = /rcdm\.ink\/([a-zA-Z0-9]{4})/g;
+  const matches = textContent.matchAll(rcdmLinkRegex);
+
+  for (const match of matches) {
+    const slug = match[1];
+    try {
+      // Update the tracked link to associate it with this campaign
+      await prisma.trackedLink.updateMany({
+        where: {
+          organizationId,
+          slug,
+          campaignId: null, // Only update if not already associated
+        },
+        data: {
+          campaignId,
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to associate link ${slug} with campaign:`, error);
+    }
+  }
 }
 
 export async function updateCampaign(
@@ -194,6 +243,11 @@ export async function updateCampaign(
     id,
     payload
   );
+
+  // Associate existing tracked links with this campaign if content was updated
+  if (data.content) {
+    await associateLinksWithCampaign(organizationId, id, data.content);
+  }
 
   if (data.audienceGroups || data.audienceSegments) {
     const audiences = await CampaignService.getAudiences(organizationId, id);
@@ -268,21 +322,11 @@ export async function getAudienceSegments() {
 export async function getCampaignStats(campaignId: string) {
   try {
     const { organizationId } = await getOrganizationId();
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/v1/campaigns/${campaignId}/stats`,
-      {
-        headers: {
-          "x-organization-id": organizationId,
-        },
-        cache: "no-store",
-      }
+    const { CampaignStatsService } = await import("@reachdem/core");
+    return await CampaignStatsService.getCampaignStats(
+      organizationId,
+      campaignId
     );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch campaign stats");
-    }
-
-    return await response.json();
   } catch (error) {
     console.error("[getCampaignStats] Error:", error);
     throw error;
@@ -295,22 +339,12 @@ export async function getCampaignStats(campaignId: string) {
 export async function getCampaignLinks(campaignId: string) {
   try {
     const { organizationId } = await getOrganizationId();
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/v1/links?campaignId=${campaignId}`,
-      {
-        headers: {
-          "x-organization-id": organizationId,
-        },
-        cache: "no-store",
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch campaign links");
-    }
-
-    const data = await response.json();
-    return data.items || [];
+    const { TrackedLinkService } = await import("@reachdem/core");
+    const result = await TrackedLinkService.listLinks(organizationId, {
+      campaignId,
+      limit: 100,
+    });
+    return result.items;
   } catch (error) {
     console.error("[getCampaignLinks] Error:", error);
     return [];

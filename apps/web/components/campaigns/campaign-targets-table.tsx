@@ -76,28 +76,21 @@ export function CampaignTargetsTable({
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Message Targets ({totalCount})</CardTitle>
-          {onRefresh && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </Button>
-          )}
+          <CardTitle className="inline-flex items-center gap-2 font-medium">
+            Message Targets{" "}
+            <Badge variant="outline" className="py- rounded-full px-4">
+              {totalCount}
+            </Badge>
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {onSearch && (
-          <div className="relative">
+          <div className="relative max-w-sm">
             <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
             <Input
-              placeholder="Search by contact name, email, or phone..."
-              className="pl-9"
+              placeholder="Search contacts..."
+              className="h-9 pl-9 text-sm"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
             />

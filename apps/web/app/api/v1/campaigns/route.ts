@@ -48,6 +48,13 @@ export const POST = withWorkspace(async ({ req, organizationId, userId }) => {
       userId
     );
 
+    // Associate existing tracked links with this campaign
+    await associateLinksWithCampaign(
+      organizationId,
+      campaign.id,
+      validation.data.content
+    );
+
     return NextResponse.json(campaign, { status: 201 });
   } catch (error: any) {
     console.error("[Campaign API - POST] Error creating campaign:", error);
@@ -57,3 +64,51 @@ export const POST = withWorkspace(async ({ req, organizationId, userId }) => {
     );
   }
 });
+
+// Helper function to associate existing rcdm.ink links with campaign
+async function associateLinksWithCampaign(
+  organizationId: string,
+  campaignId: string,
+  content: any
+): Promise<void> {
+  const { prisma } = await import("@reachdem/database");
+
+  // Extract text content
+  let textContent = "";
+  if (content?.text) {
+    textContent = content.text;
+  } else if (content?.html) {
+    textContent = content.html;
+  }
+
+  if (!textContent) return;
+
+  // Find all rcdm.ink links (already shortened)
+  const rcdmLinkRegex = /rcdm\.ink\/([a-zA-Z0-9]{4})/g;
+  const matches = textContent.matchAll(rcdmLinkRegex);
+
+  for (const match of matches) {
+    const slug = match[1];
+    try {
+      // Update the tracked link to associate it with this campaign
+      await prisma.trackedLink.updateMany({
+        where: {
+          organizationId,
+          slug,
+          campaignId: null, // Only update if not already associated
+        },
+        data: {
+          campaignId,
+        },
+      });
+      console.log(
+        `[associateLinksWithCampaign] Associated link ${slug} with campaign ${campaignId}`
+      );
+    } catch (error) {
+      console.error(
+        `[associateLinksWithCampaign] Failed to associate link ${slug}:`,
+        error
+      );
+    }
+  }
+}

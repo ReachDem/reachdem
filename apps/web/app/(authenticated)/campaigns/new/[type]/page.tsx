@@ -162,21 +162,17 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
   const segments = segmentsData?.data || [];
   const groups = groupsData?.data || [];
 
-  // Unwrap params
+  // Unwrap params and set default title once
   useEffect(() => {
     params.then((p) => {
       if (p.type !== "email" && p.type !== "sms") {
         notFound();
       }
       setType(p.type);
+      // Set default title only once when type is determined
+      setCampaignTitle(`New ${p.type === "email" ? "Email" : "SMS"} Campaign`);
     });
   }, [params]);
-
-  useEffect(() => {
-    if (type && !campaignTitle.trim()) {
-      setCampaignTitle(`New ${type === "email" ? "Email" : "SMS"} Campaign`);
-    }
-  }, [type, campaignTitle]);
 
   if (!type) {
     return <CampaignFormSkeleton />;

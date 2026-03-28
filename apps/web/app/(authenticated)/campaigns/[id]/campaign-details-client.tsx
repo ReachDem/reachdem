@@ -13,11 +13,12 @@ import {
   getCampaignLinks,
   getCampaignTargets,
 } from "@/actions/campaigns";
+import { getCampaignAnalytics } from "@/actions/links";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CampaignStatsCards } from "@/components/campaigns/campaign-stats-cards";
-import { CampaignPerformanceChart } from "@/components/campaigns/campaign-performance-chart";
+// import { CampaignStatsCards } from "@/components/campaigns/campaign-stats-cards";
+import { CampaignAnalyticsSection } from "@/components/campaigns/campaign-analytics-section";
 import { TrackedLinksTable } from "@/components/campaigns/tracked-links-table";
 import { CampaignTargetsTable } from "@/components/campaigns/campaign-targets-table";
 
@@ -31,6 +32,7 @@ export function CampaignDetailsClient({
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [links, setLinks] = useState<any[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [targets, setTargets] = useState<any>({
     targets: [],
     totalCount: 0,
@@ -43,18 +45,26 @@ export function CampaignDetailsClient({
   const loadData = async (showToast = false) => {
     setIsRefreshing(true);
     try {
-      const [statsData, linksData, targetsData] = await Promise.all([
-        getCampaignStats(campaign.id).catch(() => null),
-        getCampaignLinks(campaign.id).catch(() => []),
-        getCampaignTargets(campaign.id, {
-          page: targets.page,
-          pageSize: targets.pageSize,
-        }).catch(() => ({ targets: [], totalCount: 0, page: 1, pageSize: 50 })),
-      ]);
+      const [statsData, linksData, targetsData, analyticsData] =
+        await Promise.all([
+          getCampaignStats(campaign.id).catch(() => null),
+          getCampaignLinks(campaign.id).catch(() => []),
+          getCampaignTargets(campaign.id, {
+            page: targets.page,
+            pageSize: targets.pageSize,
+          }).catch(() => ({
+            targets: [],
+            totalCount: 0,
+            page: 1,
+            pageSize: 50,
+          })),
+          getCampaignAnalytics(campaign.id).catch(() => null),
+        ]);
 
       setStats(statsData);
       setLinks(linksData);
       setTargets(targetsData);
+      setAnalyticsData(analyticsData);
 
       if (showToast) {
         toast.success("Data refreshed");
@@ -134,94 +144,34 @@ export function CampaignDetailsClient({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div className="space-y-1">
+        <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Link href="/campaigns">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
             <h1 className="text-3xl font-semibold tracking-tight">
               {campaign.name}
             </h1>
           </div>
           {campaign.description && (
-            <p className="text-muted-foreground ml-12">
-              {campaign.description}
-            </p>
-          )}
-          <div className="ml-12 flex items-center gap-2">
-            {getChannelBadge()}
-            {getStatusBadge()}
-            <span className="text-muted-foreground text-sm">
-              Updated{" "}
-              {format(new Date(campaign.updatedAt), "MMM d, yyyy 'at' HH:mm")}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadData(true)}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </Button>
-          {campaign.status === "draft" && (
-            <Link href={`/campaigns/${campaign.id}/edit`}>
-              <Button size="sm">
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            </Link>
+            <p className="text-muted-foreground ml-1">{campaign.description}</p>
           )}
         </div>
       </div>
 
       {/* Stats Cards */}
-      {stats && <CampaignStatsCards stats={stats} />}
+      {/* {stats && <CampaignStatsCards stats={stats} />} */}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="links">
-            Tracked Links ({links.length})
-          </TabsTrigger>
-          <TabsTrigger value="targets">
-            Message Targets ({targets.totalCount})
-          </TabsTrigger>
-        </TabsList>
+      {/* Analytics Charts - Above tabs */}
+      {analyticsData && <CampaignAnalyticsSection data={analyticsData} />}
 
-        <TabsContent value="overview" className="space-y-6">
-          {stats && <CampaignPerformanceChart stats={stats} />}
-        </TabsContent>
-
-        <TabsContent value="links">
-          <TrackedLinksTable
-            links={links}
-            onRefresh={() => loadData(true)}
-            isRefreshing={isRefreshing}
-          />
-        </TabsContent>
-
-        <TabsContent value="targets">
-          <CampaignTargetsTable
-            targets={targets.targets}
-            totalCount={targets.totalCount}
-            currentPage={targets.page}
-            pageSize={targets.pageSize}
-            onPageChange={handlePageChange}
-            onSearch={handleSearch}
-            onRefresh={() => loadData(true)}
-            isRefreshing={isRefreshing}
-          />
-        </TabsContent>
-      </Tabs>
+      <CampaignTargetsTable
+        targets={targets.targets}
+        totalCount={targets.totalCount}
+        currentPage={targets.page}
+        pageSize={targets.pageSize}
+        onPageChange={handlePageChange}
+        onSearch={handleSearch}
+        onRefresh={() => loadData(true)}
+        isRefreshing={isRefreshing}
+      />
     </div>
   );
 }

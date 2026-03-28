@@ -3,16 +3,30 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Variable, Smartphone, AlertCircle } from "lucide-react";
+import {
+  Link2,
+  Variable,
+  Smartphone,
+  AlertCircle,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { createTrackedLink } from "@/actions/links";
+import { toast } from "sonner";
 
 export interface SmsContent {
   text: string;
@@ -35,63 +49,184 @@ const COMMON_VARIABLES = [
   { label: "Company", value: "{{contact.company}}" },
 ];
 
-// URL regex pattern
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+// URL regex pattern - detects complete URLs (followed by space or at end)
+const URL_REGEX =
+  /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s]*))/g;
 
 // Variable regex pattern
 const VARIABLE_REGEX = /\{\{[^}]+\}\}/g;
+
+interface DetectedUrl {
+  url: string;
+  start: number;
+  end: number;
+  isSecure: boolean;
+}
 
 export function SmsComposerNew({
   value,
   onChange,
   disabled = false,
 }: SmsComposerProps) {
-  const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
+  const [detectedUrls, setDetectedUrls] = useState<DetectedUrl[]>([]);
   const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
   const [shortenedUrls, setShortenedUrls] = useState<Map<string, string>>(
     new Map()
   );
-  const [isShortening, setIsShortening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Detect URLs and variables
   useEffect(() => {
     const text = value.text || "";
 
-    // Detect URLs
-    const urls = text.match(URL_REGEX) || [];
-    setDetectedUrls([...new Set(urls)]);
-
-    // Detect variables
+    // First, detect variables to exclude them from URL detection
     const variables = text.match(VARIABLE_REGEX) || [];
     setDetectedVariables([...new Set(variables)]);
+
+    // Create a map of variable positions to exclude
+    const variablePositions = new Set<number>();
+    variables.forEach((variable) => {
+      let index = text.indexOf(variable);
+      while (index !== -1) {
+        for (let i = index; i < index + variable.length; i++) {
+          variablePositions.add(i);
+        }
+        index = text.indexOf(variable, index + 1);
+      }
+    });
+
+    // Detect complete URLs (followed by space or at end), excluding variables and already shortened links
+    const urlsInfo: DetectedUrl[] = [];
+    let match;
+    const regex = new RegExp(URL_REGEX);
+
+    while ((match = regex.exec(text)) !== null) {
+      const url = match[1];
+      const start = match.index;
+      const end = start + url.length;
+
+      // Skip if this position overlaps with a variable
+      let overlapsVariable = false;
+      for (let i = start; i < end; i++) {
+        if (variablePositions.has(i)) {
+          overlapsVariable = true;
+          break;
+        }
+      }
+
+      if (overlapsVariable) continue;
+
+      // Skip if this is already a shortened rcdm.ink link
+      if (url.includes("rcdm.ink/")) continue;
+
+      // Check if it's followed by space or end of string (complete URL)
+      const isComplete = end === text.length || /\s/.test(text[end]);
+
+      if (isComplete) {
+        const isHttp = url.startsWith("http://");
+
+        urlsInfo.push({
+          url,
+          start,
+          end,
+          isSecure: !isHttp, // Only HTTP is insecure
+        });
+      }
+    }
+
+    setDetectedUrls(urlsInfo);
   }, [value.text]);
 
   // Auto-shorten URLs
   useEffect(() => {
-    if (detectedUrls.length > 0 && !isShortening) {
-      detectedUrls.forEach((url) => {
-        if (!shortenedUrls.has(url)) {
-          shortenUrl(url);
+    if (detectedUrls.length > 0) {
+      detectedUrls.forEach((urlInfo) => {
+        if (!shortenedUrls.has(urlInfo.url)) {
+          generatePreviewSlug(urlInfo.url);
         }
       });
     }
   }, [detectedUrls]);
 
-  const shortenUrl = async (url: string) => {
-    setIsShortening(true);
+  // Generate preview slug (not saved yet)
+  const generatePreviewSlug = (url: string) => {
+    const chars =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const slug = Array.from(
+      { length: 4 },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
+    const shortUrl = `rcdm.ink/${slug}`;
+    setShortenedUrls((prev) => new Map(prev).set(url, shortUrl));
+  };
+
+  // Replace URL in textarea with preview short URL and create tracked link
+  const replaceUrlInText = async (
+    originalUrl: string,
+    previewShortUrl: string
+  ) => {
     try {
-      // Simulate URL shortening with animation
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Extract slug from preview
+      const slug = previewShortUrl.split("/").pop() || "";
 
-      // Generate a fake shortened URL (in production, call your URL shortening API)
-      const shortUrl = `https://reach.dm/${Math.random().toString(36).substring(2, 8)}`;
+      // Create tracked link via API with the preview slug
+      const trackedLink = await createTrackedLink({
+        targetUrl: originalUrl,
+        slug, // Use the preview slug
+        channel: "sms",
+      });
 
-      setShortenedUrls((prev) => new Map(prev).set(url, shortUrl));
-    } catch (error) {
-      console.error("Error shortening URL:", error);
-    } finally {
-      setIsShortening(false);
+      // Replace in textarea with the actual short URL from API
+      const newText = (value.text || "").replace(
+        originalUrl,
+        trackedLink.shortUrl
+      );
+      handleTextChange(newText);
+
+      // Update shortened URLs map with real short URL
+      setShortenedUrls((prev) =>
+        new Map(prev).set(originalUrl, trackedLink.shortUrl)
+      );
+
+      toast.success("Link shortened and tracked");
+    } catch (error: any) {
+      console.error("Error creating tracked link:", error);
+
+      // If conflict (409), generate a new slug and retry
+      if (
+        error.message?.includes("409") ||
+        error.message?.includes("Conflict")
+      ) {
+        const chars =
+          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const newSlug = Array.from(
+          { length: 4 },
+          () => chars[Math.floor(Math.random() * chars.length)]
+        ).join("");
+
+        try {
+          const trackedLink = await createTrackedLink({
+            targetUrl: originalUrl,
+            slug: newSlug,
+            channel: "sms",
+          });
+
+          const newText = (value.text || "").replace(
+            originalUrl,
+            trackedLink.shortUrl
+          );
+          handleTextChange(newText);
+          setShortenedUrls((prev) =>
+            new Map(prev).set(originalUrl, trackedLink.shortUrl)
+          );
+          toast.success("Link shortened and tracked");
+        } catch (retryError) {
+          console.error("Retry failed:", retryError);
+          toast.error("Failed to shorten link");
+        }
+      } else {
+        toast.error("Failed to shorten link");
+      }
     }
   };
 
@@ -133,8 +268,11 @@ export function SmsComposerNew({
   // Replace URLs with shortened versions for preview
   const getPreviewText = () => {
     let previewText = value.text || "";
-    shortenedUrls.forEach((shortUrl, originalUrl) => {
-      previewText = previewText.replace(originalUrl, shortUrl);
+    detectedUrls.forEach((urlInfo) => {
+      const shortUrl = shortenedUrls.get(urlInfo.url);
+      if (shortUrl) {
+        previewText = previewText.replace(urlInfo.url, shortUrl);
+      }
     });
     return previewText;
   };
@@ -149,6 +287,55 @@ export function SmsComposerNew({
     rendered = rendered.replace(/\{\{contact\.phone\}\}/g, "+1234567890");
     rendered = rendered.replace(/\{\{contact\.company\}\}/g, "Acme Inc");
     return rendered;
+  };
+
+  // Render preview with highlighted URLs
+  const renderPreviewWithHighlights = () => {
+    const text = getRenderedPreview();
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    // Find all shortened URLs in the preview text
+    detectedUrls.forEach((urlInfo, index) => {
+      const shortUrl = shortenedUrls.get(urlInfo.url);
+      if (!shortUrl) return;
+
+      const shortUrlIndex = text.indexOf(shortUrl, lastIndex);
+      if (shortUrlIndex === -1) return;
+
+      // Add text before URL
+      if (shortUrlIndex > lastIndex) {
+        parts.push(
+          <span key={`text-${index}`}>
+            {text.substring(lastIndex, shortUrlIndex)}
+          </span>
+        );
+      }
+
+      // Add highlighted shortened URL
+      parts.push(
+        <span
+          key={`url-${index}`}
+          className={cn(
+            "rounded-sm px-1 font-medium",
+            urlInfo.isSecure
+              ? "bg-blue-500/30 text-blue-400"
+              : "bg-red-500/30 text-red-400"
+          )}
+        >
+          {shortUrl}
+        </span>
+      );
+
+      lastIndex = shortUrlIndex + shortUrl.length;
+    });
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(<span key="text-end">{text.substring(lastIndex)}</span>);
+    }
+
+    return parts.length > 0 ? parts : text;
   };
 
   return (
@@ -212,14 +399,14 @@ export function SmsComposerNew({
               </Popover>
             </div>
 
-            <Textarea
+            <textarea
               ref={textareaRef}
               id="sms-message"
               placeholder="Type your SMS message here... Use {{contact.name}} for variables."
               value={value.text || ""}
               onChange={(e) => handleTextChange(e.target.value)}
               disabled={disabled}
-              className="min-h-[200px] resize-none font-sans"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[200px] w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               maxLength={maxCharacters}
             />
 
@@ -256,33 +443,68 @@ export function SmsComposerNew({
                 Detected URLs ({detectedUrls.length})
               </div>
               <div className="space-y-2">
-                {detectedUrls.map((url, index) => {
-                  const shortUrl = shortenedUrls.get(url);
+                {detectedUrls.map((urlInfo, index) => {
+                  const shortUrl = shortenedUrls.get(urlInfo.url);
                   return (
                     <div
                       key={index}
-                      className="bg-background flex items-center gap-2 rounded-md p-2 text-xs"
+                      className="bg-background flex items-center gap-2 rounded-md p-2"
                     >
-                      <div className="text-muted-foreground flex-1 truncate font-mono">
-                        {url}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {shortUrl ? (
-                          <>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="text-primary font-mono">
+                      <div className="flex-1 space-y-1">
+                        <div className="text-muted-foreground truncate font-mono text-xs">
+                          {urlInfo.url}
+                        </div>
+                        {shortUrl && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground text-xs">
+                              →
+                            </span>
+                            <span
+                              className={cn(
+                                "font-mono text-xs font-medium",
+                                urlInfo.isSecure
+                                  ? "text-blue-600"
+                                  : "text-red-600"
+                              )}
+                            >
                               {shortUrl}
                             </span>
-                            <Badge variant="secondary" className="text-xs">
-                              Shortened
-                            </Badge>
-                          </>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!urlInfo.isSecure && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">
+                                  Ce lien n'est pas protégé (HTTP)
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {shortUrl ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              replaceUrlInText(urlInfo.url, shortUrl)
+                            }
+                          >
+                            Replace
+                          </Button>
                         ) : (
                           <Badge
                             variant="outline"
                             className="animate-pulse text-xs"
                           >
-                            Shortening...
+                            Loading...
                           </Badge>
                         )}
                       </div>
@@ -320,6 +542,7 @@ export function SmsComposerNew({
           <PhoneMockup
             senderId={value.senderId || "SENDER"}
             message={getRenderedPreview()}
+            highlightedMessage={renderPreviewWithHighlights()}
           />
         </div>
       </div>
@@ -331,9 +554,11 @@ export function SmsComposerNew({
 function PhoneMockup({
   senderId,
   message,
+  highlightedMessage,
 }: {
   senderId: string;
   message: string;
+  highlightedMessage: React.ReactNode;
 }) {
   return (
     <div className="relative w-[320px]">
@@ -386,7 +611,11 @@ function PhoneMockup({
                 {senderId}
               </div>
               <div className="text-sm leading-relaxed text-gray-200">
-                {message || (
+                {message ? (
+                  <span className="whitespace-pre-wrap">
+                    {highlightedMessage}
+                  </span>
+                ) : (
                   <span className="text-gray-500 italic">
                     Your message will appear here...
                   </span>

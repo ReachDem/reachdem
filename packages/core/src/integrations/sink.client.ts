@@ -13,13 +13,24 @@ const sinkLinkResponseSchema = z.object({
   image: z.string().optional(),
 });
 
+const sinkCreateResponseSchema = z.object({
+  link: z.object({
+    id: z.string(),
+    url: z.string().url(),
+    slug: z.string(),
+    createdAt: z.number().optional(),
+    updatedAt: z.number().optional(),
+  }),
+  shortLink: z.string().url(),
+});
+
 const sinkCountersResponseSchema = z.object({
   data: z
     .array(
       z.object({
-        visits: z.union([z.string(), z.number()]).optional(),
-        visitors: z.union([z.string(), z.number()]).optional(),
-        referers: z.union([z.string(), z.number()]).optional(),
+        visits: z.union([z.string(), z.number(), z.null()]).optional(),
+        visitors: z.union([z.string(), z.number(), z.null()]).optional(),
+        referers: z.union([z.string(), z.number(), z.null()]).optional(),
       })
     )
     .default([]),
@@ -62,9 +73,19 @@ export class SinkClient {
     schema?: z.ZodSchema<T>
   ): Promise<T> {
     let response: Response;
+    const fullUrl = `${this.baseUrl}${path}`;
+
+    console.log("[SinkClient] Making request:", {
+      url: fullUrl,
+      method: init.method,
+      hasBody: !!init.body,
+      body: init.body,
+      baseUrl: this.baseUrl,
+      hasToken: !!this.token,
+    });
 
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
+      response = await fetch(fullUrl, {
         ...init,
         headers: {
           Authorization: `Bearer ${this.token}`,
@@ -73,22 +94,40 @@ export class SinkClient {
         },
       });
     } catch (error: any) {
+      console.error("[SinkClient] Fetch error:", error);
       throw new SinkUnavailableError(error?.message);
     }
 
+    console.log("[SinkClient] Response:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
+      let errorBody;
+      try {
+        errorBody = await response.text();
+        console.error("[SinkClient] Error response body:", errorBody);
+      } catch (e) {
+        console.error("[SinkClient] Could not read error body");
+      }
+
       throw new SinkUnavailableError(
         `Sink API request failed with HTTP ${response.status}`
       );
     }
 
     const payload = await response.json();
+    console.log("[SinkClient] Success payload:", payload);
+
     if (!schema) {
       return payload as T;
     }
 
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
+      console.error("[SinkClient] Schema validation failed:", parsed.error);
       throw new SinkInvalidResponseError(parsed.error.message);
     }
 
@@ -108,32 +147,41 @@ export class SinkClient {
     slug?: string;
     comment?: string;
   }): Promise<SinkLinkResponse> {
+    console.log("[SinkClient] Creating link:", {
+      input,
+      baseUrl: this.baseUrl,
+    });
+
     const payload = await this.request<unknown>("/api/link/create", {
       method: "POST",
       body: JSON.stringify(input),
     });
 
+    console.log("[SinkClient] Create response:", payload);
+
+    // Try to parse the new response format with {link: {...}, shortLink: '...'}
+    const createResponse = sinkCreateResponseSchema.safeParse(payload);
+    if (createResponse.success) {
+      // Convert to SinkLinkResponse format using data from link object
+      return {
+        id: createResponse.data.link.id,
+        slug: createResponse.data.link.slug,
+        url: createResponse.data.link.url,
+        createdAt: createResponse.data.link.createdAt,
+        updatedAt: createResponse.data.link.updatedAt,
+      };
+    }
+
+    // Try old format
     const parsedCreated = sinkLinkResponseSchema.safeParse(payload);
     if (parsedCreated.success) {
       return parsedCreated.data;
     }
 
-    const createdSlug =
-      typeof payload === "object" &&
-      payload !== null &&
-      "slug" in payload &&
-      typeof (payload as { slug?: unknown }).slug === "string"
-        ? (payload as { slug: string }).slug
-        : input.slug;
-
-    const slug = createdSlug;
-    if (!slug) {
-      throw new SinkInvalidResponseError(
-        "Sink create response must be followed by query, but no slug was provided"
-      );
-    }
-
-    return this.queryLink(slug);
+    console.error("[SinkClient] Unexpected response format:", payload);
+    throw new SinkInvalidResponseError(
+      "Sink API returned unexpected response format"
+    );
   }
 
   static async queryLink(slug: string): Promise<SinkLinkResponse> {
@@ -177,8 +225,33 @@ export class SinkClient {
 
     const counters = payload.data?.[0];
     return {
-      totalClicks: Number(counters?.visits ?? 0),
-      uniqueClicks: Number(counters?.visitors ?? 0),
+      totalClicks: Number(counters?.visits ?? 0) || 0,
+      uniqueClicks: Number(counters?.visitors ?? 0) || 0,
     };
+  }
+
+  static async getViewsBySlug(slug: string): Promise<any> {
+    return this.request(
+      `/api/stats/views?slug=${encodeURIComponent(slug)}&unit=day`,
+      { method: "GET" }
+    );
+  }
+
+  static async getMetricsBySlug(
+    slug: string,
+    type: string,
+    unit?: string
+  ): Promise<any> {
+    const unitParam = unit ? `&unit=${encodeURIComponent(unit)}` : "";
+    return this.request(
+      `/api/stats/metrics?slug=${encodeURIComponent(slug)}&type=${encodeURIComponent(type)}${unitParam}`,
+      { method: "GET" }
+    );
+  }
+
+  static async getHeatmapBySlug(slug: string): Promise<any> {
+    return this.request(`/api/stats/heatmap?slug=${encodeURIComponent(slug)}`, {
+      method: "GET",
+    });
   }
 }
