@@ -24,7 +24,9 @@
     }
   },
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": [
+      "* * * * *"
+    ]
   },
   "queues": {
     "producers": [
@@ -32,8 +34,14 @@
         "binding": "CAMPAIGN_LAUNCH_QUEUE",
         "queue": "reachdem-campaign-launch-queue"
       },
-      { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
-      { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" }
+      {
+        "binding": "SMS_QUEUE",
+        "queue": "reachdem-sms-queue"
+      },
+      {
+        "binding": "EMAIL_QUEUE",
+        "queue": "reachdem-email-queue"
+      }
     ],
     "consumers": [
       {
@@ -75,7 +83,10 @@
             "binding": "CAMPAIGN_LAUNCH_QUEUE",
             "queue": "reachdem-campaign-launch-queue-production"
           },
-          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-production" },
+          {
+            "binding": "SMS_QUEUE",
+            "queue": "reachdem-sms-queue-production"
+          },
           {
             "binding": "EMAIL_QUEUE",
             "queue": "reachdem-email-queue-production"
