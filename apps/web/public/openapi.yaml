@@ -746,6 +746,103 @@ paths:
         "404":
           description: Tracked link not found
 
+  /payments/session:
+    post:
+      summary: Create Payment Session
+      description: Creates a workspace-scoped payment session using Flutterwave as the primary provider and Stripe as fallback.
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentSessionDto"
+      responses:
+        "201":
+          description: Payment session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePaymentSessionResult"
+        "400":
+          description: Validation error
+        "500":
+          description: Payment provider or internal server error
+
+  /payments/session/{id}:
+    get:
+      summary: Get Payment Session
+      description: Returns a workspace-scoped payment session and all recorded provider transactions.
+      tags: [Payments]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payment session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSessionDetailsResponse"
+        "404":
+          description: Payment session not found
+        "500":
+          description: Internal server error
+
+  /payments/webhooks/flutterwave:
+    post:
+      summary: Flutterwave Webhook
+      description: Receives and validates Flutterwave payment webhooks. This endpoint is unauthenticated and secured by provider signature validation.
+      tags: [Payments]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentWebhookAck"
+        "401":
+          description: Invalid webhook signature
+        "500":
+          description: Internal server error
+
+  /payments/webhooks/stripe:
+    post:
+      summary: Stripe Webhook
+      description: Receives and validates Stripe payment webhooks. This endpoint is unauthenticated and secured by provider signature validation.
+      tags: [Payments]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentWebhookAck"
+        "401":
+          description: Invalid webhook signature
+        "500":
+          description: Internal server error
+
   # ─── SMS Messaging ─────────────────────────────────────────────────────────
 
   /sms/send:
@@ -1033,6 +1130,242 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/MessageAttemptSchema"
+
+    PaymentKind:
+      type: string
+      enum: [subscription, creditPurchase]
+
+    PaymentProvider:
+      type: string
+      enum: [flutterwave, stripe]
+
+    PaymentSessionStatus:
+      type: string
+      enum:
+        [pending, providerRedirected, processing, succeeded, failed, cancelled, expired]
+
+    PaymentTransactionStatus:
+      type: string
+      enum: [initiated, pending, processing, succeeded, failed, cancelled, refunded]
+
+    CreatePaymentSessionDto:
+      type: object
+      required: [kind, currency]
+      properties:
+        kind:
+          $ref: "#/components/schemas/PaymentKind"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: XAF
+        planCode:
+          type: string
+          nullable: true
+          example: growth
+        creditsQuantity:
+          type: integer
+          nullable: true
+          minimum: 1
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+      description: For `subscription`, `planCode` is required. For `creditPurchase`, `creditsQuantity` is required.
+
+    CreatePaymentSessionResult:
+      type: object
+      required: [paymentSessionId, provider, status]
+      properties:
+        paymentSessionId:
+          type: string
+          format: uuid
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        status:
+          $ref: "#/components/schemas/PaymentSessionStatus"
+        checkoutUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    PaymentSessionResponse:
+      type: object
+      required:
+        [
+          id,
+          organizationId,
+          initiatedByUserId,
+          kind,
+          providerPrimary,
+          status,
+          currency,
+          amountMinor,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        initiatedByUserId:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/PaymentKind"
+        providerPrimary:
+          $ref: "#/components/schemas/PaymentProvider"
+        providerSelected:
+          allOf:
+            - $ref: "#/components/schemas/PaymentProvider"
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentSessionStatus"
+        currency:
+          type: string
+        amountMinor:
+          type: integer
+        planCode:
+          type: string
+          nullable: true
+        creditsQuantity:
+          type: integer
+          nullable: true
+        providerCheckoutUrl:
+          type: string
+          format: uri
+          nullable: true
+        providerSessionId:
+          type: string
+          nullable: true
+        providerReference:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        activatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentTransactionResponse:
+      type: object
+      required:
+        [
+          id,
+          paymentSessionId,
+          organizationId,
+          provider,
+          status,
+          amountMinor,
+          currency,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        paymentSessionId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        initiatedByUserId:
+          type: string
+          format: uuid
+          nullable: true
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        status:
+          $ref: "#/components/schemas/PaymentTransactionStatus"
+        amountMinor:
+          type: integer
+        currency:
+          type: string
+        providerTransactionId:
+          type: string
+          nullable: true
+        providerSessionId:
+          type: string
+          nullable: true
+        providerReference:
+          type: string
+          nullable: true
+        providerEventId:
+          type: string
+          nullable: true
+        rawStatus:
+          type: string
+          nullable: true
+        rawPayload:
+          type: object
+          nullable: true
+          additionalProperties: true
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        refundedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentSessionDetailsResponse:
+      type: object
+      required: [session, transactions]
+      properties:
+        session:
+          $ref: "#/components/schemas/PaymentSessionResponse"
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentTransactionResponse"
+
+    PaymentWebhookAck:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
 
     # ─── Existing Schemas ─────────────────────────────────────────────────────
     PaginatedContacts:
