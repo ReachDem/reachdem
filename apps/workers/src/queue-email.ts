@@ -1,7 +1,10 @@
 import { ProcessEmailMessageJobUseCase } from "@reachdem/core";
 import { emailWorkerConfig } from "./config";
 import { requireEmailWorkerEnv } from "./env";
-import { sendAlibabaDirectMail } from "./alibaba-direct-mail";
+import {
+  AlibabaDirectMailError,
+  sendAlibabaDirectMail,
+} from "./alibaba-direct-mail";
 import type { Env, EmailMessage, MessageBatch } from "./types";
 
 export async function handleEmailBatch(
@@ -57,6 +60,15 @@ export async function handleEmailBatch(
               env
             );
 
+            console.log("[Email Queue] Alibaba Direct Mail response", {
+              messageId: job.message_id,
+              to,
+              httpStatus: result.httpStatus,
+              providerMessageId: result.providerMessageId,
+              requestId: result.requestId,
+              responseMeta: result.responseMeta,
+            });
+
             return {
               success: true,
               providerName: result.providerName,
@@ -64,10 +76,31 @@ export async function handleEmailBatch(
               durationMs: Date.now() - startedAt,
             };
           } catch (error) {
+            if (error instanceof AlibabaDirectMailError) {
+              console.error("[Email Queue] Alibaba Direct Mail failed", {
+                messageId: job.message_id,
+                to,
+                httpStatus: error.httpStatus,
+                providerCode: error.providerCode,
+                providerMessage: error.providerMessage,
+                requestId: error.requestId,
+                responseMeta: error.responseMeta,
+              });
+            } else {
+              console.error("[Email Queue] Alibaba Direct Mail failed", {
+                messageId: job.message_id,
+                to,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+
             return {
               success: false,
               providerName: "alibaba-direct-mail",
-              errorCode: "ALIBABA_DIRECT_MAIL_FAILED",
+              errorCode:
+                error instanceof AlibabaDirectMailError
+                  ? (error.providerCode ?? "ALIBABA_DIRECT_MAIL_FAILED")
+                  : "ALIBABA_DIRECT_MAIL_FAILED",
               errorMessage:
                 error instanceof Error
                   ? error.message

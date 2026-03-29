@@ -460,6 +460,7 @@ enum CampaignStatus {
   partial
   completed
   failed
+  expired
 }
 
 enum CampaignChannel {

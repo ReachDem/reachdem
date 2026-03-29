@@ -24,7 +24,11 @@ export class CampaignStatsService {
   ): Promise<CampaignStatsResponse> {
     const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
-      select: { id: true },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+      },
     });
 
     if (!campaign) {
@@ -82,11 +86,34 @@ export class CampaignStatsService {
         (counts.get("sent") ?? 0) +
         (counts.get("failed") ?? 0) +
         (counts.get("skipped") ?? 0),
+      pendingCount: counts.get("pending") ?? 0,
       sentCount: counts.get("sent") ?? 0,
       failedCount: counts.get("failed") ?? 0,
+      skippedCount: counts.get("skipped") ?? 0,
       clickCount,
       uniqueClickCount,
+      resolvedStatus:
+        campaign.status as CampaignStatsResponse["resolvedStatus"],
     };
+
+    const resolvedStatus = this.deriveResolvedStatus({
+      currentStatus: campaign.status as CampaignStatsResponse["resolvedStatus"],
+      updatedAt: campaign.updatedAt,
+      audienceSize: stats.audienceSize,
+      pendingCount: stats.pendingCount,
+      sentCount: stats.sentCount,
+      failedCount: stats.failedCount,
+      skippedCount: stats.skippedCount,
+    });
+
+    if (resolvedStatus !== campaign.status) {
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: resolvedStatus as any },
+      });
+    }
+
+    stats.resolvedStatus = resolvedStatus;
 
     await RedisCacheClient.set(
       cacheKey,
@@ -95,5 +122,51 @@ export class CampaignStatsService {
     );
 
     return stats;
+  }
+
+  private static deriveResolvedStatus(input: {
+    currentStatus: CampaignStatsResponse["resolvedStatus"];
+    updatedAt: Date;
+    audienceSize: number;
+    pendingCount: number;
+    sentCount: number;
+    failedCount: number;
+    skippedCount: number;
+  }): CampaignStatsResponse["resolvedStatus"] {
+    if (input.currentStatus === "draft") {
+      return "draft";
+    }
+
+    const unsuccessfulCount = input.failedCount + input.skippedCount;
+    const isOlderThanTwoDays =
+      Date.now() - input.updatedAt.getTime() > 2 * 24 * 60 * 60 * 1000;
+
+    let nextStatus = input.currentStatus;
+
+    if (input.pendingCount > 0) {
+      nextStatus = "running";
+    } else if (
+      input.audienceSize > 0 &&
+      input.sentCount === input.audienceSize
+    ) {
+      nextStatus = "completed";
+    } else if (
+      input.audienceSize > 0 &&
+      input.sentCount === 0 &&
+      unsuccessfulCount === input.audienceSize
+    ) {
+      nextStatus = "failed";
+    } else if (input.sentCount > 0 && unsuccessfulCount > 0) {
+      nextStatus = "partial";
+    }
+
+    if (
+      isOlderThanTwoDays &&
+      (nextStatus === "failed" || nextStatus === "partial")
+    ) {
+      return "expired";
+    }
+
+    return nextStatus;
   }
 }

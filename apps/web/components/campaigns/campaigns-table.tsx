@@ -47,21 +47,37 @@ export function CampaignsTable({
         );
       case "running":
         return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600">Running</Badge>
+          <Badge className="animate-pulse bg-orange-500 text-white hover:bg-orange-500">
+            Running
+          </Badge>
         );
       case "partial":
         return (
           <Badge
             variant="secondary"
-            className="bg-amber-50 text-amber-700 hover:bg-amber-100"
+            className="bg-red-100 text-red-700 hover:bg-red-100"
           >
             Partial
           </Badge>
         );
       case "completed":
-        return <Badge variant="secondary">Completed</Badge>;
+        return (
+          <Badge variant="outline" className="hover:text-emerald-600">
+            Completed
+          </Badge>
+        );
       case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
+        return (
+          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+            Failed
+          </Badge>
+        );
+      case "expired":
+        return (
+          <Badge className="bg-red-700 text-white hover:bg-red-800">
+            Expired
+          </Badge>
+        );
       default:
         return (
           <Badge variant="outline" className="capitalize">
@@ -74,23 +90,9 @@ export function CampaignsTable({
   const getChannelBadge = (channel: string) => {
     switch (channel.toLowerCase()) {
       case "email":
-        return (
-          <Badge
-            variant="secondary"
-            className="bg-blue-50 text-blue-700 hover:bg-blue-100"
-          >
-            Email
-          </Badge>
-        );
+        return <Badge variant="secondary">Email</Badge>;
       case "sms":
-        return (
-          <Badge
-            variant="secondary"
-            className="bg-amber-50 text-amber-700 hover:bg-amber-100"
-          >
-            SMS
-          </Badge>
-        );
+        return <Badge variant="secondary">SMS</Badge>;
       default:
         return (
           <Badge variant="outline" className="capitalize">
@@ -106,7 +108,7 @@ export function CampaignsTable({
         <TableRow>
           <TableHead className="w-[30%] min-w-[200px]">Name</TableHead>
           <TableHead>Channel</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead className="text-center">Status</TableHead>
           <TableHead>Updated at</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>

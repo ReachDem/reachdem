@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Campaigns | ReachDem",
-  description: "Manage your marketing campaigns.",
+  description: "Manage your campaigns.",
 };
 
 export default async function CampaignsPage() {
@@ -21,7 +21,7 @@ export default async function CampaignsPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Campaigns</h1>
           <p className="text-muted-foreground mt-2">
-            Create, manage, and launch your marketing campaigns.
+            Create, manage, and launch your campaigns.
           </p>
         </div>
         <Link href="/campaigns/new">
@@ -32,11 +32,9 @@ export default async function CampaignsPage() {
         </Link>
       </div>
 
-      <div className="bg-background rounded-lg border shadow-sm">
-        <Suspense fallback={<TableSkeleton />}>
-          <CampaignsLoader />
-        </Suspense>
-      </div>
+      <Suspense fallback={<TableSkeleton />}>
+        <CampaignsLoader />
+      </Suspense>
     </div>
   );
 }

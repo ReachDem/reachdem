@@ -49,10 +49,22 @@ interface AnalyticsData {
     byGender?: Record<string, number>;
   };
   links: Array<{ id: string; slug: string; shortUrl: string }>;
+  linkAnalytics?: Record<
+    string,
+    {
+      dailyVisits: Array<{
+        date: string;
+        total: number;
+        byLink?: Record<string, number>;
+        byBrowser?: Record<string, number>;
+        byDevice?: Record<string, number>;
+      }>;
+    }
+  >;
 }
 
 interface CampaignAnalyticsSectionProps {
-  data: AnalyticsData;
+  data: AnalyticsData | null;
 }
 
 const COLORS = [
@@ -66,32 +78,89 @@ const COLORS = [
 export function CampaignAnalyticsSection({
   data,
 }: CampaignAnalyticsSectionProps) {
-  const [barSegment, setBarSegment] = useState<
-    "total" | "link" | "browser" | "device"
-  >("total");
+  const [barSegment, setBarSegment] = useState<"total" | "browser" | "device">(
+    "total"
+  );
+  const [selectedLinkSlug, setSelectedLinkSlug] = useState<string>("");
   const [pieSegment, setPieSegment] = useState<
     "total" | "region" | "city" | "gender"
   >("total");
 
+  const hasAnalyticsData =
+    !!data &&
+    (data.visitors.total > 0 ||
+      data.links.length > 0 ||
+      data.dailyVisits.some((day) => {
+        const hasSegments =
+          Object.keys(day.byBrowser || {}).length > 0 ||
+          Object.keys(day.byDevice || {}).length > 0;
+        return day.total > 0 || hasSegments;
+      }));
+
+  const effectiveLinkSlug = selectedLinkSlug || data?.links[0]?.slug || "";
+
+  if (!hasAnalyticsData) {
+    return (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Visit Analytics</CardTitle>
+            <CardDescription>Last 7 days including today</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border-border/70 bg-muted/20 flex h-[300px] w-full items-end gap-4 rounded-xl border border-dashed px-6 py-8">
+              {[32, 56, 44, 68, 40, 52, 36].map((height, index) => (
+                <div
+                  key={index}
+                  className="bg-muted flex-1 rounded-t-md"
+                  style={{ height: `${height}%` }}
+                />
+              ))}
+            </div>
+            <p className="text-muted-foreground text-center text-sm leading-relaxed">
+              No data currently
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Visitors</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border-border/70 bg-muted/20 mx-auto flex h-[250px] w-[250px] items-center justify-center rounded-full border border-dashed">
+              <div className="border-border/70 bg-background/80 text-muted-foreground flex h-[120px] w-[120px] items-center justify-center rounded-full border border-dashed text-sm font-medium">
+                0
+              </div>
+            </div>
+            <p className="text-muted-foreground text-center text-xs leading-relaxed">
+              No data currently
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   console.log(
     "Analytics render - barSegment:",
     barSegment,
+    "selectedLinkSlug:",
+    effectiveLinkSlug,
     "pieSegment:",
     pieSegment
   );
 
-  const barChartData = data.dailyVisits.map((day) => {
+  const selectedLinkDailyVisits =
+    data.linkAnalytics?.[effectiveLinkSlug]?.dailyVisits ?? data.dailyVisits;
+
+  const barChartData = selectedLinkDailyVisits.map((day) => {
     if (barSegment === "total") {
       return { date: day.date, Visits: day.total };
     }
 
     const result: any = { date: day.date };
-    const segmentData =
-      barSegment === "link"
-        ? day.byLink
-        : barSegment === "browser"
-          ? day.byBrowser
-          : day.byDevice;
+    const segmentData = barSegment === "browser" ? day.byBrowser : day.byDevice;
 
     if (segmentData) {
       Object.entries(segmentData).forEach(([key, value]) => {
@@ -108,13 +177,9 @@ export function CampaignAnalyticsSection({
       ? ["Visits"]
       : Array.from(
           new Set(
-            data.dailyVisits.flatMap((day) => {
+            selectedLinkDailyVisits.flatMap((day) => {
               const segmentData =
-                barSegment === "link"
-                  ? day.byLink
-                  : barSegment === "browser"
-                    ? day.byBrowser
-                    : day.byDevice;
+                barSegment === "browser" ? day.byBrowser : day.byDevice;
               return Object.keys(segmentData || {});
             })
           )
@@ -157,8 +222,6 @@ export function CampaignAnalyticsSection({
     switch (barSegment) {
       case "total":
         return "Daily visit trends over the last 7 days.";
-      case "link":
-        return "Visit distribution across tracked links.";
       case "browser":
         return "Browser breakdown of your audience.";
       case "device":
@@ -192,22 +255,41 @@ export function CampaignAnalyticsSection({
               <CardTitle>Visit Analytics</CardTitle>
               <CardDescription>Last 7 days including today</CardDescription>
             </div>
-            <Select
-              value={barSegment}
-              onValueChange={(v: any) => setBarSegment(v)}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="total">Total Visits</SelectItem>
-                {data.links.length > 1 && (
-                  <SelectItem value="link">By Link</SelectItem>
-                )}
-                <SelectItem value="browser">By Browser</SelectItem>
-                <SelectItem value="device">By Device</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="bg-muted/20 inline-flex items-center overflow-hidden rounded-lg border">
+              <Select
+                value={effectiveLinkSlug}
+                onValueChange={setSelectedLinkSlug}
+              >
+                <SelectTrigger className="h-9 w-[130px] rounded-none border-0 bg-transparent shadow-none focus:ring-0">
+                  <SelectValue placeholder="Link" />
+                </SelectTrigger>
+                <SelectContent>
+                  {data.links.map((link) => (
+                    <SelectItem key={link.slug} value={link.slug}>
+                      {link.slug}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="bg-border h-6 w-px" />
+
+              <Select
+                value={barSegment}
+                onValueChange={(value: "total" | "browser" | "device") =>
+                  setBarSegment(value)
+                }
+              >
+                <SelectTrigger className="h-9 w-[140px] rounded-none border-0 bg-transparent shadow-none focus:ring-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="total">Total</SelectItem>
+                  <SelectItem value="device">By device</SelectItem>
+                  <SelectItem value="browser">By browser</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

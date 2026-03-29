@@ -7,6 +7,7 @@ export const campaignStatusSchema = z.enum([
   "partial",
   "completed",
   "failed",
+  "expired",
 ]);
 export const campaignChannelSchema = z.enum(["sms", "email"]);
 export const audienceSourceTypeSchema = z.enum(["group", "segment"]);
@@ -142,8 +143,11 @@ export interface CampaignAudienceResponse {
 export interface CampaignStatsResponse {
   campaignId: string;
   audienceSize: number;
+  pendingCount: number;
   sentCount: number;
   failedCount: number;
+  skippedCount: number;
   clickCount: number;
   uniqueClickCount: number;
+  resolvedStatus: z.infer<typeof campaignStatusSchema>;
 }

@@ -160,7 +160,7 @@ export function CampaignDetailsClient({
       {/* {stats && <CampaignStatsCards stats={stats} />} */}
 
       {/* Analytics Charts - Above tabs */}
-      {analyticsData && <CampaignAnalyticsSection data={analyticsData} />}
+      <CampaignAnalyticsSection data={analyticsData} />
 
       <CampaignTargetsTable
         targets={targets.targets}

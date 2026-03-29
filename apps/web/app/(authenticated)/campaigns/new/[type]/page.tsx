@@ -67,9 +67,13 @@ function getPresetDate(preset: (typeof SCHEDULE_PRESETS)[number]) {
   }
 }
 
-function buildEmailCampaignContent(content: EmailContent) {
+function buildEmailCampaignContent(
+  content: EmailContent,
+  fallbackSubject?: string
+) {
   return {
-    subject: content.subject || "Untitled Email",
+    subject:
+      content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
     html: content.body || "<p>Empty email</p>",
     bodyJson: content.bodyJson,
     mode: content.mode,
@@ -199,7 +203,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       // Prepare content based on type
       const content =
         type === "email"
-          ? buildEmailCampaignContent(emailContent)
+          ? buildEmailCampaignContent(emailContent, campaignTitle)
           : buildSmsCampaignContent(smsContent);
 
       // Prepare payload
@@ -283,12 +287,6 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
     // Validate content
     if (type === "email") {
-      if (!emailContent.subject.trim()) {
-        const error = "Please enter an email subject";
-        console.error("[Campaign] Validation error:", error);
-        toast.error(error);
-        return;
-      }
       if (!emailContent.body.trim()) {
         const error = "Please enter email content";
         console.error("[Campaign] Validation error:", error);
@@ -333,10 +331,12 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
       const content =
         type === "email"
-          ? buildEmailCampaignContent({
-              ...emailContent,
-              subject: emailContent.subject.trim(),
-            })
+          ? buildEmailCampaignContent(
+              {
+                ...emailContent,
+              },
+              campaignTitle
+            )
           : buildSmsCampaignContent({
               ...smsContent,
               text: smsContent.text.trim(),
@@ -427,12 +427,6 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       console.log("[Campaign] Email Subject:", emailContent.subject);
       console.log("[Campaign] Email Body Length:", emailContent.body.length);
 
-      if (!emailContent.subject.trim()) {
-        const error = "Please enter an email subject";
-        console.error("[Campaign] Validation error:", error);
-        toast.error(error);
-        return;
-      }
       if (!emailContent.body.trim()) {
         const error = "Please enter email content";
         console.error("[Campaign] Validation error:", error);
@@ -471,10 +465,12 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       // Step 1: Create campaign
       const content =
         type === "email"
-          ? buildEmailCampaignContent({
-              ...emailContent,
-              subject: emailContent.subject.trim(),
-            })
+          ? buildEmailCampaignContent(
+              {
+                ...emailContent,
+              },
+              campaignTitle
+            )
           : buildSmsCampaignContent({
               ...smsContent,
               text: smsContent.text.trim(),

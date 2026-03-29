@@ -285,7 +285,9 @@ export async function updateCampaign(
 
 export async function deleteCampaign(id: string) {
   const { organizationId } = await getOrganizationId();
-  await CampaignService.deleteCampaign(organizationId, id);
+  await CampaignService.deleteCampaign(organizationId, id, {
+    allowUnsafeDelete: process.env.NODE_ENV === "development",
+  });
   revalidatePath("/campaigns");
   return { success: true };
 }
