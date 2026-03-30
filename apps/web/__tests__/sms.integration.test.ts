@@ -62,8 +62,20 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
     }
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await prisma.organization.update({
+      where: { id: REAL_ORG_ID },
+      data: {
+        planCode: "free",
+        creditBalance: 1000,
+        smsQuotaUsed: 0,
+        emailQuotaUsed: 0,
+        workspaceVerificationStatus: "verified",
+        workspaceVerifiedAt: new Date(),
+        senderId: "REACHDEM",
+      },
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -132,6 +144,7 @@ describe("SMS API - REAL DATABASE INTEGRATION", () => {
       expect(msg!.status).toBe("queued");
       expect(msg!.providerSelected).toBeNull();
       expect(msg!.attempts).toHaveLength(0);
+      expect(msg!.from).toBe("REACHDEM");
       expect(msg!.toLast4).toBe("5678");
       expect(fetch).toHaveBeenCalledTimes(1);
     });

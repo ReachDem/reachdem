@@ -107,11 +107,17 @@ describe("Payments API - integration", () => {
 
   afterAll(async () => {
     if (createdPaymentSessionIds.length > 0) {
+      const sessions = await prisma.paymentSession.findMany({
+        where: { id: { in: createdPaymentSessionIds } },
+        select: { providerReference: true },
+      });
+      const providerReferences = sessions
+        .map((session) => session.providerReference)
+        .filter((value): value is string => Boolean(value));
+
       await prisma.paymentWebhookEvent.deleteMany({
         where: {
-          providerReference: {
-            in: createdPaymentSessionIds.map((id) => `pay_${id}`),
-          },
+          providerReference: { in: providerReferences },
         },
       });
       await prisma.paymentTransaction.deleteMany({
@@ -120,9 +126,13 @@ describe("Payments API - integration", () => {
       await prisma.paymentSession.deleteMany({
         where: { id: { in: createdPaymentSessionIds } },
       });
-      await prisma.workspaceBillingState.deleteMany({
-        where: {
-          lastPaymentSessionId: { in: createdPaymentSessionIds },
+      await prisma.organization.update({
+        where: { id: REAL_ORG_ID },
+        data: {
+          planCode: "free",
+          creditBalance: 0,
+          smsQuotaUsed: 0,
+          emailQuotaUsed: 0,
         },
       });
     }
@@ -320,11 +330,10 @@ describe("Payments API - integration", () => {
     expect(updatedSession.status).toBe("succeeded");
     expect(updatedSession.activatedAt).toBeTruthy();
 
-    const billing = await prisma.workspaceBillingState.findUnique({
-      where: { organizationId: REAL_ORG_ID },
+    const organization = await prisma.organization.findUnique({
+      where: { id: REAL_ORG_ID },
     });
-    expect(billing?.currentPlanCode).toBe("growth");
-    expect(billing?.lastPaymentSessionId).toBe(session.id);
+    expect(organization?.planCode).toBe("growth");
   });
 
   it("Stripe webhook with invalid signature is rejected", async () => {
@@ -430,10 +439,9 @@ describe("Payments API - integration", () => {
 
     expect(res.status).toBe(200);
 
-    const billing = await prisma.workspaceBillingState.findUnique({
-      where: { organizationId: REAL_ORG_ID },
+    const organization = await prisma.organization.findUnique({
+      where: { id: REAL_ORG_ID },
     });
-    expect(billing?.creditsBalance).toBeGreaterThanOrEqual(200);
-    expect(billing?.lastPaymentSessionId).toBe(session.id);
+    expect(organization?.creditBalance).toBeGreaterThanOrEqual(200);
   });
 });

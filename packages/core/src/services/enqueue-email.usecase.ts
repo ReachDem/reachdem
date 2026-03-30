@@ -5,6 +5,7 @@ import type {
   SendEmailInput,
   SendSmsResult,
 } from "@reachdem/shared";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
 
 function hashEmail(email: string): string {
   return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
@@ -39,22 +40,32 @@ export class EnqueueEmailUseCase {
     }
 
     const correlationId = randomUUID();
-    const message = await prisma.message.create({
-      data: {
-        organizationId,
-        campaignId: input.campaignId ?? null,
-        channel: "email",
-        toEmail: input.to,
-        toHashed: hashEmail(input.to),
-        toLast4: last4Email(input.to),
-        from: input.from ?? "ReachDem Notifications",
-        subject: input.subject,
-        html: input.html,
-        status: input.scheduledAt ? "scheduled" : "queued",
-        correlationId,
-        idempotencyKey: input.idempotency_key,
-        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-      },
+    const message = await prisma.$transaction(async (tx) => {
+      if (!input.campaignId) {
+        await MessagingEntitlementsService.reserveMessageSend(
+          tx,
+          organizationId,
+          "email"
+        );
+      }
+
+      return tx.message.create({
+        data: {
+          organizationId,
+          campaignId: input.campaignId ?? null,
+          channel: "email",
+          toEmail: input.to,
+          toHashed: hashEmail(input.to),
+          toLast4: last4Email(input.to),
+          from: input.from ?? "ReachDem Notifications",
+          subject: input.subject,
+          html: input.html,
+          status: input.scheduledAt ? "scheduled" : "queued",
+          correlationId,
+          idempotencyKey: input.idempotency_key,
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+        },
+      });
     });
 
     if (input.scheduledAt) {

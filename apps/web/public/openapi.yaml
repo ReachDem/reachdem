@@ -1401,6 +1401,15 @@ components:
         phoneE164:
           type: string
           nullable: true
+        hasValidEmail:
+          type: boolean
+          nullable: true
+        hasEmailableAddress:
+          type: boolean
+          nullable: true
+        hasValidNumber:
+          type: boolean
+          nullable: true
         customFields:
           type: object
           additionalProperties: true

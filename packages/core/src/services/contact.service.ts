@@ -10,6 +10,7 @@ import type {
   UpdateContactInput,
   GetContactsOptions,
 } from "@reachdem/shared";
+import { computeContactChannelFlags } from "@reachdem/shared";
 
 export class ContactService {
   /**
@@ -46,6 +47,10 @@ export class ContactService {
     return prisma.contact.create({
       data: {
         ...data,
+        ...computeContactChannelFlags({
+          email: data.email,
+          phoneE164: data.phoneE164,
+        }),
         organizationId,
         customFields: data.customFields
           ? (data.customFields as Prisma.InputJsonValue)
@@ -161,6 +166,10 @@ export class ContactService {
       where: { id },
       data: {
         ...data,
+        ...computeContactChannelFlags({
+          email: resultingEmail,
+          phoneE164: resultingPhone,
+        }),
         customFields:
           data.customFields === undefined
             ? undefined

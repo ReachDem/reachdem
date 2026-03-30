@@ -25,3 +25,10 @@ export class PaymentVerificationError extends Error {
     this.name = "PaymentVerificationError";
   }
 }
+
+export class PaymentWebhookPayloadError extends Error {
+  constructor(message = "Invalid payment webhook payload") {
+    super(message);
+    this.name = "PaymentWebhookPayloadError";
+  }
+}
