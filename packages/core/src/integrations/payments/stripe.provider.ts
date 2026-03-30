@@ -8,6 +8,7 @@ import type {
 import {
   PaymentConfigurationError,
   PaymentWebhookPayloadError,
+  PaymentWebhookSignatureError,
 } from "../../errors/payment.errors";
 
 function getSecretKey(): string {
@@ -148,7 +149,11 @@ export class StripePaymentProvider implements PaymentProviderPort {
     rawBody: string,
     headers: Headers
   ): Promise<ParsedPaymentWebhookEvent> {
-    void headers;
+    const isValid = await this.verifyWebhookSignature(rawBody, headers);
+    if (!isValid) {
+      throw new PaymentWebhookSignatureError();
+    }
+
     let payload: Record<string, any>;
     try {
       payload = JSON.parse(rawBody) as Record<string, any>;
