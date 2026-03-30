@@ -35,8 +35,6 @@ export * from "./integrations/sink.client";
 export * from "./integrations/redis-cache.client";
 export * from "./integrations/payments/flutterwave.provider";
 export * from "./integrations/payments/stripe.provider";
-export * from "./integrations/payments/flutterwave.provider";
-export * from "./integrations/payments/stripe.provider";
 export * from "./utils/segment-compiler";
 export * from "./utils/pii-scrubber";
 export * from "./utils/cameroon-mobile-routing";
