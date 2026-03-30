@@ -41,7 +41,6 @@ export * from "./utils/cameroon-mobile-routing";
 export * from "./utils/message-personalization";
 export * from "./ports/sms-sender.port";
 export * from "./ports/payment-provider.port";
-export * from "./ports/payment-provider.port";
 export * from "./adapters/sms/stub.adapter";
 export * from "./adapters/sms/twilio.adapter";
 export * from "./adapters/sms/infobip.adapter";
