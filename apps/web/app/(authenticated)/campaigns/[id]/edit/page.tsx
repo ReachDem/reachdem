@@ -67,9 +67,13 @@ function getPresetDate(preset: (typeof SCHEDULE_PRESETS)[number]) {
   }
 }
 
-function buildEmailCampaignContent(content: EmailContent) {
+function buildEmailCampaignContent(
+  content: EmailContent,
+  fallbackSubject?: string
+) {
   return {
-    subject: content.subject || "Untitled Email",
+    subject:
+      content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
     html: content.body || "<p>Empty email</p>",
     bodyJson: content.bodyJson,
     mode: content.mode,
@@ -270,7 +274,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       // Prepare content based on type
       const content =
         type === "email"
-          ? buildEmailCampaignContent(emailContent)
+          ? buildEmailCampaignContent(emailContent, campaignTitle)
           : buildSmsCampaignContent(smsContent);
 
       // Prepare payload
@@ -347,10 +351,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
     // Validate content
     if (type === "email") {
-      if (!emailContent.subject.trim()) {
-        toast.error("Please enter an email subject");
-        return;
-      }
       if (!emailContent.body.trim()) {
         toast.error("Please enter email content");
         return;
@@ -383,10 +383,12 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       // Prepare content
       const content =
         type === "email"
-          ? buildEmailCampaignContent({
-              ...emailContent,
-              subject: emailContent.subject.trim(),
-            })
+          ? buildEmailCampaignContent(
+              {
+                ...emailContent,
+              },
+              campaignTitle
+            )
           : buildSmsCampaignContent({
               ...smsContent,
               text: smsContent.text.trim(),
@@ -495,10 +497,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
     // Validate content
     if (type === "email") {
-      if (!emailContent.subject.trim()) {
-        toast.error("Please enter an email subject");
-        return;
-      }
       if (!emailContent.body.trim()) {
         toast.error("Please enter email content");
         return;
@@ -526,10 +524,12 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       // Prepare content
       const content =
         type === "email"
-          ? buildEmailCampaignContent({
-              ...emailContent,
-              subject: emailContent.subject.trim(),
-            })
+          ? buildEmailCampaignContent(
+              {
+                ...emailContent,
+              },
+              campaignTitle
+            )
           : buildSmsCampaignContent({
               ...smsContent,
               text: smsContent.text.trim(),

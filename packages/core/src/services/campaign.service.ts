@@ -194,7 +194,10 @@ export class CampaignService {
    */
   static async deleteCampaign(
     organizationId: string,
-    id: string
+    id: string,
+    options?: {
+      allowUnsafeDelete?: boolean;
+    }
   ): Promise<void> {
     const campaign = await prisma.campaign.findFirst({
       where: { id, organizationId },
@@ -204,7 +207,7 @@ export class CampaignService {
       throw new CampaignNotFoundError();
     }
 
-    if (campaign.status !== "draft") {
+    if (campaign.status !== "draft" && !options?.allowUnsafeDelete) {
       throw new CampaignInvalidStatusError(
         `Cannot delete campaign in status '${campaign.status}'`
       );

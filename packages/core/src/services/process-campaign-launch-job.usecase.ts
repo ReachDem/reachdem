@@ -6,6 +6,7 @@ import type {
 } from "@reachdem/shared";
 import { createHash } from "crypto";
 import { ActivityLogger } from "./activity-logger.service";
+import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import { CampaignService } from "./campaign.service";
 import { EnqueueEmailUseCase } from "./enqueue-email.usecase";
 import { EnqueueSmsUseCase } from "./enqueue-sms.usecase";
@@ -34,10 +35,23 @@ export class ProcessCampaignLaunchJobUseCase {
     }
 
     try {
+      await CampaignLinkTrackingService.preprocessCampaignLinks(
+        job.organization_id,
+        campaign as any
+      );
+
+      const refreshedCampaign = await prisma.campaign.findFirst({
+        where: { id: job.campaign_id, organizationId: job.organization_id },
+      });
+
+      if (!refreshedCampaign) {
+        return "skipped";
+      }
+
       const targets = await this.resolveAndCreateTargets(
         job.organization_id,
         job.campaign_id,
-        campaign.channel
+        refreshedCampaign.channel
       );
 
       if (targets.length === 0) {
@@ -68,9 +82,10 @@ export class ProcessCampaignLaunchJobUseCase {
       let scheduledCount = 0;
       let failedCount = 0;
       const parsedCampaign = CampaignService.getCampaignContent(
-        campaign as any
+        refreshedCampaign as any
       );
-      const isEmailCampaign = (campaign.channel as "sms" | "email") === "email";
+      const isEmailCampaign =
+        (refreshedCampaign.channel as "sms" | "email") === "email";
       const logCategory = isEmailCampaign ? "email" : "sms";
 
       for (const target of targets) {
@@ -78,7 +93,7 @@ export class ProcessCampaignLaunchJobUseCase {
 
         try {
           const idempotencyKey = `campaign_${job.campaign_id}_contact_${target.contactId}`;
-          const scheduledAt = campaign.scheduledAt?.toISOString();
+          const scheduledAt = refreshedCampaign.scheduledAt?.toISOString();
           const messageResponse = await (!isEmailCampaign
             ? EnqueueSmsUseCase.execute(
                 job.organization_id,
@@ -154,7 +169,7 @@ export class ProcessCampaignLaunchJobUseCase {
           resourceId: job.campaign_id,
           status: "failed",
           meta: {
-            message: `Campaign ${campaign.name} failed during enqueue`,
+            message: `Campaign ${refreshedCampaign.name} failed during enqueue`,
             queuedCount,
             scheduledCount,
             failedCount,
@@ -173,7 +188,7 @@ export class ProcessCampaignLaunchJobUseCase {
         resourceId: job.campaign_id,
         status: "success",
         meta: {
-          message: `Campaign ${campaign.name} launched for asynchronous processing`,
+          message: `Campaign ${refreshedCampaign.name} launched for asynchronous processing`,
           queuedCount,
           scheduledCount,
           failedCount,

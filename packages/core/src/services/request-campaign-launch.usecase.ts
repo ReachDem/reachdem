@@ -12,10 +12,6 @@ import {
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
 
-// URL regex to detect links in campaign content
-const URL_REGEX =
-  /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s<>"']*))/g;
-
 export class RequestCampaignLaunchUseCase {
   static async execute(
     organizationId: string,
@@ -95,7 +91,10 @@ export class RequestCampaignLaunchUseCase {
     }
 
     // Pre-process links before launching
-    await this.preprocessLinks(organizationId, campaign);
+    await CampaignLinkTrackingService.preprocessCampaignLinks(
+      organizationId,
+      campaign as any
+    );
 
     await prisma.$transaction(async (tx) => {
       const updateContent =

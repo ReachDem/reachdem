@@ -27,25 +27,51 @@ import {
 export function NavDocuments({
   items,
   label = "Tools",
+  sectionBadge,
 }: {
   items: {
     name: string;
     url: string;
     icon: Icon;
     badge?: string;
+    disabled?: boolean;
   }[];
   label?: string;
+  sectionBadge?: string;
 }) {
   const { isMobile } = useSidebar();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      {sectionBadge ? (
+        <div className="px-2 pb-2">
+          <Badge
+            variant="secondary"
+            className="rounded-full px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase"
+          >
+            {sectionBadge}
+          </Badge>
+        </div>
+      ) : null}
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
+            <SidebarMenuButton asChild disabled={item.disabled}>
+              <a
+                href={item.disabled ? undefined : item.url}
+                aria-disabled={item.disabled}
+                onClick={
+                  item.disabled
+                    ? (event) => {
+                        event.preventDefault();
+                      }
+                    : undefined
+                }
+                className={
+                  item.disabled ? "pointer-events-none opacity-45" : ""
+                }
+              >
                 <item.icon />
                 <span>{item.name}</span>
                 {item.badge ? (
@@ -58,32 +84,34 @@ export function NavDocuments({
                 ) : null}
               </a>
             </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction
-                  id={`nav-doc-action-${item.name.replace(/\s+/g, "-").toLowerCase()}`}
-                  showOnHover
-                  className="data-[state=open]:bg-accent rounded-sm"
+            {!item.disabled ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuAction
+                    id={`nav-doc-action-${item.name.replace(/\s+/g, "-").toLowerCase()}`}
+                    showOnHover
+                    className="data-[state=open]:bg-accent rounded-sm"
+                  >
+                    <IconDots />
+                    <span className="sr-only">More</span>
+                  </SidebarMenuAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-44 rounded-lg"
+                  side={isMobile ? "bottom" : "right"}
+                  align={isMobile ? "end" : "start"}
                 >
-                  <IconDots />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-44 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <IconMail />
-                  <span>Email Templates</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <IconMessage />
-                  <span>SMS Templates</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem>
+                    <IconMail />
+                    <span>Email Templates</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <IconMessage />
+                    <span>SMS Templates</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </SidebarMenuItem>
         ))}
       </SidebarMenu>

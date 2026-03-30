@@ -5,18 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
-  Activity,
+  AlertCircle,
   CheckCircle2,
+  Clock3,
   Loader2,
+  Mail,
+  MessageSquareText,
   MoreHorizontal,
   Pencil,
   Play,
-  RefreshCw,
   Search,
   Trash2,
   Plus,
   Megaphone,
-  WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +26,7 @@ import { deleteCampaign, launchCampaign } from "@/actions/campaigns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,8 +60,11 @@ interface CampaignsClientTableProps {
 
 interface CampaignStatsSnapshot {
   audienceSize: number;
+  pendingCount: number;
   sentCount: number;
   failedCount: number;
+  skippedCount: number;
+  resolvedStatus: Campaign["status"];
 }
 
 interface WorkerStatusSnapshot {
@@ -69,6 +74,20 @@ interface WorkerStatusSnapshot {
   queues?: string[];
   error?: string;
   checkedAt: string;
+}
+
+const isDeveloperMode = process.env.NODE_ENV === "development";
+const pillBadgeClassName = "text-muted-foreground gap-1.5 px-1.5";
+
+function getEffectiveCampaignStatus(
+  campaign: Campaign,
+  stats?: CampaignStatsSnapshot | null
+) {
+  if (isScheduledCampaign(campaign)) {
+    return "scheduled" as const;
+  }
+
+  return stats?.resolvedStatus ?? campaign.status;
 }
 
 function isScheduledCampaign(campaign: Campaign) {
@@ -114,10 +133,6 @@ export function CampaignsClientTable({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  const activeCampaigns = initialCampaigns.filter(
-    (campaign) => campaign.status === "running"
-  );
-
   async function refreshCampaignSignals(showSpinner = false) {
     if (showSpinner) {
       setIsRefreshing(true);
@@ -166,25 +181,6 @@ export function CampaignsClientTable({
     void refreshCampaignSignals();
   }, [currentPage, search]);
 
-  useEffect(() => {
-    if (activeCampaigns.length === 0) return;
-
-    const intervalId = window.setInterval(() => {
-      router.refresh();
-      void refreshCampaignSignals();
-    }, 15000);
-
-    return () => window.clearInterval(intervalId);
-  }, [activeCampaigns.length, router, currentPage, search]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void refreshCampaignSignals();
-    }, 15000);
-
-    return () => window.clearInterval(intervalId);
-  }, [currentPage, search]);
-
   const handleDelete = async () => {
     if (!campaignToDelete) return;
     setIsDeleting(true);
@@ -217,42 +213,70 @@ export function CampaignsClientTable({
   };
 
   const getStatusBadge = (campaign: Campaign) => {
-    if (isScheduledCampaign(campaign)) {
+    const effectiveStatus = getEffectiveCampaignStatus(
+      campaign,
+      campaignStats[campaign.id]
+    );
+
+    if (effectiveStatus === "scheduled") {
       return (
-        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+        <Badge variant="outline" className={pillBadgeClassName}>
+          <Clock3 className="h-3.5 w-3.5 text-blue-500" />
           Scheduled
         </Badge>
       );
     }
 
-    switch (campaign.status) {
+    switch (effectiveStatus) {
       case "draft":
         return (
-          <Badge variant="outline" className="text-slate-500">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="text-muted-foreground h-3.5 w-3.5" />
             Draft
           </Badge>
         );
       case "running":
         return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600">Running</Badge>
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-500" />
+            In Progress
+          </Badge>
         );
       case "partial":
         return (
-          <Badge
-            variant="secondary"
-            className="bg-amber-50 text-amber-700 hover:bg-amber-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
             Partial
           </Badge>
         );
       case "completed":
-        return <Badge variant="secondary">Completed</Badge>;
+        return (
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <CheckCircle2 className="text-background h-3.5 w-3.5 fill-emerald-500 dark:text-black" />
+            Completed
+          </Badge>
+        );
       case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
+        return (
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-400" />
+            Failed
+          </Badge>
+        );
+      case "expired":
+        return (
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Clock3 className="h-3.5 w-3.5 text-red-500" />
+            Expired
+          </Badge>
+        );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
-            {campaign.status}
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
+            {effectiveStatus}
           </Badge>
         );
     }
@@ -262,75 +286,49 @@ export function CampaignsClientTable({
     switch (channel.toLowerCase()) {
       case "email":
         return (
-          <Badge
-            variant="secondary"
-            className="bg-blue-50 text-blue-700 hover:bg-blue-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Mail className="h-3.5 w-3.5 text-blue-500" />
             Email
           </Badge>
         );
       case "sms":
         return (
-          <Badge
-            variant="secondary"
-            className="bg-amber-50 text-amber-700 hover:bg-amber-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <MessageSquareText className="h-3.5 w-3.5 text-green-600" />
             SMS
           </Badge>
         );
       case "push":
         return (
           <Badge
-            variant="secondary"
-            className="bg-purple-50 text-purple-700 hover:bg-purple-100"
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
           >
             Push
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
             {channel}
           </Badge>
         );
     }
   };
 
-  const getWorkerBadge = () => {
-    if (!workerStatus) {
-      return (
-        <Badge variant="outline" className="gap-1">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Checking worker
-        </Badge>
-      );
-    }
-
-    if (!workerStatus.reachable || !workerStatus.healthy) {
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <WifiOff className="h-3 w-3" />
-          Worker unreachable
-        </Badge>
-      );
-    }
-
-    return (
-      <Badge className="gap-1 bg-emerald-500 hover:bg-emerald-600">
-        <CheckCircle2 className="h-3 w-3" />
-        Worker connected
-      </Badge>
-    );
-  };
-
   const getDeliverySummary = (campaign: Campaign) => {
-    if (campaign.status === "draft") {
+    const stats = campaignStats[campaign.id];
+    const effectiveStatus = getEffectiveCampaignStatus(campaign, stats);
+
+    if (effectiveStatus === "draft" || effectiveStatus === "scheduled") {
       return (
         <span className="text-muted-foreground text-xs">Not launched yet</span>
       );
     }
 
-    const stats = campaignStats[campaign.id];
     if (!stats) {
       return (
         <span className="text-muted-foreground text-xs">
@@ -339,10 +337,89 @@ export function CampaignsClientTable({
       );
     }
 
+    if (stats.audienceSize === 0) {
+      return (
+        <div className="flex min-w-[180px] flex-col items-center gap-2 text-center">
+          <div className="relative w-[90px]">
+            <Progress
+              value={0}
+              className="border-border/60 h-6 w-[90px] border border-dashed bg-transparent"
+              indicatorClassName="bg-transparent"
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
+              <div className="text-muted-foreground flex w-full items-center justify-center text-[10px] font-medium">
+                0/0
+              </div>
+            </div>
+          </div>
+          <span className="text-muted-foreground text-xs">Audience 0</span>
+        </div>
+      );
+    }
+
+    if (stats.audienceSize > 0) {
+      const unsuccessfulCount = stats.failedCount + stats.skippedCount;
+      const sentWidth = Math.max(
+        0,
+        Math.min(100, (stats.sentCount / stats.audienceSize) * 100)
+      );
+      const pendingWidth = Math.max(
+        0,
+        Math.min(100, (stats.pendingCount / stats.audienceSize) * 100)
+      );
+      const unsuccessfulWidth = Math.max(
+        0,
+        Math.min(100, (unsuccessfulCount / stats.audienceSize) * 100)
+      );
+      const trailingWidth =
+        effectiveStatus === "running" ? pendingWidth : unsuccessfulWidth;
+      const trailingColor =
+        effectiveStatus === "running" ? "bg-orange-500" : "bg-orange-300/80";
+
+      return (
+        <div className="flex min-w-[180px] flex-col items-center gap-2 text-center">
+          <div className="relative w-[90px]">
+            <Progress
+              value={sentWidth}
+              className="bg-muted h-6 w-[90px]"
+              indicatorClassName="bg-emerald-500"
+            />
+            {trailingWidth > 0 ? (
+              <div
+                className={`absolute top-0 h-6 rounded-r-full ${trailingColor}`}
+                style={{
+                  left: `${sentWidth}%`,
+                  width: `${Math.max(0, Math.min(100 - sentWidth, trailingWidth))}%`,
+                }}
+              />
+            ) : null}
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
+              <div className="flex w-full items-center justify-center gap-1 text-[10px] font-medium text-white">
+                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                <span>
+                  {stats.sentCount}/{stats.audienceSize}
+                </span>
+              </div>
+            </div>
+          </div>
+          {effectiveStatus === "running" ? (
+            <span className="text-muted-foreground text-xs">
+              {stats.pendingCount} remaining
+            </span>
+          ) : unsuccessfulCount > 0 ? (
+            <span className="text-muted-foreground text-xs">
+              {unsuccessfulCount} unsuccessful
+            </span>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-1 text-xs">
         <span className="font-medium">
-          {stats.sentCount} sent / {stats.failedCount} failed
+          {stats.sentCount} sent / {stats.failedCount + stats.skippedCount}{" "}
+          failed
         </span>
         <span className="text-muted-foreground">
           Audience {stats.audienceSize}
@@ -358,47 +435,7 @@ export function CampaignsClientTable({
         <EmptyState />
       ) : (
         <>
-          <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-            <div className="flex flex-wrap items-center gap-3">
-              {getWorkerBadge()}
-              <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                <Activity className="h-3.5 w-3.5" />
-                {activeCampaigns.length > 0
-                  ? "Auto-refresh active every 15s while campaigns are running"
-                  : "Worker and delivery status checked automatically"}
-              </div>
-              {workerStatus?.error && (
-                <div className="text-muted-foreground text-xs">
-                  {workerStatus.error}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {workerStatus?.environment && (
-                <span className="text-muted-foreground text-xs">
-                  {workerStatus.environment}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => {
-                  router.refresh();
-                  void refreshCampaignSignals(true);
-                }}
-                disabled={isRefreshing}
-              >
-                <RefreshCw
-                  className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-                />
-                Refresh
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center border-b p-4">
+          <div className="flex items-center justify-between gap-3 border-none py-4">
             <div className="relative w-full max-w-sm">
               <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
               <Input
@@ -413,19 +450,21 @@ export function CampaignsClientTable({
             </div>
           </div>
 
-          <div className="w-full max-w-[100vw] overflow-x-auto">
+          <div className="w-full max-w-[100vw] overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%] min-w-[200px]">Name</TableHead>
+                  <TableHead className="w-[30%] min-w-[200px] px-4">
+                    Name
+                  </TableHead>
                   <TableHead>Channel</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Delivery</TableHead>
+                  <TableHead className="text-center">Delivery</TableHead>
                   <TableHead>Updated at</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="">
                 {paginatedCampaigns.length === 0 ? (
                   <TableRow>
                     <TableCell
@@ -438,7 +477,7 @@ export function CampaignsClientTable({
                 ) : (
                   paginatedCampaigns.map((campaign) => (
                     <TableRow key={campaign.id} className="group">
-                      <TableCell className="font-medium">
+                      <TableCell className="px-4 font-medium">
                         <div className="flex flex-col gap-1">
                           <Link
                             href={`/campaigns/${campaign.id}`}
@@ -455,7 +494,11 @@ export function CampaignsClientTable({
                       </TableCell>
                       <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
                       <TableCell>{getStatusBadge(campaign)}</TableCell>
-                      <TableCell>{getDeliverySummary(campaign)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center">
+                          {getDeliverySummary(campaign)}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-sm">
@@ -519,28 +562,27 @@ export function CampaignsClientTable({
 
                             {campaign.status === "draft" &&
                               !isScheduledCampaign(campaign) && (
-                                <>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer text-emerald-600 focus:text-emerald-700"
-                                    onClick={() =>
-                                      setCampaignToLaunch(campaign)
-                                    }
-                                  >
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Launch
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive cursor-pointer"
-                                    onClick={() =>
-                                      setCampaignToDelete(campaign)
-                                    }
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </>
+                                <DropdownMenuItem
+                                  className="cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                  onClick={() => setCampaignToLaunch(campaign)}
+                                >
+                                  <Play className="mr-2 h-4 w-4" />
+                                  Launch
+                                </DropdownMenuItem>
                               )}
+
+                            {isDeveloperMode && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive cursor-pointer"
+                                  onClick={() => setCampaignToDelete(campaign)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -550,33 +592,31 @@ export function CampaignsClientTable({
               </TableBody>
             </Table>
           </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-end space-x-2 border-t p-4 text-sm">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-muted-foreground px-2">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          )}
         </>
+      )}
+
+      {initialCampaigns.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 px-4 pt-4 text-sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-muted-foreground px-2">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
       )}
 
       {/* Delete Confirmation */}

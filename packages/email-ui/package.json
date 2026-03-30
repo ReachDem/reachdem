@@ -8,19 +8,19 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./editor": {
+      "types": "./dist/editor/index.d.ts",
       "import": "./dist/editor/index.mjs",
-      "require": "./dist/editor/index.js",
-      "types": "./dist/editor/index.d.ts"
+      "require": "./dist/editor/index.js"
     },
     "./templates": {
+      "types": "./dist/templates/index.d.ts",
       "import": "./dist/templates/index.mjs",
-      "require": "./dist/templates/index.js",
-      "types": "./dist/templates/index.d.ts"
+      "require": "./dist/templates/index.js"
     },
     "./style.css": "./dist/index.css"
   },

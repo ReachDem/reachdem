@@ -252,9 +252,14 @@ export class ProcessEmailMessageJobUseCase {
     if (pendingCount > 0) return;
 
     const sentCount = counts.get("sent") ?? 0;
-    const failedCount = counts.get("failed") ?? 0;
+    const unsuccessfulCount =
+      (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);
     const finalStatus =
-      failedCount === 0 ? "completed" : sentCount === 0 ? "failed" : "partial";
+      unsuccessfulCount === 0
+        ? "completed"
+        : sentCount === 0
+          ? "failed"
+          : "partial";
 
     await prisma.campaign.update({
       where: { id: campaignId },

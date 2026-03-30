@@ -22,10 +22,10 @@ model User {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  members     Member[]
-  invitations Invitation[]
+  accounts            Account[]
+  sessions            Session[]
+  members             Member[]
+  invitations         Invitation[]
   paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
   paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
 
@@ -100,18 +100,18 @@ model Organization {
   senderId                    String?                     @unique
   createdAt                   DateTime                    @default(now())
 
-  members        Member[]
-  invitations    Invitation[]
-  sessions       Session[]
-  contacts       Contact[]
-  contactFields  ContactFieldDefinition[]
-  groups         Group[]
-  segments       Segment[]
-  activityEvents ActivityEvent[]
-  smsConfig      WorkspaceSmsConfig?
-  messages       Message[]
-  campaigns      Campaign[]
-  trackedLinks   TrackedLink[]
+  members             Member[]
+  invitations         Invitation[]
+  sessions            Session[]
+  contacts            Contact[]
+  contactFields       ContactFieldDefinition[]
+  groups              Group[]
+  segments            Segment[]
+  activityEvents      ActivityEvent[]
+  smsConfig           WorkspaceSmsConfig?
+  messages            Message[]
+  campaigns           Campaign[]
+  trackedLinks        TrackedLink[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
 
@@ -436,7 +436,7 @@ model Message {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   attempts     MessageAttempt[]
-  trackedLinks  TrackedLink[]
+  trackedLinks TrackedLink[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
@@ -474,6 +474,7 @@ enum CampaignStatus {
   partial
   completed
   failed
+  expired
 }
 
 enum CampaignChannel {
@@ -654,8 +655,8 @@ model PaymentSession {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  initiatedBy  User                  @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy  User                 @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
   transactions PaymentTransaction[]
 
   @@index([organizationId, status])
@@ -711,9 +712,9 @@ model PaymentWebhookEvent {
   rawPayload        Json
   receivedAt        DateTime        @default(now())
 
+  @@unique([provider, providerEventId])
   @@index([provider, providerReference])
   @@index([provider, receivedAt])
   @@index([provider, processed])
-  @@unique([provider, providerEventId])
   @@map("payment_webhook_event")
 }

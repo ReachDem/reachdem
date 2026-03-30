@@ -14,6 +14,10 @@ function percentEncode(value: string): string {
   return encodeURIComponent(value)
     .replace(/\+/g, "%20")
     .replace(/\*/g, "%2A")
+    .replace(/!/g, "%21")
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29")
     .replace(/%7E/g, "~");
 }
 
@@ -60,14 +64,15 @@ async function signString(
 
 function buildSignedQuery(
   params: Record<string, string>,
-  accessKeySecret: string
+  accessKeySecret: string,
+  httpMethod: "GET" | "POST"
 ): Promise<string> {
   const canonicalized = Object.keys(params)
     .sort()
     .map((key) => `${percentEncode(key)}=${percentEncode(params[key] ?? "")}`)
     .join("&");
 
-  const stringToSign = `GET&${percentEncode("/")}&${percentEncode(canonicalized)}`;
+  const stringToSign = `${httpMethod}&${percentEncode("/")}&${percentEncode(canonicalized)}`;
 
   return signString(stringToSign, accessKeySecret).then(
     (signature) => `${canonicalized}&Signature=${percentEncode(signature)}`
@@ -84,6 +89,57 @@ export interface AlibabaSendEmailInput {
 export interface AlibabaSendEmailResult {
   providerName: string;
   providerMessageId: string | null;
+  requestId: string | null;
+  httpStatus: number;
+  responseMeta: Record<string, unknown> | null;
+}
+
+export class AlibabaDirectMailError extends Error {
+  httpStatus: number;
+  providerCode: string | null;
+  providerMessage: string | null;
+  requestId: string | null;
+  responseMeta: Record<string, unknown> | null;
+
+  constructor(input: {
+    message: string;
+    httpStatus: number;
+    providerCode?: string | null;
+    providerMessage?: string | null;
+    requestId?: string | null;
+    responseMeta?: Record<string, unknown> | null;
+  }) {
+    super(input.message);
+    this.name = "AlibabaDirectMailError";
+    this.httpStatus = input.httpStatus;
+    this.providerCode = input.providerCode ?? null;
+    this.providerMessage = input.providerMessage ?? null;
+    this.requestId = input.requestId ?? null;
+    this.responseMeta = input.responseMeta ?? null;
+  }
+}
+
+function buildResponseMeta(
+  payload: Record<string, unknown> | null,
+  rawText: string
+): Record<string, unknown> | null {
+  if (payload) {
+    return {
+      code: payload.Code ?? null,
+      message: payload.Message ?? null,
+      requestId: payload.RequestId ?? null,
+      envId: payload.EnvId ?? null,
+    };
+  }
+
+  const trimmed = rawText.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return {
+    rawTextPreview: trimmed.slice(0, 500),
+  };
 }
 
 export async function sendAlibabaDirectMail(
@@ -136,10 +192,14 @@ export async function sendAlibabaDirectMail(
     ClickTrace: "0",
   };
 
-  const signedQuery = await buildSignedQuery(params, accessKeySecret);
+  const signedQuery = await buildSignedQuery(params, accessKeySecret, "POST");
 
-  const response = await fetch(`${endpoint}?${signedQuery}`, {
-    method: "GET",
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+    },
+    body: signedQuery,
   });
 
   const rawText = await response.text();
@@ -151,20 +211,33 @@ export async function sendAlibabaDirectMail(
     payload = null;
   }
 
+  const responseMeta = buildResponseMeta(payload, rawText);
+  const providerCode = typeof payload?.Code === "string" ? payload.Code : null;
+  const providerMessage =
+    typeof payload?.Message === "string" ? payload.Message : null;
+  const requestId =
+    typeof payload?.RequestId === "string" ? payload.RequestId : null;
+
   if (!response.ok) {
-    const message =
-      (payload?.Message as string | undefined) ||
-      rawText ||
-      `HTTP ${response.status}`;
-    throw new Error(
-      `Alibaba Direct Mail API failed (HTTP ${response.status}): ${message}`
-    );
+    throw new AlibabaDirectMailError({
+      message: `Alibaba Direct Mail API failed (HTTP ${response.status}): ${providerMessage || rawText || `HTTP ${response.status}`}`,
+      httpStatus: response.status,
+      providerCode,
+      providerMessage,
+      requestId,
+      responseMeta,
+    });
   }
 
   if (payload?.Code) {
-    throw new Error(
-      `Alibaba Direct Mail rejected request: ${String(payload.Code)}${payload.Message ? ` - ${String(payload.Message)}` : ""}`
-    );
+    throw new AlibabaDirectMailError({
+      message: `Alibaba Direct Mail rejected request: ${String(payload.Code)}${payload.Message ? ` - ${String(payload.Message)}` : ""}`,
+      httpStatus: response.status,
+      providerCode,
+      providerMessage,
+      requestId,
+      responseMeta,
+    });
   }
 
   return {
@@ -173,5 +246,8 @@ export async function sendAlibabaDirectMail(
       (payload?.EnvId as string | undefined) ??
       (payload?.RequestId as string | undefined) ??
       null,
+    requestId,
+    httpStatus: response.status,
+    responseMeta,
   };
 }

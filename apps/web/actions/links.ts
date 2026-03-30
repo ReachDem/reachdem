@@ -26,6 +26,47 @@ export interface TrackedLink {
   createdAt: Date;
 }
 
+interface DailyBucket {
+  date: string;
+  total: number;
+  byLink: Record<string, number>;
+  byBrowser: Record<string, number>;
+  byDevice: Record<string, number>;
+}
+
+interface VisitorBucket {
+  total: number;
+  byRegion: Map<string, number>;
+  byCity: Map<string, number>;
+  byGender: Map<string, number>;
+}
+
+function toIsoDay(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function buildRollingDailyBuckets(days: number) {
+  const buckets = new Map<string, DailyBucket>();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let index = days - 1; index >= 0; index--) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - index);
+    const isoDay = toIsoDay(day);
+
+    buckets.set(isoDay, {
+      date: isoDay,
+      total: 0,
+      byLink: {},
+      byBrowser: {},
+      byDevice: {},
+    });
+  }
+
+  return buckets;
+}
+
 async function getOrganizationId() {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -162,7 +203,9 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
   );
 
   // Transform data for charts
-  const dailyVisitsMap = new Map<string, any>();
+  const dailyVisitsMap = buildRollingDailyBuckets(7);
+  const perLinkDailyVisitsMap = new Map<string, Map<string, DailyBucket>>();
+  const perLinkVisitorsMap = new Map<string, VisitorBucket>();
   let totalVisitors = 0;
   const regionMap = new Map<string, number>();
   const cityMap = new Map<string, number>();
@@ -172,28 +215,36 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
   for (const stat of linkStats) {
     if (!stat.views?.data) continue;
 
+    if (!perLinkDailyVisitsMap.has(stat.link.slug)) {
+      perLinkDailyVisitsMap.set(stat.link.slug, buildRollingDailyBuckets(7));
+    }
+    if (!perLinkVisitorsMap.has(stat.link.slug)) {
+      perLinkVisitorsMap.set(stat.link.slug, {
+        total: 0,
+        byRegion: new Map(),
+        byCity: new Map(),
+        byGender: new Map(),
+      });
+    }
+
+    const linkBuckets = perLinkDailyVisitsMap.get(stat.link.slug)!;
+    const linkVisitors = perLinkVisitorsMap.get(stat.link.slug)!;
+
     for (const view of stat.views.data) {
-      const date =
-        view.time || view.date || new Date().toISOString().split("T")[0];
+      const date = view.time || view.date || toIsoDay(new Date());
       const visits = Number(view.visits || 0);
       const visitors = Number(view.visitors || 0);
 
-      if (!dailyVisitsMap.has(date)) {
-        dailyVisitsMap.set(date, {
-          date,
-          total: 0,
-          byLink: {},
-          byBrowser: {},
-          byDevice: {},
-        });
-      }
-
       const dayData = dailyVisitsMap.get(date);
+      const linkDayData = linkBuckets.get(date);
+      if (!dayData || !linkDayData) continue;
       dayData.total += visits;
       dayData.byLink[stat.link.slug] =
         (dayData.byLink[stat.link.slug] || 0) + visits;
+      linkDayData.total += visits;
 
       totalVisitors += visitors;
+      linkVisitors.total += visitors;
 
       // Aggregate location data
       if (view.region) {
@@ -201,9 +252,17 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
           view.region,
           (regionMap.get(view.region) || 0) + visitors
         );
+        linkVisitors.byRegion.set(
+          view.region,
+          (linkVisitors.byRegion.get(view.region) || 0) + visitors
+        );
       }
       if (view.city) {
         cityMap.set(view.city, (cityMap.get(view.city) || 0) + visitors);
+        linkVisitors.byCity.set(
+          view.city,
+          (linkVisitors.byCity.get(view.city) || 0) + visitors
+        );
       }
 
       // Cross-reference gender data from contact
@@ -211,11 +270,19 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
         const gender = contactGenderMap.get(view.contactId);
         if (gender) {
           genderMap.set(gender, (genderMap.get(gender) || 0) + visitors);
+          linkVisitors.byGender.set(
+            gender,
+            (linkVisitors.byGender.get(gender) || 0) + visitors
+          );
         }
       } else if (view.gender) {
         genderMap.set(
           view.gender,
           (genderMap.get(view.gender) || 0) + visitors
+        );
+        linkVisitors.byGender.set(
+          view.gender,
+          (linkVisitors.byGender.get(view.gender) || 0) + visitors
         );
       }
     }
@@ -223,9 +290,13 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
 
   // Second pass: distribute browser and device metrics across days
   for (const stat of linkStats) {
+    const linkBuckets = perLinkDailyVisitsMap.get(stat.link.slug);
+    const linkVisitors = perLinkVisitorsMap.get(stat.link.slug);
+    if (!linkBuckets) continue;
+
     // Calculate total visits for this link across all days
-    const linkTotalVisits = Array.from(dailyVisitsMap.values()).reduce(
-      (sum, day) => sum + (day.byLink[stat.link.slug] || 0),
+    const linkTotalVisits = Array.from(linkBuckets.values()).reduce(
+      (sum, day) => sum + day.total,
       0
     );
 
@@ -241,13 +312,18 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
 
         // Distribute this browser's visits proportionally across days
         for (const dayData of dailyVisitsMap.values()) {
-          const linkVisitsForDay = dayData.byLink[stat.link.slug] || 0;
+          const linkDayData = linkBuckets.get(dayData.date);
+          const linkVisitsForDay = linkDayData?.total || 0;
           const proportion = linkVisitsForDay / linkTotalVisits;
           const browserVisitsForDay = Math.round(metricCount * proportion);
 
           if (browserVisitsForDay > 0) {
             dayData.byBrowser[browser] =
               (dayData.byBrowser[browser] || 0) + browserVisitsForDay;
+            if (linkDayData) {
+              linkDayData.byBrowser[browser] =
+                (linkDayData.byBrowser[browser] || 0) + browserVisitsForDay;
+            }
           }
         }
       }
@@ -263,13 +339,18 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
 
         // Distribute this device's visits proportionally across days
         for (const dayData of dailyVisitsMap.values()) {
-          const linkVisitsForDay = dayData.byLink[stat.link.slug] || 0;
+          const linkDayData = linkBuckets.get(dayData.date);
+          const linkVisitsForDay = linkDayData?.total || 0;
           const proportion = linkVisitsForDay / linkTotalVisits;
           const deviceVisitsForDay = Math.round(metricCount * proportion);
 
           if (deviceVisitsForDay > 0) {
             dayData.byDevice[device] =
               (dayData.byDevice[device] || 0) + deviceVisitsForDay;
+            if (linkDayData) {
+              linkDayData.byDevice[device] =
+                (linkDayData.byDevice[device] || 0) + deviceVisitsForDay;
+            }
           }
         }
       }
@@ -283,6 +364,12 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
           metric.count || metric.visitors || metric.value || 0
         );
         regionMap.set(region, (regionMap.get(region) || 0) + metricCount);
+        if (linkVisitors) {
+          linkVisitors.byRegion.set(
+            region,
+            Math.max(linkVisitors.byRegion.get(region) || 0, metricCount)
+          );
+        }
       }
     }
 
@@ -294,6 +381,12 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
           metric.count || metric.visitors || metric.value || 0
         );
         cityMap.set(city, (cityMap.get(city) || 0) + metricCount);
+        if (linkVisitors) {
+          linkVisitors.byCity.set(
+            city,
+            Math.max(linkVisitors.byCity.get(city) || 0, metricCount)
+          );
+        }
       }
     }
   }
@@ -307,17 +400,33 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
   const dailyVisits = Array.from(dailyVisitsMap.values()).sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
+  const linkAnalytics = Object.fromEntries(
+    linksResult.items.map((link) => {
+      const buckets =
+        perLinkDailyVisitsMap.get(link.slug) ?? buildRollingDailyBuckets(7);
 
-  // Ensure we always have at least one day of data for the chart
-  if (dailyVisits.length === 0) {
-    dailyVisits.push({
-      date: new Date().toISOString().split("T")[0],
-      total: 0,
-      byLink: {},
-      byBrowser: {},
-      byDevice: {},
-    });
-  }
+      return [
+        link.slug,
+        {
+          dailyVisits: Array.from(buckets.values()).sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          ),
+          visitors: {
+            total: perLinkVisitorsMap.get(link.slug)?.total || 0,
+            byRegion: Object.fromEntries(
+              perLinkVisitorsMap.get(link.slug)?.byRegion ?? new Map()
+            ),
+            byCity: Object.fromEntries(
+              perLinkVisitorsMap.get(link.slug)?.byCity ?? new Map()
+            ),
+            byGender: Object.fromEntries(
+              perLinkVisitorsMap.get(link.slug)?.byGender ?? new Map()
+            ),
+          },
+        },
+      ];
+    })
+  );
 
   return {
     dailyVisits,
@@ -332,5 +441,6 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
       slug: l.slug,
       shortUrl: l.shortUrl,
     })),
+    linkAnalytics,
   };
 }
