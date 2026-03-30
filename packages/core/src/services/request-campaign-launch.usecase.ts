@@ -5,12 +5,17 @@ import { TrackedLinkService } from "./tracked-link.service";
 import { CampaignService } from "./campaign.service";
 import { SegmentService } from "./segment.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
+import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
   CampaignInsufficientCreditsError,
   CampaignInvalidStatusError,
   CampaignLaunchValidationError,
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
+
+// URL regex for detecting URLs in content
+const URL_REGEX =
+  /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s<>"']*))/g;
 
 export class RequestCampaignLaunchUseCase {
   static async execute(
