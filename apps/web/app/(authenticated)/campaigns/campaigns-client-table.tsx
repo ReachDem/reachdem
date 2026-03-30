@@ -5,11 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
+  AlertCircle,
   CheckCircle2,
+  Clock3,
+  Loader2,
+  Mail,
+  MessageSquareText,
   MoreHorizontal,
   Pencil,
   Play,
-  RefreshCw,
   Search,
   Trash2,
   Plus,
@@ -73,6 +77,7 @@ interface WorkerStatusSnapshot {
 }
 
 const isDeveloperMode = process.env.NODE_ENV === "development";
+const pillBadgeClassName = "text-muted-foreground gap-1.5 px-1.5";
 
 function getEffectiveCampaignStatus(
   campaign: Campaign,
@@ -215,7 +220,8 @@ export function CampaignsClientTable({
 
     if (effectiveStatus === "scheduled") {
       return (
-        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+        <Badge variant="outline" className={pillBadgeClassName}>
+          <Clock3 className="h-3.5 w-3.5 text-blue-500" />
           Scheduled
         </Badge>
       );
@@ -224,52 +230,52 @@ export function CampaignsClientTable({
     switch (effectiveStatus) {
       case "draft":
         return (
-          <Badge variant="outline" className="text-slate-500">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="text-muted-foreground h-3.5 w-3.5" />
             Draft
           </Badge>
         );
       case "running":
         return (
-          <Badge
-            variant="outline"
-            className="animate-pulse border-orange-500 text-orange-500 hover:bg-transparent"
-          >
-            Running
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-500" />
+            In Progress
           </Badge>
         );
       case "partial":
         return (
-          <Badge
-            variant="secondary"
-            className="bg-red-100 text-red-700 hover:bg-red-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
             Partial
           </Badge>
         );
       case "completed":
         return (
-          <Badge
-            variant="outline"
-            className="px-2 px-3 font-light text-green-900 hover:bg-transparent dark:text-green-50"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <CheckCircle2 className="text-background h-3.5 w-3.5 fill-emerald-500 dark:text-black" />
             Completed
           </Badge>
         );
       case "failed":
         return (
-          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-400" />
             Failed
           </Badge>
         );
       case "expired":
         return (
-          <Badge className="bg-red-700 text-white hover:bg-red-800">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Clock3 className="h-3.5 w-3.5 text-red-500" />
             Expired
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
             {effectiveStatus}
           </Badge>
         );
@@ -280,34 +286,33 @@ export function CampaignsClientTable({
     switch (channel.toLowerCase()) {
       case "email":
         return (
-          <Badge
-            variant="outline"
-            className="text-blue-700 hover:bg-blue-100 dark:text-blue-200"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Mail className="h-3.5 w-3.5 text-blue-500" />
             Email
           </Badge>
         );
       case "sms":
         return (
-          <Badge
-            variant="outline"
-            className="text-amber-700 hover:bg-amber-100 dark:text-amber-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <MessageSquareText className="h-3.5 w-3.5 text-green-600" />
             SMS
           </Badge>
         );
       case "push":
         return (
           <Badge
-            variant="secondary"
-            className="bg-purple-50 text-purple-700 hover:bg-purple-100"
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
           >
             Push
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
             {channel}
           </Badge>
         );

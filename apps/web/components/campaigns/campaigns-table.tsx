@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  Mail,
+  MessageSquareText,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 import type { Campaign } from "@/actions/campaigns";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +41,8 @@ interface CampaignsTableProps {
   onDelete?: (campaign: Campaign) => void;
 }
 
+const pillBadgeClassName = "text-muted-foreground gap-1.5 px-1.5";
+
 export function CampaignsTable({
   campaigns,
   onEdit,
@@ -41,46 +53,52 @@ export function CampaignsTable({
     switch (status) {
       case "draft":
         return (
-          <Badge variant="outline" className="text-slate-500">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="text-muted-foreground h-3.5 w-3.5" />
             Draft
           </Badge>
         );
       case "running":
         return (
-          <Badge className="animate-pulse bg-orange-500 text-white hover:bg-orange-500">
-            Running
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-500" />
+            In Progress
           </Badge>
         );
       case "partial":
         return (
-          <Badge
-            variant="secondary"
-            className="bg-red-100 text-red-700 hover:bg-red-100"
-          >
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
             Partial
           </Badge>
         );
       case "completed":
         return (
-          <Badge variant="outline" className="hover:text-emerald-600">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <CheckCircle2 className="text-background h-3.5 w-3.5 fill-emerald-500 dark:text-black" />
             Completed
           </Badge>
         );
       case "failed":
         return (
-          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-400" />
             Failed
           </Badge>
         );
       case "expired":
         return (
-          <Badge className="bg-red-700 text-white hover:bg-red-800">
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Clock3 className="h-3.5 w-3.5 text-red-500" />
             Expired
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
             {status}
           </Badge>
         );
@@ -90,12 +108,25 @@ export function CampaignsTable({
   const getChannelBadge = (channel: string) => {
     switch (channel.toLowerCase()) {
       case "email":
-        return <Badge variant="secondary">Email</Badge>;
+        return (
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <Mail className="h-3.5 w-3.5 text-blue-500" />
+            Email
+          </Badge>
+        );
       case "sms":
-        return <Badge variant="secondary">SMS</Badge>;
+        return (
+          <Badge variant="outline" className={pillBadgeClassName}>
+            <MessageSquareText className="h-3.5 w-3.5 text-green-600" />
+            SMS
+          </Badge>
+        );
       default:
         return (
-          <Badge variant="outline" className="capitalize">
+          <Badge
+            variant="outline"
+            className={`${pillBadgeClassName} capitalize`}
+          >
             {channel}
           </Badge>
         );
