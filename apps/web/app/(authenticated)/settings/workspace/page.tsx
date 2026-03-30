@@ -202,7 +202,7 @@ export default async function WorkspaceSettingsPage() {
               </div>
 
               {org.workspaceVerificationStatus === "not_submitted" ||
-              org.workspaceVerificationStatus === "rejected" ? (
+                org.workspaceVerificationStatus === "rejected" ? (
                 <KybDialog
                   status={org.workspaceVerificationStatus}
                   initialWebsiteUrl={org.websiteUrl}

@@ -243,8 +243,8 @@ export async function importContactsBulk(
   const existingContacts =
     orConditions.length > 0
       ? await prisma.contact.findMany({
-          where: { organizationId, deletedAt: null, OR: orConditions },
-        })
+        where: { organizationId, deletedAt: null, OR: orConditions },
+      })
       : [];
 
   // Build O(1) lookup maps

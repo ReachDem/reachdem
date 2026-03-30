@@ -9,6 +9,7 @@ import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
   CampaignInsufficientCreditsError,
   CampaignInvalidStatusError,
+  CampaignLaunchValidationError,
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
 
@@ -108,18 +109,18 @@ export class RequestCampaignLaunchUseCase {
       const updateContent =
         campaign.channel === "sms"
           ? {
-              ...(campaign.content as any),
-              from:
-                organization.workspaceVerificationStatus === "verified" &&
+            ...(campaign.content as any),
+            from:
+              organization.workspaceVerificationStatus === "verified" &&
                 organization.senderId
-                  ? organization.senderId
-                  : this.DEFAULT_SMS_SENDER_ID,
-              senderId:
-                organization.workspaceVerificationStatus === "verified" &&
+                ? organization.senderId
+                : this.DEFAULT_SMS_SENDER_ID,
+            senderId:
+              organization.workspaceVerificationStatus === "verified" &&
                 organization.senderId
-                  ? organization.senderId
-                  : this.DEFAULT_SMS_SENDER_ID,
-            }
+                ? organization.senderId
+                : this.DEFAULT_SMS_SENDER_ID,
+          }
           : undefined;
 
       await tx.organization.update({
@@ -130,15 +131,15 @@ export class RequestCampaignLaunchUseCase {
           },
           ...(campaign.channel === "sms"
             ? {
-                smsQuotaUsed: {
-                  increment: eligibleTargetCount,
-                },
-              }
+              smsQuotaUsed: {
+                increment: eligibleTargetCount,
+              },
+            }
             : {
-                emailQuotaUsed: {
-                  increment: eligibleTargetCount,
-                },
-              }),
+              emailQuotaUsed: {
+                increment: eligibleTargetCount,
+              },
+            }),
         },
       });
 

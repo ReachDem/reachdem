@@ -86,22 +86,22 @@ export class MessagingEntitlementsService {
         // We always track the usage regardless of if the limit is null
         ...(channel === "sms"
           ? {
-              smsQuotaUsed: {
-                increment: units,
-              },
-            }
+            smsQuotaUsed: {
+              increment: units,
+            },
+          }
           : {
-              emailQuotaUsed: {
-                increment: units,
-              },
-            }),
+            emailQuotaUsed: {
+              increment: units,
+            },
+          }),
       },
     });
 
     const effectiveSenderId =
       channel === "sms" &&
-      organization.workspaceVerificationStatus === "verified" &&
-      organization.senderId
+        organization.workspaceVerificationStatus === "verified" &&
+        organization.senderId
         ? organization.senderId
         : channel === "sms"
           ? this.DEFAULT_SMS_SENDER_ID
