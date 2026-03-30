@@ -3,6 +3,7 @@ import { POST as sendEmailHandler } from "../app/api/v1/email/send/route";
 import { ProcessEmailMessageJobUseCase } from "@reachdem/core";
 import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
+import { sendEmailSchema } from "@reachdem/shared";
 import { NextRequest } from "next/server";
 
 vi.mock("next/headers", () => ({
@@ -30,6 +31,10 @@ const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
 const SMTP_SECURE = process.env.SMTP_SECURE ?? "true";
 const SENDER_EMAIL = process.env.SENDER_EMAIL ?? SMTP_USER;
 const SENDER_NAME = process.env.SENDER_NAME ?? "ReachDem Notifications";
+const VALID_TEST_EMAIL_TO =
+  TEST_EMAIL_TO && sendEmailSchema.shape.to.safeParse(TEST_EMAIL_TO).success
+    ? TEST_EMAIL_TO
+    : null;
 
 if (!REAL_ORG_ID || !TEST_USER_ID || !TEST_USER_EMAIL) {
   throw new Error(
@@ -43,9 +48,17 @@ describe("Email API - integration", () => {
     process.env.EMAIL_WORKER_BASE_URL ??
     process.env.CLOUDFLARE_WORKER_BASE_URL ??
     "http://127.0.0.1:8787";
-
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await prisma.organization.update({
+      where: { id: REAL_ORG_ID },
+      data: {
+        planCode: "free",
+        creditBalance: 1000,
+        smsQuotaUsed: 0,
+        emailQuotaUsed: 0,
+      },
+    });
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
@@ -78,7 +91,7 @@ describe("Email API - integration", () => {
   });
 
   if (
-    !TEST_EMAIL_TO ||
+    !VALID_TEST_EMAIL_TO ||
     !SMTP_HOST ||
     !SMTP_USER ||
     !SMTP_PASSWORD ||
@@ -86,9 +99,9 @@ describe("Email API - integration", () => {
   ) {
     it("skips when SMTP or target email env vars are missing", () => {
       console.log(
-        "[Email API Integration] Set TEST_EMAIL_TO, SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SENDER_EMAIL to run the full flow."
+        "[Email API Integration] Set a valid TEST_EMAIL_TO, SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SENDER_EMAIL to run the full flow."
       );
-      expect(TEST_EMAIL_TO).toBeUndefined();
+      expect(Boolean(VALID_TEST_EMAIL_TO)).toBe(false);
     });
     return;
   }
@@ -105,7 +118,7 @@ describe("Email API - integration", () => {
     const req = new NextRequest("http://localhost/api/v1/email/send", {
       method: "POST",
       body: JSON.stringify({
-        to: TEST_EMAIL_TO,
+        to: VALID_TEST_EMAIL_TO,
         subject,
         html,
         from: SENDER_NAME,
@@ -116,7 +129,6 @@ describe("Email API - integration", () => {
 
     const res = await sendEmailHandler(req, {} as any);
     const body = await res.json();
-
     expect([200, 201]).toContain(res.status);
     expect(body).toHaveProperty("message_id");
     expect(body.status).toBe("queued");

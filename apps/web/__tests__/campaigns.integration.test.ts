@@ -78,6 +78,19 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       },
     });
 
+    await prisma.organization.update({
+      where: { id: REAL_ORG_ID },
+      data: {
+        planCode: "free",
+        workspaceVerificationStatus: "verified",
+        workspaceVerifiedAt: new Date(),
+        senderId: "REACHDEM",
+        creditBalance: 5000,
+        smsQuotaUsed: 0,
+        emailQuotaUsed: 0,
+      },
+    });
+
     // 2. Setup a group and contact for audience
     const group = await prisma.group.create({
       data: {
@@ -435,6 +448,78 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     expect(processedTarget!.status).toBe("sent");
     expect(processedMessage!.status).toBe("sent");
   }, 40000);
+
+  it("POST /campaigns/:id/launch -> consumes experimental SMS quota instead of shared credits", async () => {
+    await prisma.organization.update({
+      where: { id: REAL_ORG_ID },
+      data: {
+        planCode: "experimental",
+        creditBalance: 5000,
+        smsQuotaUsed: 0,
+        emailQuotaUsed: 0,
+        workspaceVerificationStatus: "verified",
+        workspaceVerifiedAt: new Date(),
+        senderId: "REACHDEM",
+      },
+    });
+
+    const createReq = new NextRequest("http://localhost/api/v1/campaigns", {
+      method: "POST",
+      body: JSON.stringify({
+        name: `Experimental SMS campaign ${Date.now()}`,
+        channel: "sms",
+        content: {
+          text: "Experimental quota test",
+          from: "Another Sender",
+        },
+      }),
+    });
+
+    const createRes = await createCampaignHandler(createReq, {
+      params: Promise.resolve({}),
+    });
+    expect(createRes.status).toBe(201);
+    const createdCampaign = await createRes.json();
+
+    const audienceReq = new NextRequest(
+      `http://localhost/api/v1/campaigns/${createdCampaign.id}/audience`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          audiences: [{ sourceType: "group", sourceId: testGroupId }],
+        }),
+      }
+    );
+    const audienceRes = await setAudienceHandler(audienceReq, {
+      params: Promise.resolve({ id: createdCampaign.id }),
+    });
+    expect(audienceRes.status).toBe(201);
+
+    const launchRes = await launchCampaignHandler(
+      new NextRequest(
+        `http://localhost/api/v1/campaigns/${createdCampaign.id}/launch`,
+        {
+          method: "POST",
+        }
+      ),
+      { params: Promise.resolve({ id: createdCampaign.id }) }
+    );
+    expect(launchRes.status).toBe(200);
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: REAL_ORG_ID },
+    });
+    expect(organization?.smsQuotaUsed).toBe(1);
+    expect(organization?.creditBalance).toBe(5000);
+
+    const updatedCampaign = await prisma.campaign.findUnique({
+      where: { id: createdCampaign.id },
+    });
+    expect((updatedCampaign?.content as any)?.senderId).toBe("REACHDEM");
+    expect((updatedCampaign?.content as any)?.from).toBe("REACHDEM");
+
+    queuedCampaignLaunchJobs.splice(0);
+  });
 
   it("POST /campaigns and launch -> supports email campaigns through async processing", async () => {
     const createReq = new NextRequest("http://localhost/api/v1/campaigns", {

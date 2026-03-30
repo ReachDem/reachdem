@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@reachdem/auth/guards";
-import { EnqueueEmailUseCase } from "@reachdem/core";
+import {
+  EnqueueEmailUseCase,
+  MessageInsufficientCreditsError,
+} from "@reachdem/core";
 import { sendEmailSchema } from "@reachdem/shared";
 import { publishEmailJob } from "../../../../../lib/publish-email-job";
 
@@ -26,6 +29,9 @@ export const POST = withWorkspace(async ({ req, organizationId }) => {
       status: result.idempotent ? 200 : 201,
     });
   } catch (error) {
+    if (error instanceof MessageInsufficientCreditsError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("[POST /email/send]", error);
     return NextResponse.json(
       { error: "Internal server error" },

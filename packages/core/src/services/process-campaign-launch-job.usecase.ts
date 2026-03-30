@@ -15,6 +15,8 @@ type ResolvedContact = {
   id: string;
   phoneE164?: string;
   email?: string;
+  hasValidNumber?: boolean | null;
+  hasEmailableAddress?: boolean | null;
 };
 
 export class ProcessCampaignLaunchJobUseCase {
@@ -233,6 +235,8 @@ export class ProcessCampaignLaunchJobUseCase {
             id: true,
             phoneE164: true,
             email: true,
+            hasValidNumber: true,
+            hasEmailableAddress: true,
           },
         });
         this.collectContacts(uniqueContacts, contacts, channel);
@@ -282,13 +286,14 @@ export class ProcessCampaignLaunchJobUseCase {
       id: string;
       phoneE164: string | null;
       email?: string | null;
+      hasValidNumber?: boolean | null;
+      hasEmailableAddress?: boolean | null;
     }>,
     channel: "sms" | "email"
   ): void {
     for (const contact of contacts) {
       if (
-        (channel === "sms" && !contact.phoneE164) ||
-        (channel === "email" && !contact.email) ||
+        !this.isContactEligible(contact, channel) ||
         uniqueContacts.has(contact.id)
       ) {
         continue;
@@ -298,8 +303,28 @@ export class ProcessCampaignLaunchJobUseCase {
         id: contact.id,
         phoneE164: contact.phoneE164 ?? undefined,
         email: contact.email ?? undefined,
+        hasValidNumber: contact.hasValidNumber,
+        hasEmailableAddress: contact.hasEmailableAddress,
       });
     }
+  }
+
+  private static isContactEligible(
+    contact: {
+      phoneE164?: string | null;
+      email?: string | null;
+      hasValidNumber?: boolean | null;
+      hasEmailableAddress?: boolean | null;
+    },
+    channel: "sms" | "email"
+  ): boolean {
+    if (channel === "sms") {
+      if (!contact.phoneE164) return false;
+      return contact.hasValidNumber !== false;
+    }
+
+    if (!contact.email) return false;
+    return contact.hasEmailableAddress !== false;
   }
 
   private static async collectSegmentContacts(

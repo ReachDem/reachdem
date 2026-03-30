@@ -86,12 +86,19 @@ model Verification {
 // ─── Better Auth Organization Plugin Models ───────────────────────────────────
 
 model Organization {
-  id        String   @id
-  name      String
-  slug      String   @unique
-  logo      String?
-  metadata  String?
-  createdAt DateTime @default(now())
+  id                          String                      @id
+  name                        String
+  slug                        String                      @unique
+  logo                        String?
+  metadata                    String?
+  planCode                    String                      @default("free")
+  creditBalance               Int                         @default(0)
+  smsQuotaUsed                Int                         @default(0)
+  emailQuotaUsed              Int                         @default(0)
+  workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
+  workspaceVerifiedAt         DateTime?
+  senderId                    String?                     @unique
+  createdAt                   DateTime                    @default(now())
 
   members        Member[]
   invitations    Invitation[]
@@ -107,7 +114,6 @@ model Organization {
   trackedLinks   TrackedLink[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
-  billingState   WorkspaceBillingState?
 
   @@map("organization")
 }
@@ -183,20 +189,23 @@ model ContactFieldDefinition {
 }
 
 model Contact {
-  id             String    @id @default(uuid())
-  organizationId String
-  name           String
-  phoneE164      String?
-  email          String?
-  gender         Gender?   @default(UNKNOWN)
-  birthdate      DateTime? @db.Date // Only store date component
-  address        String?
-  work           String?
-  enterprise     String?
-  customFields   Json? // Map of key to value
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime? // Soft delete
+  id                  String    @id @default(uuid())
+  organizationId      String
+  name                String
+  phoneE164           String?
+  email               String?
+  hasValidEmail       Boolean?
+  hasEmailableAddress Boolean?
+  hasValidNumber      Boolean?
+  gender              Gender?   @default(UNKNOWN)
+  birthdate           DateTime? @db.Date // Only store date component
+  address             String?
+  work                String?
+  enterprise          String?
+  customFields        Json? // Map of key to value
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime? // Soft delete
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships     GroupMember[]
@@ -507,6 +516,13 @@ enum PaymentTransactionStatus {
   refunded
 }
 
+enum WorkspaceVerificationStatus {
+  not_submitted
+  pending
+  verified
+  rejected
+}
+
 enum AudienceSourceType {
   group
   segment
@@ -700,19 +716,4 @@ model PaymentWebhookEvent {
   @@index([provider, processed])
   @@unique([provider, providerEventId])
   @@map("payment_webhook_event")
-}
-
-model WorkspaceBillingState {
-  id                   String   @id @default(uuid())
-  organizationId       String   @unique
-  currentPlanCode      String?
-  creditsBalance       Int      @default(0)
-  lastPaymentSessionId String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, currentPlanCode])
-  @@map("workspace_billing_state")
 }

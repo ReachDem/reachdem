@@ -19,7 +19,7 @@ export const GET = withWorkspace(async ({ organizationId, params }) => {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }

@@ -78,12 +78,12 @@ export const paymentSessionResponseSchema = z.object({
   providerSessionId: z.string().nullable(),
   providerReference: z.string().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
-  activatedAt: z.date().nullable(),
-  failedAt: z.date().nullable(),
-  cancelledAt: z.date().nullable(),
-  expiredAt: z.date().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  activatedAt: z.coerce.date().nullable(),
+  failedAt: z.coerce.date().nullable(),
+  cancelledAt: z.coerce.date().nullable(),
+  expiredAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 export type PaymentSessionResponse = z.infer<
   typeof paymentSessionResponseSchema
@@ -104,12 +104,12 @@ export const paymentTransactionResponseSchema = z.object({
   providerEventId: z.string().nullable(),
   rawStatus: z.string().nullable(),
   rawPayload: z.record(z.string(), z.unknown()).nullable(),
-  confirmedAt: z.date().nullable(),
-  failedAt: z.date().nullable(),
-  cancelledAt: z.date().nullable(),
-  refundedAt: z.date().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  confirmedAt: z.coerce.date().nullable(),
+  failedAt: z.coerce.date().nullable(),
+  cancelledAt: z.coerce.date().nullable(),
+  refundedAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 export type PaymentTransactionResponse = z.infer<
   typeof paymentTransactionResponseSchema
