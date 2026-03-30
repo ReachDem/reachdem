@@ -15,6 +15,8 @@ type ResolvedContact = {
   id: string;
   phoneE164?: string;
   email?: string;
+  hasValidNumber?: boolean | null;
+  hasEmailableAddress?: boolean | null;
 };
 
 export class LaunchCampaignUseCase {
@@ -243,16 +245,19 @@ export class LaunchCampaignUseCase {
             id: true,
             phoneE164: true,
             email: true,
+            hasValidNumber: true,
+            hasEmailableAddress: true,
           },
         });
-        this.collectContacts(uniqueContacts, contacts);
+        this.collectContacts(uniqueContacts, contacts, channel);
         continue;
       }
 
       await this.collectSegmentContacts(
         uniqueContacts,
         organizationId,
-        audience.sourceId
+        audience.sourceId,
+        channel
       );
     }
 
@@ -291,11 +296,14 @@ export class LaunchCampaignUseCase {
       id: string;
       phoneE164: string | null;
       email?: string | null;
-    }>
+      hasValidNumber?: boolean | null;
+      hasEmailableAddress?: boolean | null;
+    }>,
+    channel: "sms" | "email"
   ): void {
     for (const contact of contacts) {
       if (
-        (!contact.phoneE164 && !contact.email) ||
+        !this.isContactEligible(contact, channel) ||
         uniqueContacts.has(contact.id)
       ) {
         continue;
@@ -305,14 +313,35 @@ export class LaunchCampaignUseCase {
         id: contact.id,
         phoneE164: contact.phoneE164 ?? undefined,
         email: contact.email ?? undefined,
+        hasValidNumber: contact.hasValidNumber,
+        hasEmailableAddress: contact.hasEmailableAddress,
       });
     }
+  }
+
+  private static isContactEligible(
+    contact: {
+      phoneE164?: string | null;
+      email?: string | null;
+      hasValidNumber?: boolean | null;
+      hasEmailableAddress?: boolean | null;
+    },
+    channel: "sms" | "email"
+  ): boolean {
+    if (channel === "sms") {
+      if (!contact.phoneE164) return false;
+      return contact.hasValidNumber !== false;
+    }
+
+    if (!contact.email) return false;
+    return contact.hasEmailableAddress !== false;
   }
 
   private static async collectSegmentContacts(
     uniqueContacts: Map<string, ResolvedContact>,
     organizationId: string,
-    segmentId: string
+    segmentId: string,
+    channel: "sms" | "email"
   ): Promise<void> {
     const segment = await SegmentService.getSegmentById(
       organizationId,
@@ -329,7 +358,7 @@ export class LaunchCampaignUseCase {
         cursor
       );
 
-      this.collectContacts(uniqueContacts, result.items);
+      this.collectContacts(uniqueContacts, result.items, channel);
 
       if (!result.meta.nextCursor) break;
       cursor = result.meta.nextCursor;

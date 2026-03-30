@@ -28,7 +28,7 @@ export const POST = withWorkspace(async ({ req, organizationId, userId }) => {
   } catch (error: any) {
     console.error("[Payments API - POST /session] Error:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }

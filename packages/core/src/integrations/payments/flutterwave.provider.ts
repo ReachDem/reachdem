@@ -9,6 +9,7 @@ import type {
 } from "../../ports/payment-provider.port";
 import {
   PaymentConfigurationError,
+  PaymentWebhookPayloadError,
   PaymentVerificationError,
 } from "../../errors/payment.errors";
 
@@ -148,7 +149,14 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     headers: Headers
   ): Promise<ParsedPaymentWebhookEvent> {
     void headers;
-    const payload = JSON.parse(rawBody) as Record<string, any>;
+    let payload: Record<string, any>;
+    try {
+      payload = JSON.parse(rawBody) as Record<string, any>;
+    } catch {
+      throw new PaymentWebhookPayloadError(
+        "Invalid JSON in Flutterwave webhook"
+      );
+    }
     const status = String(
       payload?.status ?? payload?.data?.status ?? ""
     ).toLowerCase();

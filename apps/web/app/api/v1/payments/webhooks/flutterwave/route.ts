@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   PaymentOrchestratorService,
+  PaymentWebhookPayloadError,
   PaymentWebhookSignatureError,
 } from "@reachdem/core";
 
@@ -18,8 +19,11 @@ export async function POST(req: NextRequest) {
     if (error instanceof PaymentWebhookSignatureError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (error instanceof PaymentWebhookPayloadError) {
+      return NextResponse.json({ error: "Bad Request" }, { status: 400 });
+    }
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }

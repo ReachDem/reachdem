@@ -2,6 +2,7 @@
 
 import { prisma, Prisma } from "@reachdem/database";
 import { auth } from "@reachdem/auth";
+import { computeContactChannelFlags } from "@reachdem/shared";
 import { headers } from "next/headers";
 import { promises as dns } from "node:dns";
 import validator from "validator";
@@ -294,13 +295,26 @@ export async function importContactsBulk(
           ...c.customFields,
         };
       }
+      Object.assign(
+        updateData,
+        computeContactChannelFlags({
+          email:
+            updateData.email !== undefined ? updateData.email : existing.email,
+          phoneE164:
+            updateData.phoneE164 !== undefined
+              ? updateData.phoneE164
+              : existing.phoneE164,
+        })
+      );
       toUpdate.push({ id: existing.id, data: updateData });
     } else {
       toCreate.push({
         organizationId,
         name: c.name || "Unknown",
-        email: c.email || null,
-        phoneE164: c.phoneE164 || null,
+        ...computeContactChannelFlags({
+          email: c.email || null,
+          phoneE164: c.phoneE164 || null,
+        }),
         gender: c.gender || "UNKNOWN",
         birthdate: c.birthdate || null,
         address: c.address || null,
@@ -403,7 +417,11 @@ export async function updateContact(
     // Update the contact
     const updateData: any = {
       ...data,
-      email: data.email ? data.email.toLowerCase().trim() : null,
+      ...computeContactChannelFlags({
+        email: data.email !== undefined ? data.email : existing.email,
+        phoneE164:
+          data.phoneE164 !== undefined ? data.phoneE164 : existing.phoneE164,
+      }),
     };
 
     const updated = await prisma.contact.update({

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  CampaignInsufficientCreditsError,
   CampaignInvalidStatusError,
+  CampaignLaunchValidationError,
   CampaignNotFoundError,
   CampaignStatsService,
   RequestCampaignLaunchUseCase,
@@ -31,6 +33,15 @@ export const POST = withWorkspace(async ({ req, organizationId, params }) => {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
     if (error instanceof CampaignInvalidStatusError) {
+      return NextResponse.json(
+        { error: "Bad Request", details: error.message },
+        { status: 400 }
+      );
+    }
+    if (
+      error instanceof CampaignLaunchValidationError ||
+      error instanceof CampaignInsufficientCreditsError
+    ) {
       return NextResponse.json(
         { error: "Bad Request", details: error.message },
         { status: 400 }

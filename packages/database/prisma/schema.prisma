@@ -22,10 +22,10 @@ model User {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  members     Member[]
-  invitations Invitation[]
+  accounts            Account[]
+  sessions            Session[]
+  members             Member[]
+  invitations         Invitation[]
   paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
   paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
 
@@ -86,28 +86,34 @@ model Verification {
 // ─── Better Auth Organization Plugin Models ───────────────────────────────────
 
 model Organization {
-  id        String   @id
-  name      String
-  slug      String   @unique
-  logo      String?
-  metadata  String?
-  createdAt DateTime @default(now())
+  id                          String                      @id
+  name                        String
+  slug                        String                      @unique
+  logo                        String?
+  metadata                    String?
+  planCode                    String                      @default("free")
+  creditBalance               Int                         @default(0)
+  smsQuotaUsed                Int                         @default(0)
+  emailQuotaUsed              Int                         @default(0)
+  workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
+  workspaceVerifiedAt         DateTime?
+  senderId                    String?                     @unique
+  createdAt                   DateTime                    @default(now())
 
-  members        Member[]
-  invitations    Invitation[]
-  sessions       Session[]
-  contacts       Contact[]
-  contactFields  ContactFieldDefinition[]
-  groups         Group[]
-  segments       Segment[]
-  activityEvents ActivityEvent[]
-  smsConfig      WorkspaceSmsConfig?
-  messages       Message[]
-  campaigns      Campaign[]
-  trackedLinks   TrackedLink[]
+  members             Member[]
+  invitations         Invitation[]
+  sessions            Session[]
+  contacts            Contact[]
+  contactFields       ContactFieldDefinition[]
+  groups              Group[]
+  segments            Segment[]
+  activityEvents      ActivityEvent[]
+  smsConfig           WorkspaceSmsConfig?
+  messages            Message[]
+  campaigns           Campaign[]
+  trackedLinks        TrackedLink[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
-  billingState   WorkspaceBillingState?
 
   @@map("organization")
 }
@@ -183,20 +189,23 @@ model ContactFieldDefinition {
 }
 
 model Contact {
-  id             String    @id @default(uuid())
-  organizationId String
-  name           String
-  phoneE164      String?
-  email          String?
-  gender         Gender?   @default(UNKNOWN)
-  birthdate      DateTime? @db.Date // Only store date component
-  address        String?
-  work           String?
-  enterprise     String?
-  customFields   Json? // Map of key to value
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime? // Soft delete
+  id                  String    @id @default(uuid())
+  organizationId      String
+  name                String
+  phoneE164           String?
+  email               String?
+  hasValidEmail       Boolean?
+  hasEmailableAddress Boolean?
+  hasValidNumber      Boolean?
+  gender              Gender?   @default(UNKNOWN)
+  birthdate           DateTime? @db.Date // Only store date component
+  address             String?
+  work                String?
+  enterprise          String?
+  customFields        Json? // Map of key to value
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime? // Soft delete
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships     GroupMember[]
@@ -427,7 +436,7 @@ model Message {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   attempts     MessageAttempt[]
-  trackedLinks  TrackedLink[]
+  trackedLinks TrackedLink[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
@@ -506,6 +515,13 @@ enum PaymentTransactionStatus {
   failed
   cancelled
   refunded
+}
+
+enum WorkspaceVerificationStatus {
+  not_submitted
+  pending
+  verified
+  rejected
 }
 
 enum AudienceSourceType {
@@ -639,8 +655,8 @@ model PaymentSession {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  initiatedBy  User                  @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy  User                 @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
   transactions PaymentTransaction[]
 
   @@index([organizationId, status])
@@ -696,24 +712,9 @@ model PaymentWebhookEvent {
   rawPayload        Json
   receivedAt        DateTime        @default(now())
 
+  @@unique([provider, providerEventId])
   @@index([provider, providerReference])
   @@index([provider, receivedAt])
   @@index([provider, processed])
-  @@unique([provider, providerEventId])
   @@map("payment_webhook_event")
-}
-
-model WorkspaceBillingState {
-  id                   String   @id @default(uuid())
-  organizationId       String   @unique
-  currentPlanCode      String?
-  creditsBalance       Int      @default(0)
-  lastPaymentSessionId String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, currentPlanCode])
-  @@map("workspace_billing_state")
 }

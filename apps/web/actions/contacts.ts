@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@reachdem/database";
+import { computeContactChannelFlags } from "@reachdem/shared";
 import { headers } from "next/headers";
 
 export async function checkContactDuplicates(
@@ -70,6 +71,10 @@ export async function importContactsBulk(
     data: contacts.map((c) => ({
       organizationId,
       ...c,
+      ...computeContactChannelFlags({
+        email: c.email ?? null,
+        phoneE164: c.phoneE164 ?? null,
+      }),
     })),
     skipDuplicates: true, // Safety net, though caller handles strategy
   });

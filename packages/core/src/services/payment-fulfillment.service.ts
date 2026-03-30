@@ -21,38 +21,20 @@ export class PaymentFulfillmentService {
         return;
       }
 
-      const existing = await tx.workspaceBillingState.findUnique({
-        where: { organizationId: input.organizationId },
-      });
-
       if (input.kind === "subscription") {
-        await tx.workspaceBillingState.upsert({
-          where: { organizationId: input.organizationId },
-          create: {
-            organizationId: input.organizationId,
-            currentPlanCode: input.planCode ?? null,
-            creditsBalance: existing?.creditsBalance ?? 0,
-            lastPaymentSessionId: input.paymentSessionId,
-          },
-          update: {
-            currentPlanCode: input.planCode ?? null,
-            lastPaymentSessionId: input.paymentSessionId,
+        await tx.organization.update({
+          where: { id: input.organizationId },
+          data: {
+            planCode: input.planCode ?? "free",
           },
         });
       } else if (input.kind === "creditPurchase") {
-        await tx.workspaceBillingState.upsert({
-          where: { organizationId: input.organizationId },
-          create: {
-            organizationId: input.organizationId,
-            currentPlanCode: existing?.currentPlanCode ?? null,
-            creditsBalance: input.creditsQuantity ?? 0,
-            lastPaymentSessionId: input.paymentSessionId,
-          },
-          update: {
-            creditsBalance: {
+        await tx.organization.update({
+          where: { id: input.organizationId },
+          data: {
+            creditBalance: {
               increment: input.creditsQuantity ?? 0,
             },
-            lastPaymentSessionId: input.paymentSessionId,
           },
         });
       }

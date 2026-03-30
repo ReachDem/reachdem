@@ -1,4 +1,5 @@
 import { requireOrgMembership, getActiveOrganization } from "@reachdem/auth";
+import { WorkspaceBillingService } from "@reachdem/core";
 import { MemberList } from "./_components/member-list";
 import { LogoUpdate } from "./_components/logo-update";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,13 @@ export default async function WorkspaceSettingsPage() {
 
   // @ts-ignore - Better Auth returns members as part of getFullOrganization
   const members = org.members || [];
+  const billing = await WorkspaceBillingService.getSummary(org.id);
+
+  const verificationLabel = billing
+    ? billing.workspaceVerificationStatus === "verified"
+      ? "Verified"
+      : billing.workspaceVerificationStatus.replace(/_/g, " ")
+    : "Unknown";
 
   return (
     <div className="space-y-8 pb-12">
@@ -113,14 +121,33 @@ export default async function WorkspaceSettingsPage() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="bg-muted/20 flex items-center justify-between rounded-lg border p-4">
-            <div className="space-y-1">
-              <p className="text-sm leading-none font-medium">Current Plan</p>
-              <p className="text-muted-foreground text-sm">Base Tier</p>
+          <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm leading-none font-medium">Current Plan</p>
+                <p className="text-muted-foreground text-sm">
+                  {billing ? billing.planCode : "Unknown"}
+                </p>
+              </div>
+              <Button className="bg-[#f58220] text-white hover:bg-[#d6701a]">
+                Upgrade Plan
+              </Button>
             </div>
-            <Button className="bg-[#f58220] text-white hover:bg-[#d6701a]">
-              Upgrade Plan
-            </Button>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="bg-background/80 rounded-md border p-3">
+                <p className="text-sm font-medium">Workspace Verification</p>
+                <p className="text-muted-foreground mt-1 text-sm capitalize">
+                  {verificationLabel}
+                </p>
+              </div>
+              <div className="bg-background/80 rounded-md border p-3">
+                <p className="text-sm font-medium">SMS Sender ID</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {billing?.senderId ?? "Not assigned"}
+                </p>
+              </div>
+            </div>
           </div>
         </SettingsCardContent>
       </SettingsCard>
@@ -134,16 +161,39 @@ export default async function WorkspaceSettingsPage() {
           </SettingsCardDescription>
         </SettingsCardHeader>
         <SettingsCardContent className="pt-6">
-          <div className="bg-muted/20 flex items-center justify-between rounded-lg border p-4">
-            <div className="space-y-1">
-              <p className="text-sm leading-none font-medium">Credit Balance</p>
-              <p className="text-muted-foreground text-sm">
-                Used for premium actions
-              </p>
+          <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm leading-none font-medium">
+                  Credit Balance
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Used for usage-based actions and paid plans.
+                </p>
+              </div>
+              <span className="inline-flex items-center rounded-full bg-[#f58220] px-4 py-1.5 text-sm font-medium text-white">
+                {billing?.creditBalance?.toLocaleString() ?? "0"} Credits
+              </span>
             </div>
-            <span className="inline-flex items-center rounded-full bg-[#f58220] px-4 py-1.5 text-sm font-medium text-white">
-              30,294 Credits
-            </span>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="bg-background/80 rounded-md border p-3">
+                <p className="text-sm font-medium">SMS Included</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {billing?.smsIncludedLimit != null
+                    ? `${billing.smsQuotaRemaining}/${billing.smsIncludedLimit} remaining`
+                    : "Uses shared credits"}
+                </p>
+              </div>
+              <div className="bg-background/80 rounded-md border p-3">
+                <p className="text-sm font-medium">Email Included</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {billing?.emailIncludedLimit != null
+                    ? `${billing.emailQuotaRemaining}/${billing.emailIncludedLimit} remaining`
+                    : "Uses shared credits"}
+                </p>
+              </div>
+            </div>
           </div>
         </SettingsCardContent>
       </SettingsCard>

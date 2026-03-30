@@ -7,7 +7,7 @@ import type {
 } from "../../ports/payment-provider.port";
 import {
   PaymentConfigurationError,
-  PaymentWebhookSignatureError,
+  PaymentWebhookPayloadError,
 } from "../../errors/payment.errors";
 
 function getSecretKey(): string {
@@ -148,12 +148,13 @@ export class StripePaymentProvider implements PaymentProviderPort {
     rawBody: string,
     headers: Headers
   ): Promise<ParsedPaymentWebhookEvent> {
-    const isValid = await this.verifyWebhookSignature(rawBody, headers);
-    if (!isValid) {
-      throw new PaymentWebhookSignatureError();
+    void headers;
+    let payload: Record<string, any>;
+    try {
+      payload = JSON.parse(rawBody) as Record<string, any>;
+    } catch {
+      throw new PaymentWebhookPayloadError("Invalid JSON in Stripe webhook");
     }
-
-    const payload = JSON.parse(rawBody) as Record<string, any>;
     const eventType = String(payload?.type ?? "");
     const object = payload?.data?.object ?? {};
 

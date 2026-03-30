@@ -18,3 +18,17 @@ export class CampaignAudienceValidationError extends Error {
     this.name = "CampaignAudienceValidationError";
   }
 }
+
+export class CampaignLaunchValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CampaignLaunchValidationError";
+  }
+}
+
+export class CampaignInsufficientCreditsError extends Error {
+  constructor(message = "Insufficient credits to launch campaign") {
+    super(message);
+    this.name = "CampaignInsufficientCreditsError";
+  }
+}

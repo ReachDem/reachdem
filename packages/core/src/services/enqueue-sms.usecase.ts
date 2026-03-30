@@ -5,6 +5,7 @@ import type {
   SendSmsResult,
   SmsExecutionJob,
 } from "@reachdem/shared";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
 
 function hashPhone(phone: string): string {
   return createHash("sha256").update(phone).digest("hex");
@@ -39,20 +40,30 @@ export class EnqueueSmsUseCase {
     }
 
     const correlationId = randomUUID();
-    const message = await prisma.message.create({
-      data: {
-        organizationId,
-        campaignId: input.campaignId ?? null,
-        toE164: input.to,
-        toHashed: hashPhone(input.to),
-        toLast4: last4(input.to),
-        from: input.from,
-        text: input.text,
-        status: input.scheduledAt ? "scheduled" : "queued",
-        correlationId,
-        idempotencyKey: input.idempotency_key,
-        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-      },
+    const message = await prisma.$transaction(async (tx) => {
+      const reservation = input.campaignId
+        ? { senderId: input.from }
+        : await MessagingEntitlementsService.reserveMessageSend(
+            tx,
+            organizationId,
+            "sms"
+          );
+
+      return tx.message.create({
+        data: {
+          organizationId,
+          campaignId: input.campaignId ?? null,
+          toE164: input.to,
+          toHashed: hashPhone(input.to),
+          toLast4: last4(input.to),
+          from: reservation.senderId ?? input.from,
+          text: input.text,
+          status: input.scheduledAt ? "scheduled" : "queued",
+          correlationId,
+          idempotencyKey: input.idempotency_key,
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+        },
+      });
     });
 
     const job: SmsExecutionJob = {
