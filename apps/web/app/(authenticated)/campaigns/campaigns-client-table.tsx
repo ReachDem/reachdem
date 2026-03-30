@@ -475,119 +475,137 @@ export function CampaignsClientTable({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedCampaigns.map((campaign) => (
-                    <TableRow key={campaign.id} className="group">
-                      <TableCell className="px-4 font-medium">
-                        <div className="flex flex-col gap-1">
-                          <Link
-                            href={`/campaigns/${campaign.id}`}
-                            className="hover:underline"
-                          >
-                            {campaign.name}
-                          </Link>
-                          {campaign.description && (
-                            <span className="text-muted-foreground line-clamp-1 text-xs">
-                              {campaign.description}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
-                      <TableCell>{getStatusBadge(campaign)}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          {getDeliverySummary(campaign)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-sm">
-                            {format(
-                              new Date(campaign.updatedAt),
-                              "MMM d, yyyy"
-                            )}
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            {format(
-                              new Date(campaign.updatedAt),
-                              "HH:mm:ss zzz"
-                            )}
-                          </span>
-                          {isScheduledCampaign(campaign) &&
-                            campaign.scheduledAt && (
-                              <span className="text-xs text-blue-700">
-                                Scheduled for{" "}
-                                {format(
-                                  new Date(campaign.scheduledAt),
-                                  "dd.MM.yyyy 'at' HH:mm"
-                                )}
+                  paginatedCampaigns.map((campaign) => {
+                    // Redirect to edit page for drafts, details page for others
+                    const campaignUrl =
+                      campaign.status === "draft"
+                        ? `/campaigns/${campaign.id}/edit`
+                        : `/campaigns/${campaign.id}`;
+
+                    return (
+                      <TableRow key={campaign.id} className="group">
+                        <TableCell className="px-4 font-medium">
+                          <div className="flex flex-col gap-1">
+                            <Link
+                              href={campaignUrl}
+                              className="hover:underline"
+                            >
+                              {campaign.name}
+                            </Link>
+                            {campaign.description && (
+                              <span className="text-muted-foreground line-clamp-1 text-xs">
+                                {campaign.description}
                               </span>
                             )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getChannelBadge(campaign.channel)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(campaign)}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            {getDeliverySummary(campaign)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm">
+                              {format(
+                                new Date(campaign.updatedAt),
+                                "MMM d, yyyy"
+                              )}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              {format(
+                                new Date(campaign.updatedAt),
+                                "HH:mm:ss zzz"
+                              )}
+                            </span>
+                            {isScheduledCampaign(campaign) &&
+                              campaign.scheduledAt && (
+                                <span className="text-xs text-blue-700">
+                                  Scheduled for{" "}
+                                  {format(
+                                    new Date(campaign.scheduledAt),
+                                    "dd.MM.yyyy 'at' HH:mm"
+                                  )}
+                                </span>
+                              )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-[160px]"
                             >
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-[160px]"
-                          >
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/campaigns/${campaign.id}`}
-                                className="cursor-pointer"
-                              >
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/campaigns/${campaign.id}/edit`}
-                                className="cursor-pointer"
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                {campaign.status === "draft" ? "Edit" : "View"}
-                              </Link>
-                            </DropdownMenuItem>
-
-                            {campaign.status === "draft" &&
-                              !isScheduledCampaign(campaign) && (
-                                <DropdownMenuItem
-                                  className="cursor-pointer text-emerald-600 focus:text-emerald-700"
-                                  onClick={() => setCampaignToLaunch(campaign)}
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={campaignUrl}
+                                  className="cursor-pointer"
                                 >
-                                  <Play className="mr-2 h-4 w-4" />
-                                  Launch
+                                  {campaign.status === "draft"
+                                    ? "Edit"
+                                    : "View Details"}
+                                </Link>
+                              </DropdownMenuItem>
+                              {campaign.status !== "draft" && (
+                                <DropdownMenuItem asChild>
+                                  <Link
+                                    href={`/campaigns/${campaign.id}/edit`}
+                                    className="cursor-pointer"
+                                  >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </Link>
                                 </DropdownMenuItem>
                               )}
 
-                            {isDeveloperMode && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive cursor-pointer"
-                                  onClick={() => setCampaignToDelete(campaign)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                              {campaign.status === "draft" &&
+                                !isScheduledCampaign(campaign) && (
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-emerald-600 focus:text-emerald-700"
+                                    onClick={() =>
+                                      setCampaignToLaunch(campaign)
+                                    }
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Launch
+                                  </DropdownMenuItem>
+                                )}
+
+                              {isDeveloperMode && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                    onClick={() =>
+                                      setCampaignToDelete(campaign)
+                                    }
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

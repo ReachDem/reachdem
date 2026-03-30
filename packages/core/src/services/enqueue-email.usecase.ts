@@ -39,6 +39,12 @@ export class EnqueueEmailUseCase {
     }
 
     const correlationId = randomUUID();
+
+    console.log("[EnqueueEmailUseCase] Creating message with from:", {
+      inputFrom: input.from,
+      finalFrom: input.from ?? "ReachDem Notifications",
+    });
+
     const message = await prisma.message.create({
       data: {
         organizationId,

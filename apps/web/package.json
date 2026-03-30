@@ -10,7 +10,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@heroicons/react": "^2.2.0",
     "@ai-sdk/google": "^3.0.34",
     "@aws-sdk/client-s3": "^3.997.0",
     "@aws-sdk/s3-request-presigner": "^3.997.0",
@@ -19,6 +18,7 @@
     "@dnd-kit/modifiers": "9.0.0",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
+    "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.10.0",
     "@maily-to/core": "^0.3.7",
     "@maily-to/render": "^0.2.3",
@@ -100,6 +100,7 @@
     "swagger-ui-dist": "^5.32.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "validator": "^13.15.26",
     "vaul": "^1.1.2",
     "workflow": "4.2.0-beta.70",
     "xlsx": "^0.18.5",
@@ -108,10 +109,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
-    "@types/nodemailer": "^7.0.2",
     "@types/node": "^22",
+    "@types/nodemailer": "^7.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/validator": "^13.15.10",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",

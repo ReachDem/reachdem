@@ -2,14 +2,16 @@
 
 import { lazy, Suspense, useState, useEffect } from "react";
 import type { FocusPosition } from "@tiptap/core";
-import { Code2, FileCode2, Loader2 } from "lucide-react";
+import { Code2, FileCode2, Loader2, Send, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
 import { FontSelector } from "./font-selector";
+import { toast } from "sonner";
 
 // Import editor and default commands
 import {
@@ -34,6 +36,7 @@ export interface EmailContent {
   mode: EmailMode;
   fontFamily?: string;
   fontWeights?: number[];
+  fromName?: string;
 }
 
 interface EmailComposerProps {
@@ -49,6 +52,7 @@ export function EmailComposer({
 }: EmailComposerProps) {
   const [editor, setEditor] = useState<MailyEditor | null>(null);
   const [isEditorLoading, setIsEditorLoading] = useState(true);
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   // Apply font to editor when font changes
   const applyFontToEditor = (fontFamily: string) => {
@@ -105,6 +109,10 @@ export function EmailComposer({
     onChange({ ...value, subject });
   };
 
+  const handleFromNameChange = (fromName: string) => {
+    onChange({ ...value, fromName });
+  };
+
   const handleBodyChange = (body: string) => {
     onChange({ ...value, body });
   };
@@ -154,20 +162,94 @@ export function EmailComposer({
     });
   };
 
+  const handleSendTest = async () => {
+    if (!value.subject || !value.body) {
+      toast.error("Veuillez remplir le sujet et le contenu de l'email.");
+      return;
+    }
+
+    setIsSendingTest(true);
+
+    const payload = {
+      subject: value.subject,
+      htmlContent: value.body,
+      fontFamily: value.fontFamily,
+      fontWeights: value.fontWeights,
+      fromName: value.fromName,
+    };
+
+    console.log("[EmailComposer] Sending test email with payload:", payload);
+
+    try {
+      const response = await fetch("/api/v1/campaigns/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Échec de l'envoi du test");
+      }
+
+      toast.success(data.message);
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossible d'envoyer l'email de test"
+      );
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-4">
-      {/* Subject Field */}
-      <div className="space-y-2">
-        <Label htmlFor="email-subject">Subject</Label>
-        <Input
-          id="email-subject"
-          placeholder="Enter email subject..."
-          value={value.subject}
-          onChange={(e) => handleSubjectChange(e.target.value)}
-          disabled={disabled}
-          maxLength={200}
-          className="w-max-2xl border-none xl:w-3/4"
-        />
+      {/* Sender Name and Subject Fields - Side by side on large screens */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+        {/* Sender Name Field */}
+        <div className="space-y-2">
+          <Label htmlFor="email-from-name" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Sender Name
+          </Label>
+          <Input
+            id="email-from-name"
+            placeholder="ReachDem"
+            value={value.fromName || ""}
+            onChange={(e) => handleFromNameChange(e.target.value)}
+            disabled={disabled}
+            maxLength={15}
+            className="border-none"
+          />
+          <p className="text-muted-foreground text-xs">
+            {value.fromName
+              ? `${value.fromName.length}/15 characters`
+              : "Default: ReachDem (max 15 chars)"}
+          </p>
+        </div>
+
+        {/* Subject Field */}
+        <div className="space-y-2">
+          <Label htmlFor="email-subject">Subject</Label>
+          <Input
+            id="email-subject"
+            placeholder="Enter email subject..."
+            value={value.subject}
+            onChange={(e) => handleSubjectChange(e.target.value)}
+            disabled={disabled}
+            maxLength={200}
+            className="border-none"
+          />
+          <p className="text-muted-foreground text-xs">
+            {value.subject.length}/200 characters
+          </p>
+        </div>
       </div>
 
       {/* Mode Selector, Font Selector and Preview Button */}
@@ -196,13 +278,35 @@ export function EmailComposer({
           </ToggleGroup>
         </div>
 
-        <div className="flex">
+        <div className="flex gap-2">
           <div className="">
             <FontSelector
               value={value.fontFamily || "Inter"}
               onChange={handleFontChange}
             />
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSendTest}
+            disabled={
+              disabled || !value.subject || !value.body || isSendingTest
+            }
+          >
+            {isSendingTest ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Envoi...
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" />
+                Test
+              </>
+            )}
+          </Button>
 
           <EmailPreviewDialog
             subject={value.subject}

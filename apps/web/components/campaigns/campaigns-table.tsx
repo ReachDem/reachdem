@@ -155,83 +155,101 @@ export function CampaignsTable({
             </TableCell>
           </TableRow>
         ) : (
-          campaigns.map((campaign) => (
-            <TableRow key={campaign.id} className="group">
-              <TableCell className="font-medium">
-                <Link
-                  href={`/campaigns/${campaign.id}`}
-                  className="hover:underline"
-                >
-                  {campaign.name}
-                </Link>
-              </TableCell>
-              <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
-              <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-              <TableCell>
-                <div className="flex flex-col">
-                  <span className="text-sm">
-                    {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {format(new Date(campaign.updatedAt), "HH:mm")}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[160px]">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => onView?.(campaign)}
-                      asChild
-                    >
-                      <Link
-                        href={`/campaigns/${campaign.id}`}
-                        className="cursor-pointer"
+          campaigns.map((campaign) => {
+            // Redirect to edit page for drafts, details page for others
+            const campaignUrl =
+              campaign.status === "draft"
+                ? `/campaigns/${campaign.id}/edit`
+                : `/campaigns/${campaign.id}`;
+
+            return (
+              <TableRow key={campaign.id} className="group">
+                <TableCell className="font-medium">
+                  <Link href={campaignUrl} className="hover:underline">
+                    {campaign.name}
+                  </Link>
+                </TableCell>
+                <TableCell>{getChannelBadge(campaign.channel)}</TableCell>
+                <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="text-sm">
+                      {format(new Date(campaign.updatedAt), "MMM d, yyyy")}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {format(new Date(campaign.updatedAt), "HH:mm")}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                       >
-                        View
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onEdit?.(campaign)}
-                      asChild
-                    >
-                      <Link
-                        href={`/campaigns/${campaign.id}/edit`}
-                        className="cursor-pointer"
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[160px]">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => onView?.(campaign)}
+                        asChild
                       >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </Link>
-                    </DropdownMenuItem>
-                    {campaign.status === "draft" && (
-                      <>
-                        <DropdownMenuSeparator />
+                        <Link href={campaignUrl} className="cursor-pointer">
+                          {campaign.status === "draft" ? "Edit" : "View"}
+                        </Link>
+                      </DropdownMenuItem>
+                      {campaign.status === "draft" && (
                         <DropdownMenuItem
-                          variant="destructive"
-                          className="cursor-pointer"
-                          onClick={() => onDelete?.(campaign)}
+                          onClick={() => onEdit?.(campaign)}
+                          asChild
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                          <Link
+                            href={`/campaigns/${campaign.id}/edit`}
+                            className="cursor-pointer"
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Link>
                         </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))
+                      )}
+                      {campaign.status !== "draft" && (
+                        <DropdownMenuItem
+                          onClick={() => onEdit?.(campaign)}
+                          asChild
+                        >
+                          <Link
+                            href={`/campaigns/${campaign.id}/edit`}
+                            className="cursor-pointer"
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      {campaign.status === "draft" && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            className="cursor-pointer"
+                            onClick={() => onDelete?.(campaign)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })
         )}
       </TableBody>
     </Table>

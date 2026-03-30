@@ -161,10 +161,33 @@ export async function sendAlibabaDirectMail(
     env.ALIBABA_SENDER_EMAIL?.trim() ||
     env.SENDER_EMAIL?.trim() ||
     env.SMTP_USER?.trim();
-  const fromAlias =
-    env.ALIBABA_SENDER_NAME?.trim() ||
-    env.SENDER_NAME?.trim() ||
-    input.fromName;
+
+  // Priority: custom fromName from input, then env variables
+  // IMPORTANT: Alibaba Direct Mail FromAlias has a 15 character limit
+  const customFromName = input.fromName?.trim();
+  let fromAlias =
+    customFromName && customFromName.length > 0
+      ? customFromName
+      : env.ALIBABA_SENDER_NAME?.trim() ||
+        env.SENDER_NAME?.trim() ||
+        "ReachDem";
+
+  // Truncate to 15 characters if needed (Alibaba Direct Mail limit)
+  if (fromAlias.length > 15) {
+    console.warn(
+      `[Alibaba Direct Mail] FromAlias "${fromAlias}" exceeds 15 character limit, truncating to "${fromAlias.substring(0, 15)}"`
+    );
+    fromAlias = fromAlias.substring(0, 15);
+  }
+
+  console.log("[Alibaba Direct Mail] Sender configuration:", {
+    inputFromName: input.fromName,
+    customFromName,
+    finalFromAlias: fromAlias,
+    fromAliasLength: fromAlias.length,
+    envAlibabaName: env.ALIBABA_SENDER_NAME,
+    envSenderName: env.SENDER_NAME,
+  });
 
   if (!accountName) {
     throw new Error(

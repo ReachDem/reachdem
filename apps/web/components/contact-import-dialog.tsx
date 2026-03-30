@@ -65,6 +65,8 @@ import {
   checkContactDuplicates,
   importContactsBulk,
   getDefaultCountryCode,
+  prepareContactsForImport,
+  type InvalidImportedEmailContact,
 } from "@/app/actions/contacts";
 
 const STEPS = [
@@ -112,6 +114,10 @@ export function ContactImportDialog({
     phones: 0,
     missingRequires: 0,
   });
+  const [preparedImportRows, setPreparedImportRows] = useState<any[]>([]);
+  const [invalidEmailContacts, setInvalidEmailContacts] = useState<
+    InvalidImportedEmailContact[]
+  >([]);
 
   // Import state
   const [isImporting, setIsImporting] = useState(false);
@@ -134,6 +140,8 @@ export function ContactImportDialog({
     setImportDone(false);
     setDuplicateStats({ emails: 0, phones: 0, missingRequires: 0 });
     setImportStats({ success: 0, total: 0 });
+    setPreparedImportRows([]);
+    setInvalidEmailContacts([]);
   };
 
   const goNext = () => {
@@ -320,30 +328,31 @@ export function ContactImportDialog({
 
     const countryCode = await getDefaultCountryCode();
 
-    let missing = 0;
-    const emailsToCheck: string[] = [];
-    const phonesToCheck: string[] = [];
+    const mappedRows: any[] = [];
 
     allParsedRows.forEach((r) => {
       const mapped = getMappedRow(r, countryCode);
-      if (!mapped.name || (!mapped.email && !mapped.phoneE164)) {
-        missing++;
-      } else {
-        if (mapped.email) emailsToCheck.push(mapped.email);
-        if (mapped.phoneE164) phonesToCheck.push(mapped.phoneE164);
-      }
+      mappedRows.push(mapped);
     });
 
     try {
+      const prepared = await prepareContactsForImport("", mappedRows);
+      setPreparedImportRows(prepared.contacts);
+      setInvalidEmailContacts(prepared.invalidEmailContacts);
+
       const { existingEmails, existingPhones } = await checkContactDuplicates(
         "",
-        emailsToCheck,
-        phonesToCheck
+        prepared.contacts
+          .map((contact) => contact.email)
+          .filter(Boolean) as string[],
+        prepared.contacts
+          .map((contact) => contact.phoneE164)
+          .filter(Boolean) as string[]
       );
       setDuplicateStats({
         emails: existingEmails.length,
         phones: existingPhones.length,
-        missingRequires: missing,
+        missingRequires: prepared.rowsMissingRequired,
       });
       goNext();
     } catch (err: any) {
@@ -353,17 +362,30 @@ export function ContactImportDialog({
 
   const handleImport = async () => {
     setIsImporting(true);
-    setImportStats({ success: 0, total: allParsedRows.length });
 
     const toastId = toast.loading("Starting import...", {
       position: "bottom-right",
     });
 
     try {
-      const countryCode = await getDefaultCountryCode();
-      const validRows = allParsedRows
-        .map((r) => getMappedRow(r, countryCode))
-        .filter((r) => r.name && (r.email || r.phoneE164));
+      let validRows = preparedImportRows;
+
+      if (validRows.length === 0) {
+        const countryCode = await getDefaultCountryCode();
+        const mappedRows = allParsedRows.map((r) =>
+          getMappedRow(r, countryCode)
+        );
+        const prepared = await prepareContactsForImport("", mappedRows);
+        validRows = prepared.contacts;
+        setPreparedImportRows(prepared.contacts);
+        setInvalidEmailContacts(prepared.invalidEmailContacts);
+        setDuplicateStats((current) => ({
+          ...current,
+          missingRequires: prepared.rowsMissingRequired,
+        }));
+      }
+
+      setImportStats({ success: 0, total: validRows.length });
 
       let successCount = 0;
       const chunkSize = 10;
@@ -411,6 +433,37 @@ export function ContactImportDialog({
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const downloadInvalidEmailsCsv = () => {
+    if (invalidEmailContacts.length === 0) return;
+
+    const headers = ["name", "originalEmail", "phoneE164", "reason"];
+    const escapeValue = (value: string | null | undefined) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const csv = [
+      headers.join(","),
+      ...invalidEmailContacts.map((contact) =>
+        [
+          escapeValue(contact.name),
+          escapeValue(contact.originalEmail),
+          escapeValue(contact.phoneE164),
+          escapeValue(contact.reason),
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "contacts-with-emails-to-review.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -924,6 +977,14 @@ export function ContactImportDialog({
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-muted-foreground text-sm">
+                  Emails removed for safety
+                </span>
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-500">
+                  {invalidEmailContacts.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-muted-foreground text-sm">
                   Duplicate strategy
                 </span>
                 <Badge variant="secondary" className="font-normal capitalize">
@@ -931,6 +992,37 @@ export function ContactImportDialog({
                 </Badge>
               </div>
             </div>
+
+            {invalidEmailContacts.length > 0 && (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex gap-3">
+                    <IconAlertTriangle className="mt-0.5 size-4 text-amber-500" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        Some contacts will be imported without their email
+                        address.
+                      </p>
+                      <p className="text-muted-foreground text-xs leading-5">
+                        Their email did not look ready to receive messages, so
+                        ReachDem will keep the contact but leave the email field
+                        blank. You can download the list, correct the addresses,
+                        and import them again later.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadInvalidEmailsCsv}
+                    className="shrink-0"
+                  >
+                    <IconDownload className="size-4" />
+                    Download CSV
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {isImporting && (
               <div className="bg-muted/20 flex flex-col gap-2 rounded-lg border p-4">
@@ -984,6 +1076,30 @@ export function ContactImportDialog({
                 errors and were skipped.
               </p>
             </div>
+            {invalidEmailContacts.length > 0 && (
+              <div className="w-full rounded-lg border border-amber-500/20 bg-amber-500/8 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex gap-3">
+                    <IconAlertTriangle className="mt-0.5 size-4 text-amber-500" />
+                    <p className="text-muted-foreground text-sm leading-6">
+                      {invalidEmailContacts.length} contact
+                      {invalidEmailContacts.length > 1 ? "s" : ""} were kept,
+                      but their email address was left blank because it did not
+                      seem valid for delivery.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadInvalidEmailsCsv}
+                    className="shrink-0"
+                  >
+                    <IconDownload className="size-4" />
+                    Download CSV
+                  </Button>
+                </div>
+              </div>
+            )}
             <Separator className="my-2" />
             <div className="flex gap-2">
               <Button

@@ -41,7 +41,14 @@ export const emailCampaignContentSchema = z.object({
     .string()
     .min(1, "Email HTML is required")
     .max(200000, "HTML cannot exceed 200000 characters"),
-  from: z.string().min(1).max(200).optional(),
+  from: z
+    .string()
+    .min(1)
+    .max(
+      15,
+      "Sender name cannot exceed 15 characters (Alibaba Direct Mail limit)"
+    )
+    .optional(),
   bodyJson: z.unknown().optional(),
   mode: z.enum(["visual", "html", "react"]).optional(),
   fontFamily: z.string().min(1).max(200).optional(),

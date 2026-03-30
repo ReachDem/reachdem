@@ -75,6 +75,7 @@ function buildEmailCampaignContent(
     subject:
       content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
     html: content.body || "<p>Empty email</p>",
+    from: content.fromName?.trim() || undefined,
     bodyJson: content.bodyJson,
     mode: content.mode,
     fontFamily: content.fontFamily,

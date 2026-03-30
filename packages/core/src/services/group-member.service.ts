@@ -93,53 +93,55 @@ export class GroupMemberService {
     organizationId: string,
     contactIds: string[]
   ) {
-    return await prisma.$transaction(async (tx) => {
-      // Verify group exists
-      await tx.group.findUniqueOrThrow({
-        where: { id: groupId, organizationId },
-      });
-
-      const uniqueContactIds = [...new Set(contactIds)];
-
-      // Ensure physical ownership of all contacts
-      const contactChunks = chunkArray(uniqueContactIds, 500);
-      let validContactsCount = 0;
-
-      for (const chunk of contactChunks) {
-        const count = await tx.contact.count({
-          where: {
-            id: { in: chunk },
-            organizationId,
-            deletedAt: null,
-          },
-        });
-        validContactsCount += count;
-      }
-
-      if (validContactsCount !== uniqueContactIds.length) {
-        throw new Error(
-          "One or more contacts are invalid or do not belong to this workspace."
-        );
-      }
-
-      // Insert graceful duplicate skipping via nested chunks
-      let totalInserted = 0;
-      const insertData = uniqueContactIds.map((contactId) => ({
-        groupId,
-        contactId,
-      }));
-      const insertChunks = chunkArray(insertData, 500);
-
-      for (const chunk of insertChunks) {
-        const result = await tx.groupMember.createMany({
-          data: chunk,
-          skipDuplicates: true,
-        });
-        totalInserted += result.count;
-      }
-
-      return totalInserted;
+    await prisma.group.findFirstOrThrow({
+      where: { id: groupId, organizationId },
+      select: { id: true },
     });
+
+    const uniqueContactIds = [...new Set(contactIds.filter(Boolean))];
+
+    if (uniqueContactIds.length === 0) {
+      return 0;
+    }
+
+    // Ensure all selected contacts belong to the workspace before inserting.
+    const contactChunks = chunkArray(uniqueContactIds, 500);
+    let validContactsCount = 0;
+
+    for (const chunk of contactChunks) {
+      const count = await prisma.contact.count({
+        where: {
+          id: { in: chunk },
+          organizationId,
+          deletedAt: null,
+        },
+      });
+      validContactsCount += count;
+    }
+
+    if (validContactsCount !== uniqueContactIds.length) {
+      throw new Error(
+        "One or more contacts are invalid or do not belong to this workspace."
+      );
+    }
+
+    // Create memberships in chunks and skip duplicates gracefully.
+    let totalInserted = 0;
+    const insertData = uniqueContactIds.map((contactId) => ({
+      groupId,
+      contactId,
+    }));
+    const insertChunks = chunkArray(insertData, 500);
+
+    for (const chunk of insertChunks) {
+      const result = await prisma.groupMember.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
+      totalInserted += result.count;
+    }
+
+    return totalInserted;
   }
 
   /**

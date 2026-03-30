@@ -75,6 +75,7 @@ function buildEmailCampaignContent(
     subject:
       content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
     html: content.body || "<p>Empty email</p>",
+    from: content.fromName?.trim() || undefined,
     bodyJson: content.bodyJson,
     mode: content.mode,
     fontFamily: content.fontFamily,
@@ -204,6 +205,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
             mode: data.content?.mode || "visual",
             fontFamily: data.content?.fontFamily,
             fontWeights: data.content?.fontWeights,
+            fromName: data.content?.from,
           });
         } else if (data.channel === "sms") {
           setSmsContent({
