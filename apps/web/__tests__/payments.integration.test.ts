@@ -12,6 +12,7 @@ import { createHmac, randomUUID } from "crypto";
 import { prisma } from "@reachdem/database";
 import { POST as createPaymentSessionHandler } from "../app/api/v1/payments/session/route";
 import { GET as getPaymentSessionHandler } from "../app/api/v1/payments/session/[id]/route";
+import { POST as reconcilePaymentSessionHandler } from "../app/api/v1/payments/session/[id]/route";
 import { POST as flutterwaveWebhookHandler } from "../app/api/v1/payments/webhooks/flutterwave/route";
 import { POST as stripeWebhookHandler } from "../app/api/v1/payments/webhooks/stripe/route";
 
@@ -51,9 +52,11 @@ describe("Payments API - integration", () => {
     });
 
     process.env.PAYMENT_PLAN_GROWTH_AMOUNT_MINOR = "15000";
+    process.env.PAYMENT_PLAN_BASIC_AMOUNT_MINOR = "5000";
+    process.env.PAYMENT_PLAN_PRO_AMOUNT_MINOR = "50000";
     process.env.PAYMENT_CREDIT_UNIT_AMOUNT_MINOR = "10";
     process.env.PAYMENT_RETURN_URL =
-      "https://reachdem.example.com/dashboard/billing";
+      "https://reachdem.example.com/settings/workspace";
     process.env.FLUTTERWAVE_V4_BASE_URL = "https://api.flutterwave.com/v3";
     process.env.FLUTTERWAVE_SECRET_KEY = "flw-secret";
     process.env.FLUTTERWAVE_WEBHOOK_SECRET_HASH = "flw-webhook-secret";
@@ -276,7 +279,11 @@ describe("Payments API - integration", () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
 
-        if (url.startsWith("https://api.flutterwave.com/v3/charges/")) {
+        if (
+          url.startsWith(
+            "https://api.flutterwave.com/v3/transactions/999999/verify"
+          )
+        ) {
           return new Response(
             JSON.stringify({
               data: {
@@ -334,6 +341,84 @@ describe("Payments API - integration", () => {
       where: { id: REAL_ORG_ID },
     });
     expect(organization?.planCode).toBe("growth");
+  });
+
+  it("POST /payments/session/:id reconciles a Flutterwave redirect and fulfills the purchase", async () => {
+    const createReq = new NextRequest(
+      "http://localhost/api/v1/payments/session",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "creditPurchase",
+          creditsQuantity: 250,
+          currency: "XAF",
+        }),
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    const createRes = await createPaymentSessionHandler(createReq, {} as any);
+    const created = await createRes.json();
+    createdPaymentSessionIds.push(created.paymentSessionId);
+
+    const session = await prisma.paymentSession.findUniqueOrThrow({
+      where: { id: created.paymentSessionId },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (
+          url === "https://api.flutterwave.com/v3/transactions/777777/verify"
+        ) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                id: 777777,
+                tx_ref: session.providerReference,
+                reference: session.providerReference,
+                status: "successful",
+                amount: 5000,
+                currency: "XAF",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        return new Response("not found", { status: 404 });
+      })
+    );
+
+    const res = await reconcilePaymentSessionHandler(
+      new NextRequest(
+        `http://localhost/api/v1/payments/session/${created.paymentSessionId}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "flutterwave",
+            providerReference: session.providerReference,
+            providerTransactionId: "777777",
+            status: "successful",
+          }),
+          headers: { "Content-Type": "application/json" },
+        }
+      ),
+      { params: Promise.resolve({ id: created.paymentSessionId }) }
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.session.status).toBe("succeeded");
+    expect(body.transactions[0].providerTransactionId).toBe("777777");
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: REAL_ORG_ID },
+    });
+    expect(organization?.creditBalance).toBeGreaterThanOrEqual(250);
   });
 
   it("Stripe webhook with invalid signature is rejected", async () => {

@@ -27,6 +27,7 @@ export * from "./services/tracked-link.service";
 export * from "./services/payment-fulfillment.service";
 export * from "./services/payment-orchestrator.service";
 export * from "./services/plan-entitlements.service";
+export * from "./services/billing-catalog.service";
 export * from "./services/workspace-billing.service";
 export * from "./errors/campaign.errors";
 export * from "./errors/messaging.errors";

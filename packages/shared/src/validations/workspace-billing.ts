@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { billingPlanSchema, creditPricingSchema } from "./billing-catalog";
 
 export const workspaceBillingSummarySchema = z.object({
   organizationId: z.string(),
@@ -19,6 +20,8 @@ export const workspaceBillingSummarySchema = z.object({
   smsQuotaRemaining: z.number().int().nonnegative().nullable(),
   emailQuotaRemaining: z.number().int().nonnegative().nullable(),
   usesSharedCredits: z.boolean(),
+  availablePlans: z.array(billingPlanSchema),
+  creditPricing: creditPricingSchema,
 });
 
 export type WorkspaceBillingSummary = z.infer<

@@ -1,5 +1,6 @@
 import { prisma } from "@reachdem/database";
 import type { WorkspaceBillingSummary } from "@reachdem/shared";
+import { BillingCatalogService } from "./billing-catalog.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
 
 export class WorkspaceBillingService {
@@ -24,11 +25,14 @@ export class WorkspaceBillingService {
       return null;
     }
 
-    const entitlements = PlanEntitlementsService.get(organization.planCode);
+    const normalizedPlanCode = BillingCatalogService.normalizePlanCode(
+      organization.planCode
+    );
+    const entitlements = PlanEntitlementsService.get(normalizedPlanCode);
 
     return {
       organizationId: organization.id,
-      planCode: organization.planCode,
+      planCode: normalizedPlanCode,
       creditBalance: organization.creditBalance,
       workspaceVerificationStatus: organization.workspaceVerificationStatus,
       workspaceVerifiedAt: organization.workspaceVerifiedAt,
@@ -54,6 +58,8 @@ export class WorkspaceBillingService {
         "email"
       ),
       usesSharedCredits: entitlements.usesSharedCredits,
+      availablePlans: BillingCatalogService.getPlanCatalog(),
+      creditPricing: BillingCatalogService.getCreditPricing(),
     };
   }
 }

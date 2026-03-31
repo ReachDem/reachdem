@@ -1,3 +1,5 @@
+import { BillingCatalogService } from "./billing-catalog.service";
+
 type Channel = "sms" | "email";
 
 export interface PlanEntitlements {
@@ -9,22 +11,14 @@ export interface PlanEntitlements {
 
 export class PlanEntitlementsService {
   static get(planCode?: string | null): PlanEntitlements {
-    switch ((planCode ?? "free").toLowerCase()) {
-      case "experimental":
-        return {
-          planCode: "experimental",
-          smsIncludedLimit: 5,
-          emailIncludedLimit: 30,
-          usesSharedCredits: false,
-        };
-      default:
-        return {
-          planCode: (planCode ?? "free").toLowerCase(),
-          smsIncludedLimit: null,
-          emailIncludedLimit: null,
-          usesSharedCredits: true,
-        };
-    }
+    const normalized = BillingCatalogService.normalizePlanCode(planCode);
+
+    return {
+      planCode: normalized,
+      smsIncludedLimit: null,
+      emailIncludedLimit: null,
+      usesSharedCredits: true,
+    };
   }
 
   static getRemainingIncluded(

@@ -16,9 +16,24 @@ import {
 const ZERO_DECIMAL_CURRENCIES = new Set(["XAF", "XOF", "JPY", "KRW"]);
 
 function getBaseUrl(): string {
-  return (
-    process.env.FLUTTERWAVE_V4_BASE_URL ?? "https://api.flutterwave.com/v3"
-  );
+  const configured = process.env.FLUTTERWAVE_V4_BASE_URL?.trim();
+  if (!configured) {
+    return "https://api.flutterwave.com/v3";
+  }
+
+  if (/f4bexperience\.flutterwave\.com/i.test(configured)) {
+    return "https://api.flutterwave.com/v3";
+  }
+
+  if (/\/v\d+$/i.test(configured)) {
+    return configured;
+  }
+
+  if (/flutterwave\.com/i.test(configured)) {
+    return `${configured.replace(/\/+$/, "")}/v3`;
+  }
+
+  return configured;
 }
 
 function getSecretKey(): string {
@@ -45,6 +60,13 @@ function getWebhookSecret(): string {
 
 export class FlutterwavePaymentProvider implements PaymentProviderPort {
   readonly providerName = "flutterwave" as const;
+
+  private buildReturnUrl(baseUrl: string, paymentSessionId: string): string {
+    const url = new URL(baseUrl);
+    url.searchParams.set("payment_session_id", paymentSessionId);
+    url.searchParams.set("provider", this.providerName);
+    return url.toString();
+  }
 
   private toProviderAmount(currency: string, amountMinor: number): number {
     return ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase())
@@ -74,13 +96,24 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
           tx_ref: txRef,
           amount: this.toProviderAmount(input.currency, input.amountMinor),
           currency: input.currency,
-          redirect_url: input.returnUrl,
+          redirect_url: this.buildReturnUrl(
+            input.returnUrl,
+            input.paymentSessionId
+          ),
           customer: {
             email: input.customerEmail ?? "payments@reachdem.local",
           },
           customizations: {
             title: "ReachDem Payment",
             description: input.description,
+          },
+          configurations: {
+            session_duration: Number(
+              process.env.PAYMENT_SESSION_DURATION_MINUTES ?? "30"
+            ),
+            max_retry_attempt: Number(
+              process.env.PAYMENT_MAX_RETRY_ATTEMPTS ?? "5"
+            ),
           },
           meta: {
             paymentSessionId: input.paymentSessionId,
@@ -211,7 +244,7 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     }
 
     const response = await fetch(
-      `${getBaseUrl().replace(/\/+$/, "")}/charges/${encodeURIComponent(transactionId)}`,
+      `${getBaseUrl().replace(/\/+$/, "")}/transactions/${encodeURIComponent(transactionId)}/verify`,
       {
         method: "GET",
         headers: {
@@ -255,7 +288,7 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
         status === "completed" ||
         status === "succeeded") &&
       currency === input.expectedCurrency.toUpperCase() &&
-      amountMinor === input.expectedAmountMinor &&
+      amountMinor >= input.expectedAmountMinor &&
       Boolean(
         reference &&
         input.providerReference &&

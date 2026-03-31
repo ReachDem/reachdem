@@ -7,30 +7,33 @@ import type {
   PaymentSessionDetailsResponse,
   PaymentSessionResponse,
   PaymentTransactionResponse,
+  ReconcilePaymentSessionDto,
 } from "@reachdem/shared";
 import { FlutterwavePaymentProvider } from "../integrations/payments/flutterwave.provider";
 import {
-  PaymentVerificationError,
   PaymentSessionNotFoundError,
+  PaymentVerificationError,
   PaymentWebhookSignatureError,
 } from "../errors/payment.errors";
 import type {
   CreateProviderCheckoutSessionInput,
   PaymentProviderPort,
 } from "../ports/payment-provider.port";
-import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { StripePaymentProvider } from "../integrations/payments/stripe.provider";
-
-const PLAN_AMOUNT_ENV_PREFIX = "PAYMENT_PLAN_";
-const CREDIT_UNIT_AMOUNT_ENV = "PAYMENT_CREDIT_UNIT_AMOUNT_MINOR";
+import { BillingCatalogService } from "./billing-catalog.service";
+import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 
 function getReturnUrl(): string {
-  return (
-    process.env.PAYMENT_RETURN_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.BETTER_AUTH_URL ??
-    "http://localhost:3000/dashboard/billing"
-  );
+  const explicit = process.env.PAYMENT_RETURN_URL?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ??
+    process.env.BETTER_AUTH_URL?.trim() ??
+    "http://localhost:3000";
+  return new URL("/settings/workspace", baseUrl).toString();
 }
 
 function mapSession(session: any): PaymentSessionResponse {
@@ -85,36 +88,30 @@ function mapTransaction(transaction: any): PaymentTransactionResponse {
   };
 }
 
-function getPlanAmountMinor(planCode: string): number {
-  const envKey = `${PLAN_AMOUNT_ENV_PREFIX}${planCode.toUpperCase()}_AMOUNT_MINOR`;
-  const raw = process.env[envKey];
-  const amount = Number(raw);
-  if (!raw || !Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`Missing or invalid plan amount env: ${envKey}`);
-  }
-  return amount;
-}
-
-function getCreditUnitAmountMinor(): number {
-  const raw = process.env[CREDIT_UNIT_AMOUNT_ENV] ?? "1";
-  const amount = Number(raw);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`Missing or invalid ${CREDIT_UNIT_AMOUNT_ENV}`);
-  }
-  return amount;
-}
-
 function resolveAmountMinor(data: CreatePaymentSessionDto): number {
   if (data.kind === "subscription") {
-    return getPlanAmountMinor(data.planCode!);
+    return BillingCatalogService.getPlanAmountMinor(data.planCode);
   }
-  return getCreditUnitAmountMinor() * (data.creditsQuantity ?? 0);
+
+  const minimumQuantity =
+    BillingCatalogService.getCreditPricing().minimumQuantity;
+  if ((data.creditsQuantity ?? 0) < minimumQuantity) {
+    throw new Error(
+      `Minimum credit purchase is ${minimumQuantity.toLocaleString()} credits`
+    );
+  }
+
+  return BillingCatalogService.calculateCreditAmountMinor(
+    data.creditsQuantity ?? 0
+  );
 }
 
 function resolveDescription(data: CreatePaymentSessionDto): string {
   if (data.kind === "subscription") {
-    return `ReachDem subscription for plan ${data.planCode}`;
+    const plan = BillingCatalogService.getPlan(data.planCode);
+    return `ReachDem ${plan?.name ?? data.planCode} subscription`;
   }
+
   return `ReachDem credits purchase (${data.creditsQuantity} credits)`;
 }
 
@@ -127,7 +124,103 @@ function createProvider(provider: PaymentProvider): PaymentProviderPort {
   }
 }
 
+type MutableSessionStatus =
+  | "pending"
+  | "providerRedirected"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "expired";
+
+type MutableTransactionStatus =
+  | "initiated"
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "refunded";
+
 export class PaymentOrchestratorService {
+  private static async markSessionAndTransaction(args: {
+    paymentSessionId: string;
+    transactionId: string;
+    provider: PaymentProvider;
+    sessionStatus: MutableSessionStatus;
+    transactionStatus: MutableTransactionStatus;
+    providerTransactionId?: string | null;
+    providerEventId?: string | null;
+    providerReference?: string | null;
+    rawStatus?: string | null;
+    rawPayload?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const session = await prisma.paymentSession.findUnique({
+      where: { id: args.paymentSessionId },
+    });
+
+    if (!session) {
+      throw new PaymentSessionNotFoundError();
+    }
+
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.paymentTransaction.update({
+        where: { id: args.transactionId },
+        data: {
+          status: args.transactionStatus,
+          providerTransactionId:
+            args.providerTransactionId !== undefined
+              ? args.providerTransactionId
+              : undefined,
+          providerEventId:
+            args.providerEventId !== undefined
+              ? args.providerEventId
+              : undefined,
+          providerReference:
+            args.providerReference !== undefined
+              ? args.providerReference
+              : undefined,
+          rawStatus: args.rawStatus !== undefined ? args.rawStatus : undefined,
+          rawPayload:
+            args.rawPayload !== undefined
+              ? (args.rawPayload as any)
+              : undefined,
+          confirmedAt: args.transactionStatus === "succeeded" ? now : undefined,
+          failedAt: args.transactionStatus === "failed" ? now : undefined,
+          cancelledAt: args.transactionStatus === "cancelled" ? now : undefined,
+          refundedAt: args.transactionStatus === "refunded" ? now : undefined,
+        },
+      });
+
+      await tx.paymentSession.update({
+        where: { id: args.paymentSessionId },
+        data: {
+          status: args.sessionStatus,
+          providerSelected: args.provider,
+          providerReference:
+            args.providerReference !== undefined
+              ? args.providerReference
+              : undefined,
+          failedAt: args.sessionStatus === "failed" ? now : undefined,
+          cancelledAt: args.sessionStatus === "cancelled" ? now : undefined,
+          expiredAt: args.sessionStatus === "expired" ? now : undefined,
+        },
+      });
+    });
+
+    if (args.sessionStatus === "succeeded" && !session.activatedAt) {
+      await PaymentFulfillmentService.fulfill({
+        paymentSessionId: session.id,
+        organizationId: session.organizationId,
+        kind: session.kind as PaymentKind,
+        planCode: session.planCode,
+        creditsQuantity: session.creditsQuantity,
+      });
+    }
+  }
+
   static async createSession(
     organizationId: string,
     initiatedByUserId: string,
@@ -135,6 +228,15 @@ export class PaymentOrchestratorService {
   ): Promise<CreatePaymentSessionResult> {
     const amountMinor = resolveAmountMinor(data);
     const providerPrimary: PaymentProvider = "flutterwave";
+    const normalizedPlanCode =
+      data.kind === "subscription"
+        ? BillingCatalogService.normalizePlanCode(data.planCode)
+        : null;
+    const user = await prisma.user.findUnique({
+      where: { id: initiatedByUserId },
+      select: { email: true },
+    });
+
     const session = await prisma.paymentSession.create({
       data: {
         organizationId,
@@ -143,7 +245,7 @@ export class PaymentOrchestratorService {
         providerPrimary,
         currency: data.currency,
         amountMinor,
-        planCode: data.planCode ?? null,
+        planCode: normalizedPlanCode,
         creditsQuantity: data.creditsQuantity ?? null,
         metadata: (data.metadata ?? null) as any,
       },
@@ -154,6 +256,7 @@ export class PaymentOrchestratorService {
 
     for (const providerName of providerOrder) {
       const provider = createProvider(providerName);
+
       try {
         const providerInput: CreateProviderCheckoutSessionInput = {
           paymentSessionId: session.id,
@@ -162,15 +265,17 @@ export class PaymentOrchestratorService {
           amountMinor,
           description: resolveDescription(data),
           returnUrl: getReturnUrl(),
+          customerEmail: user?.email ?? null,
           metadata: {
             kind: data.kind,
-            planCode: data.planCode ?? null,
+            planCode: normalizedPlanCode,
             creditsQuantity: data.creditsQuantity ?? null,
             ...(data.metadata ?? {}),
           },
         };
 
         const result = await provider.createCheckoutSession(providerInput);
+
         await prisma.$transaction(async (tx) => {
           await tx.paymentSession.update({
             where: { id: session.id },
@@ -244,6 +349,129 @@ export class PaymentOrchestratorService {
     };
   }
 
+  static async reconcileSession(
+    organizationId: string,
+    id: string,
+    data: ReconcilePaymentSessionDto
+  ): Promise<PaymentSessionDetailsResponse> {
+    const session = await prisma.paymentSession.findFirst({
+      where: { id, organizationId },
+      include: {
+        transactions: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!session) {
+      throw new PaymentSessionNotFoundError();
+    }
+
+    const transaction = session.transactions.at(-1);
+    if (!transaction) {
+      return {
+        session: mapSession(session),
+        transactions: session.transactions.map(mapTransaction),
+      };
+    }
+
+    const providerName = (data.provider ??
+      session.providerSelected ??
+      transaction.provider) as PaymentProvider;
+
+    if (data.cancelled || data.status?.toLowerCase() === "cancelled") {
+      await this.markSessionAndTransaction({
+        paymentSessionId: session.id,
+        transactionId: transaction.id,
+        provider: providerName,
+        sessionStatus: "cancelled",
+        transactionStatus: "cancelled",
+        providerTransactionId:
+          data.providerTransactionId ?? transaction.providerTransactionId,
+        providerReference:
+          data.providerReference ?? transaction.providerReference,
+        rawStatus: data.status ?? "cancelled",
+      });
+      return this.getSessionById(organizationId, id);
+    }
+
+    if (
+      data.status?.toLowerCase() === "failed" &&
+      !data.providerTransactionId
+    ) {
+      await this.markSessionAndTransaction({
+        paymentSessionId: session.id,
+        transactionId: transaction.id,
+        provider: providerName,
+        sessionStatus: "failed",
+        transactionStatus: "failed",
+        providerReference:
+          data.providerReference ?? transaction.providerReference,
+        rawStatus: data.status,
+      });
+      return this.getSessionById(organizationId, id);
+    }
+
+    const provider = createProvider(providerName);
+    if (
+      typeof provider.verifyTransaction !== "function" ||
+      (!data.providerTransactionId && !transaction.providerTransactionId)
+    ) {
+      return {
+        session: mapSession(session),
+        transactions: session.transactions.map(mapTransaction),
+      };
+    }
+
+    const verification = await provider.verifyTransaction({
+      providerReference:
+        data.providerReference ?? transaction.providerReference,
+      providerTransactionId:
+        data.providerTransactionId ?? transaction.providerTransactionId,
+      expectedAmountMinor: transaction.amountMinor,
+      expectedCurrency: transaction.currency,
+    });
+
+    if (verification.verified) {
+      await this.markSessionAndTransaction({
+        paymentSessionId: session.id,
+        transactionId: transaction.id,
+        provider: providerName,
+        sessionStatus: "succeeded",
+        transactionStatus: "succeeded",
+        providerTransactionId:
+          verification.providerTransactionId ??
+          transaction.providerTransactionId,
+        providerReference:
+          verification.providerReference ?? transaction.providerReference,
+        rawStatus: verification.rawStatus ?? data.status ?? "successful",
+        rawPayload: verification.rawPayload,
+      });
+
+      return this.getSessionById(organizationId, id);
+    }
+
+    const status = (verification.rawStatus ?? data.status ?? "").toLowerCase();
+    if (status === "failed") {
+      await this.markSessionAndTransaction({
+        paymentSessionId: session.id,
+        transactionId: transaction.id,
+        provider: providerName,
+        sessionStatus: "failed",
+        transactionStatus: "failed",
+        providerTransactionId:
+          verification.providerTransactionId ??
+          transaction.providerTransactionId,
+        providerReference:
+          verification.providerReference ?? transaction.providerReference,
+        rawStatus: verification.rawStatus ?? data.status ?? "failed",
+        rawPayload: verification.rawPayload,
+      });
+    }
+
+    return this.getSessionById(organizationId, id);
+  }
+
   static async processWebhook(
     providerName: PaymentProvider,
     rawBody: string,
@@ -254,9 +482,11 @@ export class PaymentOrchestratorService {
       rawBody,
       headers
     );
+
     if (!signatureValid) {
       throw new PaymentWebhookSignatureError();
     }
+
     const parsed = await provider.parseWebhookEvent(rawBody, headers);
 
     const existingEvent = parsed.providerEventId
@@ -346,72 +576,27 @@ export class PaymentOrchestratorService {
       }
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.paymentTransaction.update({
-        where: { id: transaction.id },
-        data: {
-          status: parsed.normalizedTransactionStatus,
-          providerTransactionId:
-            parsed.providerTransactionId ?? transaction.providerTransactionId,
-          providerEventId: parsed.providerEventId ?? null,
-          rawStatus: parsed.rawStatus ?? null,
-          rawPayload: parsed.rawPayload as any,
-          confirmedAt:
-            parsed.normalizedTransactionStatus === "succeeded"
-              ? new Date()
-              : transaction.confirmedAt,
-          failedAt:
-            parsed.normalizedTransactionStatus === "failed"
-              ? new Date()
-              : transaction.failedAt,
-          cancelledAt:
-            parsed.normalizedTransactionStatus === "cancelled"
-              ? new Date()
-              : transaction.cancelledAt,
-          refundedAt:
-            parsed.normalizedTransactionStatus === "refunded"
-              ? new Date()
-              : transaction.refundedAt,
-        },
-      });
-
-      await tx.paymentSession.update({
-        where: { id: transaction.paymentSessionId },
-        data: {
-          status: parsed.normalizedSessionStatus,
-          providerSelected: providerName,
-          failedAt:
-            parsed.normalizedSessionStatus === "failed"
-              ? new Date()
-              : transaction.paymentSession.failedAt,
-          cancelledAt:
-            parsed.normalizedSessionStatus === "cancelled"
-              ? new Date()
-              : transaction.paymentSession.cancelledAt,
-          expiredAt:
-            parsed.normalizedSessionStatus === "expired"
-              ? new Date()
-              : transaction.paymentSession.expiredAt,
-        },
-      });
-
-      await tx.paymentWebhookEvent.update({
-        where: { id: webhookEvent.id },
-        data: {
-          processed: true,
-          processedAt: new Date(),
-        },
-      });
+    await this.markSessionAndTransaction({
+      paymentSessionId: transaction.paymentSessionId,
+      transactionId: transaction.id,
+      provider: providerName,
+      sessionStatus: parsed.normalizedSessionStatus,
+      transactionStatus: parsed.normalizedTransactionStatus,
+      providerTransactionId:
+        parsed.providerTransactionId ?? transaction.providerTransactionId,
+      providerEventId: parsed.providerEventId ?? null,
+      providerReference:
+        parsed.providerReference ?? transaction.providerReference,
+      rawStatus: parsed.rawStatus ?? null,
+      rawPayload: parsed.rawPayload,
     });
 
-    if (parsed.normalizedSessionStatus === "succeeded") {
-      await PaymentFulfillmentService.fulfill({
-        paymentSessionId: transaction.paymentSessionId,
-        organizationId: transaction.organizationId,
-        kind: transaction.paymentSession.kind as PaymentKind,
-        planCode: transaction.paymentSession.planCode,
-        creditsQuantity: transaction.paymentSession.creditsQuantity,
-      });
-    }
+    await prisma.paymentWebhookEvent.update({
+      where: { id: webhookEvent.id },
+      data: {
+        processed: true,
+        processedAt: new Date(),
+      },
+    });
   }
 }

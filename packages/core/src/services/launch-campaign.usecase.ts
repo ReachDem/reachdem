@@ -117,7 +117,7 @@ export class LaunchCampaignUseCase {
                   from:
                     ("subject" in parsedCampaign
                       ? parsedCampaign.from
-                      : undefined) ?? "ReachDem Notifications",
+                      : undefined) ?? "ReachDem",
                   idempotency_key: idempotencyKey,
                   campaignId,
                   scheduledAt,

@@ -38,7 +38,7 @@ const navigationItems = [
   {
     heading: "Contacts",
     items: [
-      { icon: Users, label: "All Contacts", href: "/dashboard/contacts" },
+      { icon: Users, label: "All Contacts", href: "/contacts" },
       { icon: Users, label: "Groups", href: "/dashboard/contacts/groups" },
       { icon: Users, label: "Segments", href: "/dashboard/contacts/segments" },
     ],

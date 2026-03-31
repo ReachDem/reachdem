@@ -38,7 +38,7 @@ describe("Workspace billing API - integration", () => {
     await prisma.organization.update({
       where: { id: REAL_ORG_ID },
       data: {
-        planCode: "experimental",
+        planCode: "growth",
         creditBalance: 42,
         smsQuotaUsed: 2,
         emailQuotaUsed: 7,
@@ -56,14 +56,16 @@ describe("Workspace billing API - integration", () => {
 
     expect(res.status).toBe(200);
     expect(body.organizationId).toBe(REAL_ORG_ID);
-    expect(body.planCode).toBe("experimental");
+    expect(body.planCode).toBe("growth");
     expect(body.creditBalance).toBe(42);
     expect(body.senderId).toBe("REACHDEM");
     expect(body.workspaceVerificationStatus).toBe("verified");
-    expect(body.smsIncludedLimit).toBe(5);
-    expect(body.emailIncludedLimit).toBe(30);
-    expect(body.smsQuotaRemaining).toBe(3);
-    expect(body.emailQuotaRemaining).toBe(23);
-    expect(body.usesSharedCredits).toBe(false);
+    expect(body.smsIncludedLimit).toBeNull();
+    expect(body.emailIncludedLimit).toBeNull();
+    expect(body.smsQuotaRemaining).toBeNull();
+    expect(body.emailQuotaRemaining).toBeNull();
+    expect(body.usesSharedCredits).toBe(true);
+    expect(body.availablePlans).toHaveLength(4);
+    expect(body.creditPricing.currency).toBe("XAF");
   });
 });

@@ -57,7 +57,7 @@ export class EnqueueEmailUseCase {
           toEmail: input.to,
           toHashed: hashEmail(input.to),
           toLast4: last4Email(input.to),
-          from: input.from ?? "ReachDem Notifications",
+          from: input.from ?? "ReachDem",
           subject: input.subject,
           html: input.html,
           status: input.scheduledAt ? "scheduled" : "queued",

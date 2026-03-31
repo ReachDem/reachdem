@@ -792,6 +792,36 @@ paths:
           description: Payment session not found
         "500":
           description: Internal server error
+    post:
+      summary: Reconcile Payment Session
+      description: Confirms or refreshes the current payment session after a provider redirect using the provider transaction identifiers.
+      tags: [Payments]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcilePaymentSessionDto"
+      responses:
+        "200":
+          description: Payment session detail after reconciliation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSessionDetailsResponse"
+        "400":
+          description: Validation error
+        "404":
+          description: Payment session not found
+        "500":
+          description: Internal server error
 
   /payments/webhooks/flutterwave:
     post:
@@ -1161,6 +1191,7 @@ components:
           example: XAF
         planCode:
           type: string
+          enum: [free, basic, growth, pro, custom]
           nullable: true
           example: growth
         creditsQuantity:
@@ -1171,7 +1202,7 @@ components:
           type: object
           nullable: true
           additionalProperties: true
-      description: For `subscription`, `planCode` is required. For `creditPurchase`, `creditsQuantity` is required.
+      description: For `subscription`, `planCode` is required. For `creditPurchase`, `creditsQuantity` is required. `free` and `custom` are not purchasable via checkout.
 
     CreatePaymentSessionResult:
       type: object
@@ -1187,6 +1218,24 @@ components:
         checkoutUrl:
           type: string
           format: uri
+          nullable: true
+
+    ReconcilePaymentSessionDto:
+      type: object
+      properties:
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        providerReference:
+          type: string
+          nullable: true
+        providerTransactionId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
           nullable: true
 
     PaymentSessionResponse:

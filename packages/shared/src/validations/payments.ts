@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { billingPlanCodeSchema } from "./billing-catalog";
 
 export const paymentKindSchema = z.enum(["subscription", "creditPurchase"]);
 export const paymentProviderSchema = z.enum(["flutterwave", "stripe"]);
@@ -37,7 +38,7 @@ export const createPaymentSessionSchema = z
       .min(3)
       .max(3)
       .transform((value) => value.toUpperCase()),
-    planCode: z.string().min(1).max(100).optional(),
+    planCode: billingPlanCodeSchema.optional(),
     creditsQuantity: z.number().int().positive().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
@@ -57,9 +58,31 @@ export const createPaymentSessionSchema = z
         path: ["creditsQuantity"],
       });
     }
+
+    if (
+      value.kind === "subscription" &&
+      (value.planCode === "free" || value.planCode === "custom")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "This plan cannot be purchased through checkout",
+        path: ["planCode"],
+      });
+    }
   });
 export type CreatePaymentSessionDto = z.infer<
   typeof createPaymentSessionSchema
+>;
+
+export const reconcilePaymentSessionSchema = z.object({
+  provider: paymentProviderSchema.optional(),
+  providerReference: z.string().min(1).optional(),
+  providerTransactionId: z.string().min(1).optional(),
+  status: z.string().min(1).optional(),
+  cancelled: z.boolean().optional(),
+});
+export type ReconcilePaymentSessionDto = z.infer<
+  typeof reconcilePaymentSessionSchema
 >;
 
 export const paymentSessionResponseSchema = z.object({
