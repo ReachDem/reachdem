@@ -224,13 +224,10 @@ export function EmailComposer({
             value={value.fromName || ""}
             onChange={(e) => handleFromNameChange(e.target.value)}
             disabled={disabled}
-            maxLength={15}
             className="border-none"
           />
           <p className="text-muted-foreground text-xs">
-            {value.fromName
-              ? `${value.fromName.length}/15 characters`
-              : "Default: ReachDem (max 15 chars)"}
+            {value.fromName ? "" : "Default: ReachDem"}
           </p>
         </div>
 

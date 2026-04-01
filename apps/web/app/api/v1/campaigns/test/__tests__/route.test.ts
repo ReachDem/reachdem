@@ -26,7 +26,7 @@ vi.mock("@reachdem/core", () => ({
 }));
 
 // Mock publishEmailJob
-const mockPublishEmailJob = vi.fn();
+const mockPublishEmailJob = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/publish-email-job", () => ({
   publishEmailJob: mockPublishEmailJob,
 }));

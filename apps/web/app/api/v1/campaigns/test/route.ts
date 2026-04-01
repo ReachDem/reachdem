@@ -11,13 +11,7 @@ const testEmailSchema = z.object({
   htmlContent: z.string().min(1, "Email content is required"),
   fontFamily: z.string().optional(),
   fontWeights: z.array(z.number()).optional(),
-  fromName: z
-    .string()
-    .max(
-      15,
-      "Sender name cannot exceed 15 characters (Alibaba Direct Mail limit)"
-    )
-    .optional(),
+  fromName: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -67,26 +61,11 @@ export async function POST(req: NextRequest) {
 
     // Use the same sender name as campaigns
     // Trim and check if fromName is not empty
-    // IMPORTANT: Alibaba Direct Mail has a 15 character limit for FromAlias
     const customFromName = parsed.data.fromName?.trim();
     let fromName =
       customFromName && customFromName.length > 0
         ? customFromName
         : process.env.SENDER_NAME || "ReachDem";
-
-    // Warn if exceeds 15 characters (will be truncated by worker)
-    if (fromName.length > 15) {
-      console.warn(
-        `[Test Email] Sender name "${fromName}" exceeds 15 character limit (Alibaba Direct Mail), will be truncated`
-      );
-    }
-
-    console.log("[Test Email] Using sender name:", {
-      customFromName,
-      finalFromName: fromName,
-      fromNameLength: fromName.length,
-      envSenderName: process.env.SENDER_NAME,
-    });
 
     // Use the same email sending system as campaigns
     const result = await EnqueueEmailUseCase.execute(

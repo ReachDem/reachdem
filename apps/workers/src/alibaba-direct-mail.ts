@@ -172,14 +172,6 @@ export async function sendAlibabaDirectMail(
         env.SENDER_NAME?.trim() ||
         "ReachDem";
 
-  // Truncate to 15 characters if needed (Alibaba Direct Mail limit)
-  if (fromAlias.length > 15) {
-    console.warn(
-      `[Alibaba Direct Mail] FromAlias "${fromAlias}" exceeds 15 character limit, truncating to "${fromAlias.substring(0, 15)}"`
-    );
-    fromAlias = fromAlias.substring(0, 15);
-  }
-
   console.log("[Alibaba Direct Mail] Sender configuration:", {
     inputFromName: input.fromName,
     customFromName,
