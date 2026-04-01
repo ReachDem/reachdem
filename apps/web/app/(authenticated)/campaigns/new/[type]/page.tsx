@@ -278,8 +278,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       toast.success("Draft saved successfully");
       console.log("[Campaign] Draft save completed");
 
-      // Redirect to campaigns list
-      router.push("/campaigns");
+      // Redirect to edit page
+      router.replace(`/campaigns/${result.id}/edit`);
     } catch (error) {
       console.error("[Campaign] Error saving draft:", error);
       const errorMessage =

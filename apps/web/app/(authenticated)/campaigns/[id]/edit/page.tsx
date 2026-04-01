@@ -346,7 +346,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       }
 
       toast.success("Draft saved successfully");
-      router.push("/campaigns");
     } catch (error) {
       console.error("[Edit Campaign] Error saving draft:", error);
       const errorMessage =

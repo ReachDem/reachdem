@@ -18,6 +18,23 @@ import {
 } from "../errors/campaign.errors";
 
 export class CampaignService {
+  private static getSafeString(
+    value: unknown,
+    fallback: string,
+    maxLength?: number
+  ): string {
+    if (typeof value !== "string") {
+      return fallback;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return fallback;
+    }
+
+    return maxLength ? trimmed.slice(0, maxLength) : trimmed;
+  }
+
   static getCampaignContent(campaign: {
     channel: "sms" | "email";
     content: unknown;
@@ -25,12 +42,64 @@ export class CampaignService {
     try {
       return parseCampaignContent(campaign.channel, campaign.content);
     } catch (error) {
+      const rawContent =
+        campaign.content && typeof campaign.content === "object"
+          ? (campaign.content as Record<string, unknown>)
+          : {};
+
       if (campaign.channel === "sms") {
-        return { text: "Error loading content" } as SmsCampaignContent;
+        return {
+          text: this.getSafeString(
+            rawContent.text,
+            "Error loading content",
+            1600
+          ),
+          ...(typeof rawContent.from === "string" && rawContent.from.trim()
+            ? { from: rawContent.from.trim().slice(0, 20) }
+            : {}),
+          ...(typeof rawContent.senderId === "string" &&
+          rawContent.senderId.trim()
+            ? { senderId: rawContent.senderId.trim().slice(0, 20) }
+            : {}),
+        } as SmsCampaignContent;
       }
+
       return {
-        subject: "Error loading content",
-        html: "<p>Error loading content</p>",
+        subject: this.getSafeString(
+          rawContent.subject,
+          "Error loading content",
+          200
+        ),
+        html: this.getSafeString(
+          rawContent.html,
+          "<p>Error loading content</p>",
+          200000
+        ),
+        ...(typeof rawContent.from === "string" && rawContent.from.trim()
+          ? { from: rawContent.from.trim() }
+          : {}),
+        ...(rawContent.bodyJson !== undefined
+          ? { bodyJson: rawContent.bodyJson }
+          : {}),
+        ...(rawContent.mode === "visual" ||
+        rawContent.mode === "html" ||
+        rawContent.mode === "react"
+          ? { mode: rawContent.mode }
+          : {}),
+        ...(typeof rawContent.fontFamily === "string" &&
+        rawContent.fontFamily.trim()
+          ? { fontFamily: rawContent.fontFamily.trim().slice(0, 200) }
+          : {}),
+        ...(Array.isArray(rawContent.fontWeights)
+          ? {
+              fontWeights: rawContent.fontWeights.filter(
+                (value): value is number =>
+                  typeof value === "number" &&
+                  Number.isInteger(value) &&
+                  value > 0
+              ),
+            }
+          : {}),
       } as EmailCampaignContent;
     }
   }

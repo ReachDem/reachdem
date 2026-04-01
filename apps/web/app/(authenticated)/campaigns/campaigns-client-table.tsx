@@ -8,6 +8,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock3,
+  Copy,
   Loader2,
   Mail,
   MessageSquareText,
@@ -22,7 +23,11 @@ import {
 import { toast } from "sonner";
 
 import type { Campaign } from "@/actions/campaigns";
-import { deleteCampaign, launchCampaign } from "@/actions/campaigns";
+import {
+  deleteCampaign,
+  launchCampaign,
+  duplicateCampaign,
+} from "@/actions/campaigns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +120,7 @@ export function CampaignsClientTable({
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [workerStatus, setWorkerStatus] = useState<WorkerStatusSnapshot | null>(
     null
@@ -193,6 +199,20 @@ export function CampaignsClientTable({
     } finally {
       setIsDeleting(false);
       setCampaignToDelete(null);
+    }
+  };
+
+  const handleDuplicate = async (campaignToDuplicate: Campaign) => {
+    if (isDuplicating) return;
+    setIsDuplicating(true);
+    try {
+      const result = await duplicateCampaign(campaignToDuplicate.id);
+      toast.success("Campaign duplicated successfully");
+      router.push(`/campaigns/${result.data.id}/edit`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to duplicate campaign");
+    } finally {
+      setIsDuplicating(false);
     }
   };
 
@@ -572,6 +592,15 @@ export function CampaignsClientTable({
                                   </Link>
                                 </DropdownMenuItem>
                               )}
+
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleDuplicate(campaign)}
+                                disabled={isDuplicating}
+                              >
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate
+                              </DropdownMenuItem>
 
                               {campaign.status === "draft" &&
                                 !isScheduledCampaign(campaign) && (

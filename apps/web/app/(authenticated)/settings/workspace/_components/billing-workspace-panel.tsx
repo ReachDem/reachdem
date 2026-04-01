@@ -185,6 +185,12 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
     billing.workspaceVerificationStatus === "verified"
       ? "Verified"
       : billing.workspaceVerificationStatus.replace(/_/g, " ");
+  const standardPlans = billing.availablePlans.filter(
+    (plan) => !plan.contactSales && plan.priceMinor != null
+  );
+  const customPlan = billing.availablePlans.find(
+    (plan) => plan.contactSales || plan.priceMinor == null
+  );
   const pricingTier =
     getApplicableTier(billing.creditPricing, creditsQuantity) ??
     billing.creditPricing.tiers[0];
@@ -279,10 +285,9 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {billing.availablePlans.map((plan) => {
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {standardPlans.map((plan) => {
               const isCurrentPlan = billing.planCode === plan.code;
-              const isCustomPlan = plan.contactSales || plan.priceMinor == null;
               const isBusy = busyKey === `plan:${plan.code}`;
 
               return (
@@ -329,40 +334,51 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                   </div>
 
                   <div className="mt-6">
-                    {isCustomPlan ? (
-                      <Button asChild className="w-full" variant="outline">
-                        <a
-                          href="https://reachdem.cc/pricing"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Talk to sales
-                        </a>
-                      </Button>
-                    ) : (
-                      <Button
-                        className="w-full bg-[#f58220] text-white hover:bg-[#d6701a]"
-                        disabled={isCurrentPlan || Boolean(busyKey)}
-                        onClick={() =>
-                          void createCheckoutSession({
-                            kind: "subscription",
-                            currency: plan.currency,
-                            planCode: plan.code,
-                            busyKey: `plan:${plan.code}`,
-                          })
-                        }
-                      >
-                        {isBusy ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : null}
-                        {isCurrentPlan ? "Current plan" : `Choose ${plan.name}`}
-                      </Button>
-                    )}
+                    <Button
+                      className="w-full bg-[#f58220] text-white hover:bg-[#d6701a]"
+                      disabled={isCurrentPlan || Boolean(busyKey)}
+                      onClick={() =>
+                        void createCheckoutSession({
+                          kind: "subscription",
+                          currency: plan.currency,
+                          planCode: plan.code,
+                          busyKey: `plan:${plan.code}`,
+                        })
+                      }
+                    >
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {isCurrentPlan ? "Current plan" : `Choose ${plan.name}`}
+                    </Button>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {customPlan ? (
+            <div className="bg-muted/20 flex flex-col items-start justify-between gap-4 rounded-xl border p-5 md:flex-row md:items-center">
+              <div className="space-y-1">
+                <p className="text-base font-semibold">
+                  Want a customized solution?
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Talk to sales for custom integrations, compliance needs, and
+                  rollout support.
+                </p>
+              </div>
+              <Button asChild variant="outline" className="shrink-0">
+                <a
+                  href="https://reachdem.cc/pricing"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Talk to sales
+                </a>
+              </Button>
+            </div>
+          ) : null}
         </SettingsCardContent>
       </SettingsCard>
 

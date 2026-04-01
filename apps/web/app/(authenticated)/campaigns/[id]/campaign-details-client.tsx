@@ -211,19 +211,109 @@ export function CampaignDetailsClient({
       {/* Stats Cards */}
       {/* {stats && <CampaignStatsCards stats={stats} />} */}
 
-      {/* Analytics Charts - Above tabs */}
-      <CampaignAnalyticsSection data={analyticsData} />
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full space-y-6 border-b-0"
+      >
+        <TabsList className="grid w-[400px] grid-cols-2">
+          <TabsTrigger value="overview">Overview & Delivery</TabsTrigger>
+          <TabsTrigger value="preview">Message Preview</TabsTrigger>
+        </TabsList>
 
-      <CampaignTargetsTable
-        targets={targets.targets}
-        totalCount={targets.totalCount}
-        currentPage={targets.page}
-        pageSize={targets.pageSize}
-        onPageChange={handlePageChange}
-        onSearch={handleSearch}
-        onRefresh={() => loadData(true)}
-        isRefreshing={isRefreshing}
-      />
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          {/* Analytics Charts - Above tabs */}
+          <CampaignAnalyticsSection data={analyticsData} />
+
+          <CampaignTargetsTable
+            targets={targets.targets}
+            totalCount={targets.totalCount}
+            currentPage={targets.page}
+            pageSize={targets.pageSize}
+            onPageChange={handlePageChange}
+            onSearch={handleSearch}
+            onRefresh={() => loadData(true)}
+            isRefreshing={isRefreshing}
+          />
+        </TabsContent>
+
+        <TabsContent value="preview" className="mt-0 space-y-6">
+          <div className="bg-card text-card-foreground mx-auto w-full rounded-lg border p-6 shadow-sm md:p-10">
+            <h3 className="mb-6 flex items-center gap-2 text-xl font-semibold">
+              <Mail className="text-muted-foreground h-5 w-5" />
+              Campaign Content Preview
+            </h3>
+
+            {campaign.channel === "sms" ? (
+              <div className="flex justify-center py-10">
+                <div className="relative mx-auto h-[600px] w-[300px] overflow-hidden rounded-[2.5rem] border-[14px] border-gray-800 bg-gray-900 shadow-2xl shadow-xl">
+                  {/* Notch */}
+                  <div className="absolute top-0 left-1/2 z-20 h-[18px] w-[148px] -translate-x-1/2 rounded-b-[1rem] bg-gray-800"></div>
+                  {/* Screen Content */}
+                  <div className="flex h-[600px] w-full flex-col bg-gray-50 px-4 pt-12">
+                    <div className="mb-4 border-b border-gray-200 pb-4 text-center">
+                      <div className="flex items-center justify-center gap-2 font-semibold text-gray-900">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 font-bold text-gray-500">
+                          R
+                        </div>
+                        {campaign.content?.senderId ||
+                          campaign.content?.from ||
+                          "Message"}
+                      </div>
+                    </div>
+
+                    {/* Bubble */}
+                    <div className="max-w-[85%] self-start rounded-2xl rounded-tl-sm bg-gray-200 px-4 py-3 text-sm whitespace-pre-wrap text-gray-900 shadow-sm">
+                      {campaign.content?.text || "No preview available."}
+                    </div>
+
+                    <div className="mt-auto flex flex-col items-center pb-4">
+                      <p className="mb-2 text-xs text-gray-400">SMS Message</p>
+                      {/* Home indicator */}
+                      <div className="h-1 w-1/2 rounded-full bg-gray-300"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : campaign.channel === "email" ? (
+              <div className="border-muted-foreground/20 flex min-h-[600px] flex-col overflow-hidden rounded-xl border bg-white shadow-sm">
+                <div className="bg-muted flex items-center justify-between border-b px-4 py-3 text-sm">
+                  <div className="font-medium">
+                    <span className="text-muted-foreground mr-2">From:</span>
+                    {campaign.content?.from || "Unknown"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground mr-2">Subject:</span>
+                    <span className="font-medium">
+                      {campaign.content?.subject || "No Subject"}
+                    </span>
+                  </div>
+                </div>
+
+                {campaign.content?.html ? (
+                  <iframe
+                    srcDoc={campaign.content.html}
+                    className="min-h-[600px] w-full flex-1 border-none bg-white"
+                    title="Email Preview"
+                  />
+                ) : (
+                  <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center p-12 text-center">
+                    <Mail className="text-muted mb-4 h-12 w-12" />
+                    <p>No HTML preview available.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-muted-foreground bg-muted/20 flex flex-col items-center justify-center rounded-xl py-20 text-center">
+                <AlertCircle className="text-muted-foreground/50 mb-3 h-10 w-10" />
+                <p>
+                  Preview normally not supported for {campaign.channel} channel.
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

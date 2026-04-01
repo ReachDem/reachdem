@@ -432,3 +432,49 @@ export async function getCampaignTargets(
     };
   }
 }
+
+export async function duplicateCampaign(id: string) {
+  try {
+    const { organizationId, userId } = await getOrganizationId();
+    const existing = await CampaignService.getCampaign(organizationId, id);
+    if (!existing) throw new Error("Campaign not found");
+
+    const audiences = await CampaignService.getAudiences(organizationId, id);
+
+    const payload: CreateCampaignDto = {
+      name: `${existing.name} (Copy)`,
+      description: existing.description ?? undefined,
+      channel: existing.channel as "sms" | "email",
+      content: existing.content,
+    };
+
+    const newCampaign = await CampaignService.createCampaign(
+      organizationId,
+      payload,
+      userId
+    );
+
+    await CampaignService.setAudiences(organizationId, newCampaign.id, {
+      audiences: audiences.map((a) => ({
+        sourceType: a.sourceType,
+        sourceId: a.sourceId,
+      })),
+    });
+
+    if (existing.content) {
+      await associateLinksWithCampaign(
+        organizationId,
+        newCampaign.id,
+        existing.content
+      );
+    }
+
+    revalidatePath("/campaigns");
+    return { success: true, data: newCampaign };
+  } catch (error) {
+    console.error("[duplicateCampaign] Error:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to duplicate campaign"
+    );
+  }
+}
