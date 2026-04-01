@@ -7,7 +7,7 @@ import {
   CalendarDaysIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
-import { addDays, format, startOfToday } from "date-fns";
+import { addDays, format, isPast, startOfToday } from "date-fns";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
