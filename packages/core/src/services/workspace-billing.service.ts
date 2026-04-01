@@ -28,7 +28,20 @@ export class WorkspaceBillingService {
     const normalizedPlanCode = BillingCatalogService.normalizePlanCode(
       organization.planCode
     );
-    const entitlements = PlanEntitlementsService.get(normalizedPlanCode);
+    const hasActivatedCreditPurchase =
+      (await prisma.paymentSession.count({
+        where: {
+          organizationId,
+          kind: "creditPurchase",
+          activatedAt: {
+            not: null,
+          },
+        },
+      })) > 0;
+    const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
+      PlanEntitlementsService.get(normalizedPlanCode),
+      { hasActivatedCreditPurchase }
+    );
 
     return {
       organizationId: organization.id,

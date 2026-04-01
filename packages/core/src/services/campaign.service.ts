@@ -109,6 +109,21 @@ export class CampaignService {
     };
   }
 
+  static async revertScheduledCampaignClaim(id: string) {
+    return prisma.campaign.updateMany({
+      where: {
+        id,
+        status: "running",
+        scheduledAt: {
+          not: null,
+        },
+      },
+      data: {
+        status: "draft",
+      },
+    });
+  }
+
   /**
    * Get a single campaign
    */

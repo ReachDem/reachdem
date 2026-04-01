@@ -9,7 +9,6 @@ import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
   CampaignInsufficientCreditsError,
   CampaignInvalidStatusError,
-  CampaignLaunchValidationError,
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
 
@@ -18,6 +17,8 @@ const URL_REGEX =
   /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s<>"']*))/g;
 
 export class RequestCampaignLaunchUseCase {
+  private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
+
   static async execute(
     organizationId: string,
     campaignId: string,
@@ -53,21 +54,16 @@ export class RequestCampaignLaunchUseCase {
       throw new CampaignNotFoundError("Organization not found");
     }
 
-    const parsedCampaign = CampaignService.getCampaignContent(campaign as any);
-
-    if (campaign.channel === "sms") {
-      if (organization.workspaceVerificationStatus !== "verified") {
-        throw new CampaignLaunchValidationError(
-          "SMS campaigns require a verified organization"
-        );
-      }
-
-      if (!organization.senderId) {
-        throw new CampaignLaunchValidationError(
-          "SMS campaigns require an active sender ID"
-        );
-      }
-    }
+    const hasActivatedCreditPurchase =
+      (await prisma.paymentSession.count({
+        where: {
+          organizationId,
+          kind: "creditPurchase",
+          activatedAt: {
+            not: null,
+          },
+        },
+      })) > 0;
 
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
@@ -75,7 +71,10 @@ export class RequestCampaignLaunchUseCase {
       campaign.channel
     );
 
-    const entitlements = PlanEntitlementsService.get(organization.planCode);
+    const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
+      PlanEntitlementsService.get(organization.planCode),
+      { hasActivatedCreditPurchase }
+    );
     const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
       entitlements,
       {
@@ -91,7 +90,12 @@ export class RequestCampaignLaunchUseCase {
           `Insufficient ${campaign.channel} quota for plan ${entitlements.planCode}`
         );
       }
-    } else if (eligibleTargetCount > organization.creditBalance) {
+    }
+
+    if (
+      entitlements.usesSharedCredits &&
+      eligibleTargetCount > organization.creditBalance
+    ) {
       throw new CampaignInsufficientCreditsError();
     }
 
@@ -103,11 +107,19 @@ export class RequestCampaignLaunchUseCase {
 
     await prisma.$transaction(async (tx) => {
       const updateContent =
-        campaign.channel === "sms" && organization.senderId
+        campaign.channel === "sms"
           ? {
               ...(campaign.content as any),
-              from: organization.senderId,
-              senderId: organization.senderId,
+              from:
+                organization.workspaceVerificationStatus === "verified" &&
+                organization.senderId
+                  ? organization.senderId
+                  : this.DEFAULT_SMS_SENDER_ID,
+              senderId:
+                organization.workspaceVerificationStatus === "verified" &&
+                organization.senderId
+                  ? organization.senderId
+                  : this.DEFAULT_SMS_SENDER_ID,
             }
           : undefined;
 
@@ -126,11 +138,14 @@ export class RequestCampaignLaunchUseCase {
                     increment: eligibleTargetCount,
                   },
                 }
-            : {
+            : {}),
+          ...(entitlements.usesSharedCredits
+            ? {
                 creditBalance: {
                   decrement: eligibleTargetCount,
                 },
-              }),
+              }
+            : {}),
         },
       });
 

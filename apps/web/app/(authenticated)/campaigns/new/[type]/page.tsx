@@ -91,6 +91,22 @@ function buildSmsCampaignContent(content: SmsContent) {
   };
 }
 
+function optionalTrimmedString(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function buildScheduledDateTime(date: Date, time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const scheduledDateTime = new Date(date);
+  scheduledDateTime.setHours(hours, minutes, 0, 0);
+  return scheduledDateTime;
+}
+
+function isScheduledDateTimeInPast(date: Date, time: string) {
+  return buildScheduledDateTime(date, time).getTime() <= Date.now();
+}
+
 function buildAudiencePayload(
   selectedSegmentId: string,
   selectedGroupId: string
@@ -210,7 +226,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       // Prepare payload
       const payload = {
         name: campaignTitle.trim(),
-        description: campaignDescription.trim() || null,
+        description: optionalTrimmedString(campaignDescription),
         channel: type,
         content,
       };
@@ -286,6 +302,13 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       return;
     }
 
+    if (isScheduledDateTimeInPast(scheduledDate, scheduledTime)) {
+      const error = "Please choose a future date and time";
+      console.error("[Campaign] Validation error:", error);
+      toast.error(error);
+      return;
+    }
+
     // Validate content
     if (type === "email") {
       if (!emailContent.body.trim()) {
@@ -321,9 +344,10 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
     try {
       // Combine date and time
-      const [hours, minutes] = scheduledTime.split(":").map(Number);
-      const scheduledDateTime = new Date(scheduledDate);
-      scheduledDateTime.setHours(hours, minutes, 0, 0);
+      const scheduledDateTime = buildScheduledDateTime(
+        scheduledDate,
+        scheduledTime
+      );
 
       console.log(
         "[Campaign] Scheduled DateTime:",
@@ -345,7 +369,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
       const campaignPayload = {
         name: campaignTitle.trim(),
-        description: campaignDescription.trim() || null,
+        description: optionalTrimmedString(campaignDescription),
         channel: type,
         content,
         scheduledAt: scheduledDateTime.toISOString(),
@@ -479,7 +503,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
       const campaignPayload = {
         name: campaignTitle.trim(),
-        description: campaignDescription.trim() || null,
+        description: optionalTrimmedString(campaignDescription),
         channel: type,
         content,
       };
@@ -696,6 +720,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
                         mode="single"
                         selected={scheduledDate}
                         onSelect={setScheduledDate}
+                        disabled={(date) => date < startOfToday()}
                         className="w-full"
                       />
                     </div>
@@ -708,6 +733,13 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
                         value={scheduledTime}
                         onChange={(event) =>
                           setScheduledTime(event.target.value)
+                        }
+                        min={
+                          scheduledDate &&
+                          format(scheduledDate, "yyyy-MM-dd") ===
+                            format(new Date(), "yyyy-MM-dd")
+                            ? format(new Date(), "HH:mm")
+                            : undefined
                         }
                       />
                     </div>

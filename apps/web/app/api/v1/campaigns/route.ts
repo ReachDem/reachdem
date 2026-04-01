@@ -37,7 +37,11 @@ export const POST = withWorkspace(async ({ req, organizationId, userId }) => {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation Error", details: validation.error.format() },
+        {
+          error: "Validation Error",
+          details: validation.error.flatten(),
+          issues: validation.error.issues,
+        },
         { status: 400 }
       );
     }

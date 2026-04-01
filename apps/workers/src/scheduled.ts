@@ -63,7 +63,17 @@ async function handleScheduledCampaigns(
       scheduledAt: campaign.scheduledAt?.toISOString() ?? null,
     });
 
-    await env.CAMPAIGN_LAUNCH_QUEUE.send(job);
+    try {
+      await env.CAMPAIGN_LAUNCH_QUEUE.send(job);
+    } catch (error) {
+      console.error("[Cron] Failed to publish scheduled campaign", {
+        campaignId: campaign.id,
+        organizationId: campaign.organizationId,
+        queue: getCampaignLaunchQueueName(env.ENVIRONMENT),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await CampaignService.revertScheduledCampaignClaim(campaign.id);
+    }
   }
 }
 
@@ -105,14 +115,32 @@ async function handleScheduledMessages(
         queue: smsWorkerConfig.queueName,
         resolvedQueue: getSmsQueueName(env.ENVIRONMENT),
       });
-      await env.SMS_QUEUE.send(job);
+      try {
+        await env.SMS_QUEUE.send(job);
+      } catch (error) {
+        console.error("[Cron] Failed to publish scheduled SMS message", {
+          messageId: job.message_id,
+          queue: getSmsQueueName(env.ENVIRONMENT),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await MessageService.revertScheduledMessageClaim(job.message_id);
+      }
     } else {
       console.log("[Cron] Publishing scheduled email message", {
         messageId: job.message_id,
         queue: emailWorkerConfig.queueName,
         resolvedQueue: getEmailQueueName(env.ENVIRONMENT),
       });
-      await env.EMAIL_QUEUE.send(job);
+      try {
+        await env.EMAIL_QUEUE.send(job);
+      } catch (error) {
+        console.error("[Cron] Failed to publish scheduled email message", {
+          messageId: job.message_id,
+          queue: getEmailQueueName(env.ENVIRONMENT),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await MessageService.revertScheduledMessageClaim(job.message_id);
+      }
     }
   }
 

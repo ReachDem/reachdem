@@ -21,6 +21,18 @@ type ResolvedContact = {
 };
 
 export class ProcessCampaignLaunchJobUseCase {
+  private static resolveMessageScheduledAt(
+    campaignScheduledAt: Date | null
+  ): string | undefined {
+    if (!campaignScheduledAt) {
+      return undefined;
+    }
+
+    return campaignScheduledAt.getTime() > Date.now()
+      ? campaignScheduledAt.toISOString()
+      : undefined;
+  }
+
   static async execute(
     job: CampaignLaunchJob,
     publishSmsJob: (job: SmsExecutionJob) => Promise<void>,
@@ -93,7 +105,9 @@ export class ProcessCampaignLaunchJobUseCase {
 
         try {
           const idempotencyKey = `campaign_${job.campaign_id}_contact_${target.contactId}`;
-          const scheduledAt = refreshedCampaign.scheduledAt?.toISOString();
+          const scheduledAt = this.resolveMessageScheduledAt(
+            refreshedCampaign.scheduledAt
+          );
           const messageResponse = await (!isEmailCampaign
             ? EnqueueSmsUseCase.execute(
                 job.organization_id,
@@ -101,7 +115,7 @@ export class ProcessCampaignLaunchJobUseCase {
                   from:
                     ("text" in parsedCampaign
                       ? parsedCampaign.from
-                      : undefined) ?? "ReachDem Campaign",
+                      : undefined) ?? "ReachDem",
                   to: target.contact.phoneE164!,
                   text: "text" in parsedCampaign ? parsedCampaign.text : "",
                   idempotency_key: idempotencyKey,

@@ -195,4 +195,19 @@ export class MessageService {
 
     return { count: result.count, ids };
   }
+
+  static async revertScheduledMessageClaim(id: string) {
+    return prisma.message.updateMany({
+      where: {
+        id,
+        status: "queued",
+        scheduledAt: {
+          not: null,
+        },
+      },
+      data: {
+        status: "scheduled",
+      },
+    });
+  }
 }

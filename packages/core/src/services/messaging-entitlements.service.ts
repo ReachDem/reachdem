@@ -9,6 +9,8 @@ type DbClient = typeof prisma | Prisma.TransactionClient;
 type MessagingChannel = "sms" | "email";
 
 export class MessagingEntitlementsService {
+  private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
+
   static async reserveMessageSend(
     db: DbClient,
     organizationId: string,
@@ -31,21 +33,21 @@ export class MessagingEntitlementsService {
       throw new MessageSendValidationError("Organization not found");
     }
 
-    if (channel === "sms") {
-      if (organization.workspaceVerificationStatus !== "verified") {
-        throw new MessageSendValidationError(
-          "SMS sending requires a verified organization"
-        );
-      }
+    const hasActivatedCreditPurchase =
+      (await db.paymentSession.count({
+        where: {
+          organizationId,
+          kind: "creditPurchase",
+          activatedAt: {
+            not: null,
+          },
+        },
+      })) > 0;
 
-      if (!organization.senderId) {
-        throw new MessageSendValidationError(
-          "SMS sending requires an active sender ID"
-        );
-      }
-    }
-
-    const entitlements = PlanEntitlementsService.get(organization.planCode);
+    const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
+      PlanEntitlementsService.get(organization.planCode),
+      { hasActivatedCreditPurchase }
+    );
     const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
       entitlements,
       {
@@ -61,14 +63,16 @@ export class MessagingEntitlementsService {
           `Insufficient ${channel} quota for plan ${entitlements.planCode}`
         );
       }
-    } else if (units > organization.creditBalance) {
+    }
+
+    if (entitlements.usesSharedCredits && units > organization.creditBalance) {
       throw new MessageInsufficientCreditsError();
     }
 
     await db.organization.update({
       where: { id: organizationId },
-      data:
-        remainingIncluded != null
+      data: {
+        ...(remainingIncluded != null
           ? channel === "sms"
             ? {
                 smsQuotaUsed: {
@@ -80,15 +84,28 @@ export class MessagingEntitlementsService {
                   increment: units,
                 },
               }
-          : {
+          : {}),
+        ...(entitlements.usesSharedCredits
+          ? {
               creditBalance: {
                 decrement: units,
               },
-            },
+            }
+          : {}),
+      },
     });
 
+    const effectiveSenderId =
+      channel === "sms" &&
+      organization.workspaceVerificationStatus === "verified" &&
+      organization.senderId
+        ? organization.senderId
+        : channel === "sms"
+          ? this.DEFAULT_SMS_SENDER_ID
+          : null;
+
     return {
-      senderId: organization.senderId,
+      senderId: effectiveSenderId,
     };
   }
 }

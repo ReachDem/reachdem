@@ -7,7 +7,7 @@ import {
   CalendarDaysIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
-import { addDays, format, startOfToday, isPast } from "date-fns";
+import { addDays, format, startOfToday } from "date-fns";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,22 @@ function buildSmsCampaignContent(content: SmsContent) {
     from: content.senderId || undefined,
     senderId: content.senderId,
   };
+}
+
+function optionalTrimmedString(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function buildScheduledDateTime(date: Date, time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const scheduledDateTime = new Date(date);
+  scheduledDateTime.setHours(hours, minutes, 0, 0);
+  return scheduledDateTime;
+}
+
+function isScheduledDateTimeInPast(date: Date, time: string) {
+  return buildScheduledDateTime(date, time).getTime() <= Date.now();
 }
 
 function buildAudiencePayload(
@@ -351,6 +367,11 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       return;
     }
 
+    if (isScheduledDateTimeInPast(scheduledDate, scheduledTime)) {
+      toast.error("Please choose a future date and time");
+      return;
+    }
+
     // Validate content
     if (type === "email") {
       if (!emailContent.body.trim()) {
@@ -378,9 +399,10 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
     try {
       // Combine date and time
-      const [hours, minutes] = scheduledTime.split(":").map(Number);
-      const scheduledDateTime = new Date(scheduledDate);
-      scheduledDateTime.setHours(hours, minutes, 0, 0);
+      const scheduledDateTime = buildScheduledDateTime(
+        scheduledDate,
+        scheduledTime
+      );
 
       // Prepare content
       const content =
@@ -400,7 +422,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       if (isFailedCampaign) {
         const campaignPayload = {
           name: campaignTitle.trim(),
-          description: campaignDescription.trim() || null,
+          description: optionalTrimmedString(campaignDescription),
           channel: type,
           content,
           scheduledAt: scheduledDateTime.toISOString(),
@@ -543,7 +565,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       if (isFailedCampaign) {
         const campaignPayload = {
           name: campaignTitle.trim(),
-          description: campaignDescription.trim() || null,
+          description: optionalTrimmedString(campaignDescription),
           channel: type,
           content,
         };
@@ -752,6 +774,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                         mode="single"
                         selected={scheduledDate}
                         onSelect={setScheduledDate}
+                        disabled={(date) => date < startOfToday()}
                         className="w-full"
                       />
                     </div>
@@ -764,6 +787,13 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                         value={scheduledTime}
                         onChange={(event) =>
                           setScheduledTime(event.target.value)
+                        }
+                        min={
+                          scheduledDate &&
+                          format(scheduledDate, "yyyy-MM-dd") ===
+                            format(new Date(), "yyyy-MM-dd")
+                            ? format(new Date(), "HH:mm")
+                            : undefined
                         }
                       />
                     </div>

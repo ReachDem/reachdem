@@ -13,12 +13,39 @@ export class PlanEntitlementsService {
   static get(planCode?: string | null): PlanEntitlements {
     const normalized = BillingCatalogService.normalizePlanCode(planCode);
 
+    if (normalized === "free") {
+      return {
+        planCode: normalized,
+        smsIncludedLimit: 5,
+        emailIncludedLimit: null,
+        usesSharedCredits: true,
+      };
+    }
+
     return {
       planCode: normalized,
       smsIncludedLimit: null,
       emailIncludedLimit: null,
       usesSharedCredits: true,
     };
+  }
+
+  static applyCreditPurchaseStatus(
+    plan: PlanEntitlements,
+    options: { hasActivatedCreditPurchase: boolean }
+  ): PlanEntitlements {
+    if (
+      plan.planCode === "free" &&
+      options.hasActivatedCreditPurchase &&
+      plan.smsIncludedLimit != null
+    ) {
+      return {
+        ...plan,
+        smsIncludedLimit: null,
+      };
+    }
+
+    return plan;
   }
 
   static getRemainingIncluded(
