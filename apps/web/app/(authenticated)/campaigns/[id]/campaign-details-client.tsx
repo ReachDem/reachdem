@@ -109,6 +109,31 @@ export function CampaignDetailsClient({
     setTargets(targetsData);
   };
 
+  const smsPreviewSender =
+    campaign.content && "text" in campaign.content
+      ? campaign.content.senderId || campaign.content.from || "Message"
+      : "Message";
+
+  const smsPreviewText =
+    campaign.content && "text" in campaign.content
+      ? campaign.content.text || "No preview available."
+      : "No preview available.";
+
+  const emailPreviewFrom =
+    campaign.content && "subject" in campaign.content
+      ? campaign.content.from || "Unknown"
+      : "Unknown";
+
+  const emailPreviewSubject =
+    campaign.content && "subject" in campaign.content
+      ? campaign.content.subject || "No Subject"
+      : "No Subject";
+
+  const emailPreviewHtml =
+    campaign.content && "subject" in campaign.content
+      ? campaign.content.html
+      : undefined;
+
   const getStatusBadge = () => {
     switch (campaign.status) {
       case "draft":
@@ -256,15 +281,13 @@ export function CampaignDetailsClient({
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 font-bold text-gray-500">
                           R
                         </div>
-                        {campaign.content?.senderId ||
-                          campaign.content?.from ||
-                          "Message"}
+                        {smsPreviewSender}
                       </div>
                     </div>
 
                     {/* Bubble */}
                     <div className="max-w-[85%] self-start rounded-2xl rounded-tl-sm bg-gray-200 px-4 py-3 text-sm whitespace-pre-wrap text-gray-900 shadow-sm">
-                      {campaign.content?.text || "No preview available."}
+                      {smsPreviewText}
                     </div>
 
                     <div className="mt-auto flex flex-col items-center pb-4">
@@ -280,19 +303,17 @@ export function CampaignDetailsClient({
                 <div className="bg-muted flex items-center justify-between border-b px-4 py-3 text-sm">
                   <div className="font-medium">
                     <span className="text-muted-foreground mr-2">From:</span>
-                    {campaign.content?.from || "Unknown"}
+                    {emailPreviewFrom}
                   </div>
                   <div>
                     <span className="text-muted-foreground mr-2">Subject:</span>
-                    <span className="font-medium">
-                      {campaign.content?.subject || "No Subject"}
-                    </span>
+                    <span className="font-medium">{emailPreviewSubject}</span>
                   </div>
                 </div>
 
-                {campaign.content?.html ? (
+                {emailPreviewHtml ? (
                   <iframe
-                    srcDoc={campaign.content.html}
+                    srcDoc={emailPreviewHtml}
                     className="min-h-[600px] w-full flex-1 border-none bg-white"
                     title="Email Preview"
                   />
