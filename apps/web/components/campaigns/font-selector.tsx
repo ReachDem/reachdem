@@ -1,13 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface GoogleFont {
   family: string;
@@ -19,6 +29,17 @@ interface FontSelectorProps {
   value?: string;
   onChange: (font: string) => void;
 }
+
+const EMAIL_SAFE_FONTS = [
+  "Arial",
+  "Helvetica",
+  "Georgia",
+  "Times New Roman",
+  "Verdana",
+  "Tahoma",
+  "Trebuchet MS",
+  "Courier New",
+] as const;
 
 const POPULAR_FONTS = [
   // Les Incontournables (Sans-Serif)
@@ -34,6 +55,7 @@ const POPULAR_FONTS = [
   "Manrope",
 
   // Les Élégantes (Serif)
+  "Times New Roman",
   "Playfair Display",
   "Lora",
   "Merriweather",
@@ -59,6 +81,21 @@ export function FontSelector({ value = "Inter", onChange }: FontSelectorProps) {
   const [fonts, setFonts] = useState<GoogleFont[]>([]);
   const [loading, setLoading] = useState(true);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const emailSafeFonts = EMAIL_SAFE_FONTS.map((family) => ({
+    family,
+    variants: ["400", "600", "700"],
+    category: "system",
+  }));
+  const allFonts = [
+    ...emailSafeFonts,
+    ...fonts.filter(
+      (font) =>
+        !EMAIL_SAFE_FONTS.includes(
+          font.family as (typeof EMAIL_SAFE_FONTS)[number]
+        )
+    ),
+  ];
 
   useEffect(() => {
     fetchGoogleFonts();
@@ -115,26 +152,61 @@ export function FontSelector({ value = "Inter", onChange }: FontSelectorProps) {
 
   return (
     <div className="w-[200px]">
-      <Select value={value} onValueChange={onChange} disabled={loading}>
-        <SelectTrigger>
-          <SelectValue placeholder={loading ? "Loading..." : "Select font"} />
-        </SelectTrigger>
-        <SelectContent className="max-h-[300px]">
-          {fonts.map((font) => (
-            <SelectItem
-              key={font.family}
-              value={font.family}
-              style={{
-                fontFamily: fontsLoaded
-                  ? `'${font.family}', sans-serif`
-                  : "inherit",
-              }}
-            >
-              {font.family}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+            disabled={loading}
+            style={{
+              fontFamily: value ? `'${value}', sans-serif` : "inherit",
+            }}
+          >
+            {value
+              ? allFonts.find((font) => font.family === value)?.family || value
+              : loading
+                ? "Loading..."
+                : "Select font"}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[200px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search font..." />
+            <CommandList className="max-h-[300px]">
+              <CommandEmpty>No font found.</CommandEmpty>
+              <CommandGroup>
+                {allFonts.map((font) => (
+                  <CommandItem
+                    key={font.family}
+                    value={font.family}
+                    onSelect={() => {
+                      onChange(font.family);
+                      setOpen(false);
+                    }}
+                    style={{
+                      fontFamily:
+                        font.category === "system" || fontsLoaded
+                          ? `'${font.family}', sans-serif`
+                          : "inherit",
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === font.family ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {font.family}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
