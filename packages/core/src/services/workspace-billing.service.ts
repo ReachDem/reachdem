@@ -28,19 +28,21 @@ export class WorkspaceBillingService {
     const normalizedPlanCode = BillingCatalogService.normalizePlanCode(
       organization.planCode
     );
-    const hasActivatedCreditPurchase =
-      (await prisma.paymentSession.count({
-        where: {
-          organizationId,
-          kind: "creditPurchase",
-          activatedAt: {
-            not: null,
-          },
-        },
-      })) > 0;
+
+    const totalPurchasesResult = await prisma.paymentSession.aggregate({
+      where: {
+        organizationId,
+        status: "succeeded",
+      },
+      _sum: {
+        amountMinor: true,
+      },
+    });
+    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
+
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(normalizedPlanCode),
-      { hasActivatedCreditPurchase }
+      { totalPurchasedMinor }
     );
 
     return {
@@ -70,7 +72,7 @@ export class WorkspaceBillingService {
         },
         "email"
       ),
-      usesSharedCredits: entitlements.usesSharedCredits,
+      usesSharedCredits: true,
       availablePlans: BillingCatalogService.getPlanCatalog(),
       creditPricing: BillingCatalogService.getCreditPricing(),
     };

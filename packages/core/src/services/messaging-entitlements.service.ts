@@ -33,21 +33,25 @@ export class MessagingEntitlementsService {
       throw new MessageSendValidationError("Organization not found");
     }
 
-    const hasActivatedCreditPurchase =
-      (await db.paymentSession.count({
-        where: {
-          organizationId,
-          kind: "creditPurchase",
-          activatedAt: {
-            not: null,
-          },
-        },
-      })) > 0;
+    // 1. Calculate historical purchases logic
+    const totalPurchasesResult = await db.paymentSession.aggregate({
+      where: {
+        organizationId,
+        status: "succeeded",
+      },
+      _sum: {
+        amountMinor: true,
+      },
+    });
+    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
 
+    // 2. Resolve final quotas
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(organization.planCode),
-      { hasActivatedCreditPurchase }
+      { totalPurchasedMinor }
     );
+
+    // 3. Verify maximum capacity restrictions (Quota Check)
     const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
       entitlements,
       {
@@ -60,38 +64,37 @@ export class MessagingEntitlementsService {
     if (remainingIncluded != null) {
       if (units > remainingIncluded) {
         throw new MessageInsufficientCreditsError(
-          `Insufficient ${channel} quota for plan ${entitlements.planCode}`
+          `Sending limit reached for ${channel} under plan ${entitlements.planCode}. Upgrade plan or wait for reset.`
         );
       }
     }
 
-    if (entitlements.usesSharedCredits && units > organization.creditBalance) {
-      throw new MessageInsufficientCreditsError();
+    // 4. Verify account funding (Credit Check)
+    if (units > organization.creditBalance) {
+      throw new MessageInsufficientCreditsError(
+        `Insufficient credit balance to send ${units} ${channel} message(s).`
+      );
     }
 
+    // 5. Commit increments
     await db.organization.update({
       where: { id: organizationId },
       data: {
-        ...(remainingIncluded != null
-          ? channel === "sms"
-            ? {
-                smsQuotaUsed: {
-                  increment: units,
-                },
-              }
-            : {
-                emailQuotaUsed: {
-                  increment: units,
-                },
-              }
-          : {}),
-        ...(entitlements.usesSharedCredits
+        creditBalance: {
+          decrement: units,
+        },
+        // We always track the usage regardless of if the limit is null
+        ...(channel === "sms"
           ? {
-              creditBalance: {
-                decrement: units,
+              smsQuotaUsed: {
+                increment: units,
               },
             }
-          : {}),
+          : {
+              emailQuotaUsed: {
+                increment: units,
+              },
+            }),
       },
     });
 

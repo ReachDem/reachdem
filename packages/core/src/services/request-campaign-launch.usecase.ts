@@ -54,16 +54,16 @@ export class RequestCampaignLaunchUseCase {
       throw new CampaignNotFoundError("Organization not found");
     }
 
-    const hasActivatedCreditPurchase =
-      (await prisma.paymentSession.count({
-        where: {
-          organizationId,
-          kind: "creditPurchase",
-          activatedAt: {
-            not: null,
-          },
-        },
-      })) > 0;
+    const totalPurchasesResult = await prisma.paymentSession.aggregate({
+      where: {
+        organizationId,
+        status: "succeeded",
+      },
+      _sum: {
+        amountMinor: true,
+      },
+    });
+    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
 
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
@@ -73,7 +73,7 @@ export class RequestCampaignLaunchUseCase {
 
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(organization.planCode),
-      { hasActivatedCreditPurchase }
+      { totalPurchasedMinor }
     );
     const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
       entitlements,
@@ -87,16 +87,15 @@ export class RequestCampaignLaunchUseCase {
     if (remainingIncluded != null) {
       if (eligibleTargetCount > remainingIncluded) {
         throw new CampaignInsufficientCreditsError(
-          `Insufficient ${campaign.channel} quota for plan ${entitlements.planCode}`
+          `Sending limit reached for ${campaign.channel} under plan ${entitlements.planCode}.`
         );
       }
     }
 
-    if (
-      entitlements.usesSharedCredits &&
-      eligibleTargetCount > organization.creditBalance
-    ) {
-      throw new CampaignInsufficientCreditsError();
+    if (eligibleTargetCount > organization.creditBalance) {
+      throw new CampaignInsufficientCreditsError(
+        `Insufficient credit balance.`
+      );
     }
 
     // Pre-process links before launching
@@ -126,26 +125,20 @@ export class RequestCampaignLaunchUseCase {
       await tx.organization.update({
         where: { id: organizationId },
         data: {
-          ...(remainingIncluded != null
-            ? campaign.channel === "sms"
-              ? {
-                  smsQuotaUsed: {
-                    increment: eligibleTargetCount,
-                  },
-                }
-              : {
-                  emailQuotaUsed: {
-                    increment: eligibleTargetCount,
-                  },
-                }
-            : {}),
-          ...(entitlements.usesSharedCredits
+          creditBalance: {
+            decrement: eligibleTargetCount,
+          },
+          ...(campaign.channel === "sms"
             ? {
-                creditBalance: {
-                  decrement: eligibleTargetCount,
+                smsQuotaUsed: {
+                  increment: eligibleTargetCount,
                 },
               }
-            : {}),
+            : {
+                emailQuotaUsed: {
+                  increment: eligibleTargetCount,
+                },
+              }),
         },
       });
 

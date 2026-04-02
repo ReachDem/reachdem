@@ -6,7 +6,6 @@ export interface PlanEntitlements {
   planCode: string;
   smsIncludedLimit: number | null;
   emailIncludedLimit: number | null;
-  usesSharedCredits: boolean;
 }
 
 export class PlanEntitlementsService {
@@ -17,8 +16,31 @@ export class PlanEntitlementsService {
       return {
         planCode: normalized,
         smsIncludedLimit: 5,
-        emailIncludedLimit: null,
-        usesSharedCredits: true,
+        emailIncludedLimit: 5,
+      };
+    }
+
+    if (normalized === "basic") {
+      return {
+        planCode: normalized,
+        smsIncludedLimit: 150,
+        emailIncludedLimit: 250,
+      };
+    }
+
+    if (normalized === "growth") {
+      return {
+        planCode: normalized,
+        smsIncludedLimit: 500,
+        emailIncludedLimit: 1000,
+      };
+    }
+
+    if (normalized === "pro") {
+      return {
+        planCode: normalized,
+        smsIncludedLimit: 2000,
+        emailIncludedLimit: 4000,
       };
     }
 
@@ -26,22 +48,18 @@ export class PlanEntitlementsService {
       planCode: normalized,
       smsIncludedLimit: null,
       emailIncludedLimit: null,
-      usesSharedCredits: true,
     };
   }
 
   static applyCreditPurchaseStatus(
     plan: PlanEntitlements,
-    options: { hasActivatedCreditPurchase: boolean }
+    options: { totalPurchasedMinor: number }
   ): PlanEntitlements {
-    if (
-      plan.planCode === "free" &&
-      options.hasActivatedCreditPurchase &&
-      plan.smsIncludedLimit != null
-    ) {
+    if (plan.planCode === "free" && options.totalPurchasedMinor > 2500) {
       return {
         ...plan,
         smsIncludedLimit: null,
+        emailIncludedLimit: null,
       };
     }
 
