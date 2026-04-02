@@ -3,6 +3,7 @@ import type { CampaignStatsResponse } from "@reachdem/shared";
 import { CampaignNotFoundError } from "../errors/campaign.errors";
 import { SinkClient } from "../integrations/sink.client";
 import { RedisCacheClient } from "../integrations/redis-cache.client";
+import { EmailDeliverabilityService } from "./email-deliverability.service";
 
 const CAMPAIGN_STATS_TTL_SECONDS = 60;
 
@@ -26,6 +27,7 @@ export class CampaignStatsService {
       where: { id: campaignId, organizationId },
       select: {
         id: true,
+        channel: true,
         status: true,
         updatedAt: true,
       },
@@ -92,6 +94,13 @@ export class CampaignStatsService {
       skippedCount: counts.get("skipped") ?? 0,
       clickCount,
       uniqueClickCount,
+      deliverability:
+        campaign.channel === "email"
+          ? await EmailDeliverabilityService.getCampaignSummary(
+              organizationId,
+              campaignId
+            )
+          : null,
       resolvedStatus:
         campaign.status as CampaignStatsResponse["resolvedStatus"],
     };

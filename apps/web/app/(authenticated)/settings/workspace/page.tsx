@@ -1,8 +1,6 @@
 import { requireOrgMembership, getActiveOrganization } from "@reachdem/auth";
-import { WorkspaceBillingService } from "@reachdem/core";
 import { MemberList } from "./_components/member-list";
 import { LogoUpdate } from "./_components/logo-update";
-import { BillingWorkspacePanel } from "./_components/billing-workspace-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,7 +22,6 @@ export default async function WorkspaceSettingsPage() {
 
   // @ts-ignore - Better Auth returns members as part of getFullOrganization
   const members = org.members || [];
-  const billing = await WorkspaceBillingService.getSummary(org.id);
 
   return (
     <div className="space-y-8 pb-12">
@@ -106,8 +103,6 @@ export default async function WorkspaceSettingsPage() {
           <MemberList members={members} />
         </SettingsCardContent>
       </SettingsCard>
-
-      <BillingWorkspacePanel billing={billing} />
 
       {/* Danger Zone */}
       <SettingsCard className="border-red-500/20">

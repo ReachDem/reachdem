@@ -349,7 +349,9 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                       {isBusy ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
-                      {isCurrentPlan ? "Current plan" : `Choose ${plan.name}`}
+                      {isCurrentPlan
+                        ? "Current plan"
+                        : `Upgrade to ${plan.name}`}
                     </Button>
                   </div>
                 </div>

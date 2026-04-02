@@ -112,6 +112,7 @@ model Organization {
   messages            Message[]
   campaigns           Campaign[]
   trackedLinks        TrackedLink[]
+  emailDeliveryEvents EmailDeliveryEvent[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
 
@@ -400,6 +401,16 @@ enum AttemptStatus {
   failed
 }
 
+enum EmailDeliveryEventType {
+  delivered
+  bounced
+  opened
+  clicked
+  complained
+  unsubscribed
+  resubscribed
+}
+
 model WorkspaceSmsConfig {
   id                 String        @id @default(uuid())
   organizationId     String        @unique
@@ -437,6 +448,7 @@ model Message {
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   attempts     MessageAttempt[]
   trackedLinks TrackedLink[]
+  deliveryEvents EmailDeliveryEvent[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
@@ -459,11 +471,49 @@ model MessageAttempt {
   durationMs        Int
   createdAt         DateTime      @default(now())
 
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message             Message               @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  emailDeliveryEvents EmailDeliveryEvent[]
 
   @@index([messageId])
   @@index([organizationId, createdAt])
   @@map("message_attempt")
+}
+
+model EmailDeliveryEvent {
+  id                    String                 @id @default(uuid())
+  organizationId        String
+  campaignId            String?
+  messageId             String?
+  messageAttemptId      String?
+  provider              String
+  providerEventId       String                 @unique
+  providerEventType     String
+  providerMessageId     String?
+  providerMailMessageId String?
+  eventType             EmailDeliveryEventType
+  recipientEmail        String?
+  senderEmail           String?
+  url                   String?
+  userAgent             String?
+  clientIp              String?
+  errorCode             String?
+  errorMessage          String?
+  failureType           String?
+  providerTag           String?
+  rawPayload            Json
+  occurredAt            DateTime
+  createdAt             DateTime               @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  attempt      MessageAttempt? @relation(fields: [messageAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, campaignId, eventType])
+  @@index([organizationId, messageId, eventType])
+  @@index([organizationId, providerMessageId])
+  @@index([organizationId, occurredAt])
+  @@map("email_delivery_event")
 }
 
 // ─── Campaigns ──────────────────────────────────────────────────────────────
@@ -554,6 +604,7 @@ model Campaign {
   audiences    CampaignAudience[]
   targets      CampaignTarget[]
   trackedLinks TrackedLink[]
+  deliveryEvents EmailDeliveryEvent[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])

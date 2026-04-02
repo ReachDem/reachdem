@@ -161,6 +161,9 @@ export async function sendAlibabaDirectMail(
     env.ALIBABA_SENDER_EMAIL?.trim() ||
     env.SENDER_EMAIL?.trim() ||
     env.SMTP_USER?.trim();
+  const clickTraceEnabled =
+    env.ALIBABA_ENABLE_CLICK_TRACE?.trim()?.toLowerCase() !== "false";
+  const tagName = env.ALIBABA_TAG_NAME?.trim();
 
   // Priority: custom fromName from input, then env variables
   // IMPORTANT: Alibaba Direct Mail FromAlias has a 15 character limit
@@ -179,6 +182,8 @@ export async function sendAlibabaDirectMail(
     fromAliasLength: fromAlias.length,
     envAlibabaName: env.ALIBABA_SENDER_NAME,
     envSenderName: env.SENDER_NAME,
+    clickTraceEnabled,
+    tagName,
   });
 
   if (!accountName) {
@@ -204,8 +209,12 @@ export async function sendAlibabaDirectMail(
     Subject: input.subject,
     HtmlBody: input.html,
     FromAlias: fromAlias,
-    ClickTrace: "0",
+    ClickTrace: clickTraceEnabled ? "1" : "0",
   };
+
+  if (tagName) {
+    params.TagName = tagName;
+  }
 
   const signedQuery = await buildSignedQuery(params, accessKeySecret, "POST");
 

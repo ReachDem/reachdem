@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { auth } from "@reachdem/auth";
 import { TrackedLinkService } from "@reachdem/core";
 import { SinkClient } from "@reachdem/core";
+import { CampaignStatsService } from "@reachdem/core";
 import type { CreateTrackedLinkDto } from "@reachdem/shared";
 
 export interface CreateTrackedLinkInput {
@@ -104,6 +105,10 @@ export async function createTrackedLink(
 
 export async function getCampaignAnalytics(campaignId: string): Promise<any> {
   const { organizationId } = await getOrganizationId();
+  const campaignStats = await CampaignStatsService.getCampaignStats(
+    organizationId,
+    campaignId
+  ).catch(() => null);
 
   // Get all links for this campaign
   const linksResult = await TrackedLinkService.listLinks(organizationId, {
@@ -112,7 +117,20 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
   });
 
   if (linksResult.items.length === 0) {
-    return null;
+    const emptyDailyVisits = Array.from(buildRollingDailyBuckets(7).values());
+
+    return {
+      dailyVisits: emptyDailyVisits,
+      visitors: {
+        total: 0,
+        byRegion: {},
+        byCity: {},
+        byGender: {},
+      },
+      links: [],
+      linkAnalytics: {},
+      deliverability: campaignStats?.deliverability ?? null,
+    };
   }
 
   // Get campaign targets to cross-reference contact data
@@ -442,5 +460,6 @@ export async function getCampaignAnalytics(campaignId: string): Promise<any> {
       shortUrl: l.shortUrl,
     })),
     linkAnalytics,
+    deliverability: campaignStats?.deliverability ?? null,
   };
 }

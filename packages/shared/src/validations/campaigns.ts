@@ -149,5 +149,18 @@ export interface CampaignStatsResponse {
   skippedCount: number;
   clickCount: number;
   uniqueClickCount: number;
+  deliverability?: {
+    attemptedCount: number;
+    acceptedCount: number;
+    deliveredCount: number;
+    bouncedCount: number;
+    openedCount: number;
+    clickedCount: number;
+    complainedCount: number;
+    unsubscribedCount: number;
+    resubscribedCount: number;
+    totalOpenEvents: number;
+    totalClickEvents: number;
+  } | null;
   resolvedStatus: z.infer<typeof campaignStatusSchema>;
 }

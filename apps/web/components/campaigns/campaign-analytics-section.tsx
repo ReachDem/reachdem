@@ -45,11 +45,26 @@ interface LinkAnalyticsBucket {
   visitors?: VisitorsBucket;
 }
 
+interface DeliverabilityBucket {
+  attemptedCount: number;
+  acceptedCount: number;
+  deliveredCount: number;
+  bouncedCount: number;
+  openedCount: number;
+  clickedCount: number;
+  complainedCount: number;
+  unsubscribedCount: number;
+  resubscribedCount: number;
+  totalOpenEvents: number;
+  totalClickEvents: number;
+}
+
 interface AnalyticsData {
   dailyVisits: DailyBucket[];
   visitors: VisitorsBucket;
   links: Array<{ id: string; slug: string; shortUrl: string }>;
   linkAnalytics?: Record<string, LinkAnalyticsBucket>;
+  deliverability?: DeliverabilityBucket;
 }
 
 interface CampaignAnalyticsSectionProps {
@@ -121,7 +136,12 @@ export function CampaignAnalyticsSection({
   const hasAnyAnalytics =
     !!data &&
     (data.dailyVisits.some((day) => Number(day.total || 0) > 0) ||
-      Number(data.visitors.total || 0) > 0);
+      Number(data.visitors.total || 0) > 0 ||
+      Number(data.deliverability?.acceptedCount || 0) > 0 ||
+      Number(data.deliverability?.deliveredCount || 0) > 0 ||
+      Number(data.deliverability?.openedCount || 0) > 0 ||
+      Number(data.deliverability?.clickedCount || 0) > 0 ||
+      Number(data.deliverability?.bouncedCount || 0) > 0);
 
   const barChartData = useMemo(() => {
     if (barSegment === "total") {
@@ -180,6 +200,59 @@ export function CampaignAnalyticsSection({
       .sort((a, b) => b.value - a.value);
   }, [pieSegment, selectedVisitors]);
 
+  const deliverabilityData = useMemo(() => {
+    if (!data?.deliverability) return [];
+
+    return [
+      {
+        stage: "Accepted",
+        value: data.deliverability.acceptedCount || 0,
+        base: data.deliverability.attemptedCount || 0,
+        color: "hsl(var(--chart-1))",
+      },
+      {
+        stage: "Delivered",
+        value: data.deliverability.deliveredCount || 0,
+        base: data.deliverability.acceptedCount || 0,
+        color: "hsl(var(--chart-2))",
+      },
+      {
+        stage: "Opened",
+        value: data.deliverability.openedCount || 0,
+        base: data.deliverability.deliveredCount || 0,
+        color: "hsl(var(--chart-3))",
+      },
+      {
+        stage: "Clicked",
+        value: data.deliverability.clickedCount || 0,
+        base: data.deliverability.openedCount || 0,
+        color: "hsl(var(--chart-4))",
+      },
+    ].filter((item) => item.value > 0);
+  }, [data]);
+
+  const deliverabilityExceptions = useMemo(() => {
+    if (!data?.deliverability) return [];
+
+    return [
+      {
+        label: "Bounced",
+        value: data.deliverability.bouncedCount || 0,
+        color: "hsl(var(--destructive))",
+      },
+      {
+        label: "Complaints",
+        value: data.deliverability.complainedCount || 0,
+        color: "hsl(var(--chart-5))",
+      },
+      {
+        label: "Unsubscribed",
+        value: data.deliverability.unsubscribedCount || 0,
+        color: "hsl(var(--muted-foreground))",
+      },
+    ].filter((item) => item.value > 0);
+  }, [data]);
+
   const hasBarSeriesData =
     stackKeys.length > 0 &&
     barChartData.some((day) =>
@@ -190,6 +263,9 @@ export function CampaignAnalyticsSection({
     pieSegment === "total"
       ? true
       : pieData.some((item) => Number(item.value || 0) > 0);
+
+  const hasDeliverabilityData =
+    deliverabilityData.length > 0 || deliverabilityExceptions.length > 0;
 
   const barChartConfig = Object.fromEntries(
     stackKeys.map((key, index) => [
@@ -332,6 +408,23 @@ export function CampaignAnalyticsSection({
             </div>
             <p className="text-muted-foreground text-center text-sm">
               No data currently
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Deliverability</CardTitle>
+            <CardDescription>Email Delivery Status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border-border/70 bg-muted/20 mx-auto flex h-[250px] w-[250px] items-center justify-center rounded-full border border-dashed">
+              <div className="text-muted-foreground text-sm font-medium">
+                No data
+              </div>
+            </div>
+            <p className="text-muted-foreground text-center text-sm">
+              Deliverability statistics will appear here
             </p>
           </CardContent>
         </Card>
@@ -548,6 +641,157 @@ export function CampaignAnalyticsSection({
           <p className="text-muted-foreground text-center text-xs">
             {getPieDescription()}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-3">
+        <CardHeader>
+          <CardTitle>Email Deliverability</CardTitle>
+          <CardDescription>
+            Funnel progression for accepted, delivered, opened, and clicked
+            emails, with exceptions tracked separately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasDeliverabilityData ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+              <div className="space-y-4">
+                <ChartContainer
+                  config={Object.fromEntries(
+                    deliverabilityData.map((entry) => [
+                      entry.stage,
+                      { label: entry.stage, color: entry.color },
+                    ])
+                  )}
+                  className="h-[280px] w-full"
+                >
+                  <BarChart data={deliverabilityData}>
+                    <XAxis
+                      dataKey="stage"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {deliverabilityData.map((entry) => (
+                        <Cell
+                          key={`deliverability-${entry.stage}`}
+                          fill={entry.color}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {deliverabilityData.map((entry) => {
+                    const rate =
+                      entry.base > 0
+                        ? Math.round((entry.value / entry.base) * 100)
+                        : 0;
+
+                    return (
+                      <div
+                        key={`deliverability-summary-${entry.stage}`}
+                        className="rounded-xl border p-4"
+                      >
+                        <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+                          {entry.stage}
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold">
+                          {entry.value.toLocaleString()}
+                        </div>
+                        <div className="text-muted-foreground mt-1 text-sm">
+                          {rate}% of previous stage
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl border p-4">
+                  <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+                    Attempted
+                  </div>
+                  <div className="mt-2 text-3xl font-semibold">
+                    {data?.deliverability?.attemptedCount?.toLocaleString() ??
+                      "0"}
+                  </div>
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    Provider-accepted emails move through the funnel. Opens and
+                    clicks are nested engagement events, not parallel outcomes.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border p-4">
+                  <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+                    Exception signals
+                  </div>
+                  {deliverabilityExceptions.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      {deliverabilityExceptions.map((entry) => (
+                        <div
+                          key={`deliverability-exception-${entry.label}`}
+                          className="flex items-center justify-between gap-4"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-sm font-medium">
+                              {entry.label}
+                            </span>
+                          </div>
+                          <span className="text-muted-foreground text-sm">
+                            {entry.value.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground mt-3 text-sm">
+                      No bounce, complaint, or unsubscribe events captured yet.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border p-4">
+                  <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+                    Engagement events
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="bg-muted/40 rounded-lg p-3">
+                      <div className="text-muted-foreground text-xs">
+                        Total opens
+                      </div>
+                      <div className="mt-1 text-xl font-semibold">
+                        {data?.deliverability?.totalOpenEvents?.toLocaleString() ??
+                          "0"}
+                      </div>
+                    </div>
+                    <div className="bg-muted/40 rounded-lg p-3">
+                      <div className="text-muted-foreground text-xs">
+                        Total clicks
+                      </div>
+                      <div className="mt-1 text-xl font-semibold">
+                        {data?.deliverability?.totalClickEvents?.toLocaleString() ??
+                          "0"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border-border/70 bg-muted/10 text-muted-foreground flex h-[250px] items-center justify-center rounded-xl border border-dashed text-sm">
+              No delivery data yet
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

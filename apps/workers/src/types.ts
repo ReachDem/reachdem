@@ -42,6 +42,8 @@ export interface Env {
   ALIBABA_REGION?: string;
   ALIBABA_SENDER_EMAIL?: string;
   ALIBABA_SENDER_NAME?: string;
+  ALIBABA_ENABLE_CLICK_TRACE?: string;
+  ALIBABA_TAG_NAME?: string;
   LMT_API_KEY?: string;
   LMT_SECRET?: string;
   AVLYTEXT_API_KEY?: string;

@@ -11,6 +11,7 @@ export * from "./services/segment.service";
 export * from "./services/activity-logger.service";
 export * from "./services/campaign.service";
 export * from "./services/campaign-stats.service";
+export * from "./services/email-deliverability.service";
 export * from "./services/launch-campaign.usecase";
 export * from "./services/request-campaign-launch.usecase";
 export * from "./services/process-campaign-launch-job.usecase";
