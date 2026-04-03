@@ -28,6 +28,7 @@ model User {
   invitations         Invitation[]
   paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
   paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
+  feedbacks           Feedback[]
 
   @@map("user")
 }
@@ -115,6 +116,7 @@ model Organization {
   emailDeliveryEvents EmailDeliveryEvent[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
+  feedbacks           Feedback[]
 
   @@map("organization")
 }
@@ -586,6 +588,20 @@ enum TargetStatus {
   skipped
 }
 
+enum FeedbackSource {
+  dashboard
+  widget
+  email
+  api
+  manual
+}
+
+enum FeedbackStatus {
+  new
+  reviewed
+  archived
+}
+
 model Campaign {
   id             String          @id @default(uuid())
   organizationId String
@@ -749,6 +765,32 @@ model PaymentTransaction {
   @@index([provider, providerTransactionId])
   @@index([provider, providerEventId])
   @@map("payment_transaction")
+}
+
+model Feedback {
+  id             String         @id @default(uuid())
+  organizationId String?
+  userId         String?
+  source         FeedbackSource @default(dashboard)
+  status         FeedbackStatus @default(new)
+  category       String?
+  rating         Int?
+  pagePath       String?
+  message        String
+  email          String?
+  metadata       Json?
+  reviewedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@map("feedbacks")
 }
 
 model PaymentWebhookEvent {

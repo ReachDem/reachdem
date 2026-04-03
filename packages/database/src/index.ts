@@ -32,6 +32,33 @@ function readRuntimeConfig() {
   };
 }
 
+function normalizeDatabaseUrl(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    const sslMode = url.searchParams.get("sslmode");
+    const usesLibpqCompat =
+      url.searchParams.get("uselibpqcompat")?.toLowerCase() === "true";
+
+    if (
+      usesLibpqCompat ||
+      !sslMode ||
+      sslMode === "disable" ||
+      sslMode === "allow" ||
+      sslMode === "verify-full"
+    ) {
+      return connectionString;
+    }
+
+    // pg-connection-string v2 treats require/prefer/verify-ca like verify-full.
+    // Rewrite to the explicit equivalent so current behavior stays unchanged and
+    // the warning disappears ahead of the next major version.
+    url.searchParams.set("sslmode", "verify-full");
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 export function configureDatabaseRuntime(input: {
   databaseUrl?: string;
   prismaAccelerateUrl?: string;
@@ -69,15 +96,17 @@ function createClientOptions(): Prisma.PrismaClientOptions & {
     );
   }
 
+  const connectionString = normalizeDatabaseUrl(runtime.databaseUrl);
+
   if (runtime.driver === "neon") {
-    const adapter = new PrismaNeon({ connectionString: runtime.databaseUrl });
+    const adapter = new PrismaNeon({ connectionString });
     return {
       log,
       adapter,
     };
   }
 
-  const pool = new Pool({ connectionString: runtime.databaseUrl });
+  const pool = new Pool({ connectionString });
 
   return {
     log,
