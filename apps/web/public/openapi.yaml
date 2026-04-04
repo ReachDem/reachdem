@@ -749,7 +749,7 @@ paths:
   /payments/session:
     post:
       summary: Create Payment Session
-      description: Creates a workspace-scoped payment session using Flutterwave as the primary provider and Stripe as fallback.
+      description: Creates a workspace-scoped payment session using Flutterwave checkout.
       tags: [Payments]
       requestBody:
         required: true
@@ -827,31 +827,6 @@ paths:
     post:
       summary: Flutterwave Webhook
       description: Receives and validates Flutterwave payment webhooks. This endpoint is unauthenticated and secured by provider signature validation.
-      tags: [Payments]
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        "200":
-          description: Webhook accepted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaymentWebhookAck"
-        "401":
-          description: Invalid webhook signature
-        "500":
-          description: Internal server error
-
-  /payments/webhooks/stripe:
-    post:
-      summary: Stripe Webhook
-      description: Receives and validates Stripe payment webhooks. This endpoint is unauthenticated and secured by provider signature validation.
       tags: [Payments]
       security: []
       requestBody:
@@ -1168,6 +1143,7 @@ components:
     PaymentProvider:
       type: string
       enum: [flutterwave, stripe]
+      description: `flutterwave` is the active checkout provider. `stripe` is retained for legacy compatibility with historical payment records.
 
     PaymentSessionStatus:
       type: string
@@ -1212,7 +1188,8 @@ components:
           type: string
           format: uuid
         provider:
-          $ref: "#/components/schemas/PaymentProvider"
+          type: string
+          enum: [flutterwave]
         status:
           $ref: "#/components/schemas/PaymentSessionStatus"
         checkoutUrl:

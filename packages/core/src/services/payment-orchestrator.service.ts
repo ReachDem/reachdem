@@ -251,79 +251,74 @@ export class PaymentOrchestratorService {
       },
     });
 
-    const providerOrder: PaymentProvider[] = ["flutterwave", "stripe"];
-    let lastError: Error | null = null;
+    const provider = createProvider(providerPrimary);
 
-    for (const providerName of providerOrder) {
-      const provider = createProvider(providerName);
+    try {
+      const providerInput: CreateProviderCheckoutSessionInput = {
+        paymentSessionId: session.id,
+        organizationId,
+        currency: data.currency,
+        amountMinor,
+        description: resolveDescription(data),
+        returnUrl: getReturnUrl(),
+        customerEmail: user?.email ?? null,
+        metadata: {
+          kind: data.kind,
+          planCode: normalizedPlanCode,
+          creditsQuantity: data.creditsQuantity ?? null,
+          ...(data.metadata ?? {}),
+        },
+      };
 
-      try {
-        const providerInput: CreateProviderCheckoutSessionInput = {
-          paymentSessionId: session.id,
-          organizationId,
-          currency: data.currency,
-          amountMinor,
-          description: resolveDescription(data),
-          returnUrl: getReturnUrl(),
-          customerEmail: user?.email ?? null,
-          metadata: {
-            kind: data.kind,
-            planCode: normalizedPlanCode,
-            creditsQuantity: data.creditsQuantity ?? null,
-            ...(data.metadata ?? {}),
+      const result = await provider.createCheckoutSession(providerInput);
+
+      await prisma.$transaction(async (tx) => {
+        await tx.paymentSession.update({
+          where: { id: session.id },
+          data: {
+            providerSelected: result.provider,
+            status: "providerRedirected",
+            providerCheckoutUrl: result.checkoutUrl ?? null,
+            providerSessionId: result.providerSessionId ?? null,
+            providerReference: result.providerReference ?? null,
           },
-        };
-
-        const result = await provider.createCheckoutSession(providerInput);
-
-        await prisma.$transaction(async (tx) => {
-          await tx.paymentSession.update({
-            where: { id: session.id },
-            data: {
-              providerSelected: result.provider,
-              status: "providerRedirected",
-              providerCheckoutUrl: result.checkoutUrl ?? null,
-              providerSessionId: result.providerSessionId ?? null,
-              providerReference: result.providerReference ?? null,
-            },
-          });
-
-          await tx.paymentTransaction.create({
-            data: {
-              paymentSessionId: session.id,
-              organizationId,
-              initiatedByUserId,
-              provider: result.provider,
-              status: "pending",
-              amountMinor,
-              currency: data.currency,
-              providerSessionId: result.providerSessionId ?? null,
-              providerReference: result.providerReference ?? null,
-              rawPayload: (result.rawPayload ?? null) as any,
-            },
-          });
         });
 
-        return {
-          paymentSessionId: session.id,
-          provider: result.provider,
-          status: "providerRedirected",
-          checkoutUrl: result.checkoutUrl ?? null,
-        };
-      } catch (error) {
-        lastError = error as Error;
-      }
+        await tx.paymentTransaction.create({
+          data: {
+            paymentSessionId: session.id,
+            organizationId,
+            initiatedByUserId,
+            provider: result.provider,
+            status: "pending",
+            amountMinor,
+            currency: data.currency,
+            providerSessionId: result.providerSessionId ?? null,
+            providerReference: result.providerReference ?? null,
+            rawPayload: (result.rawPayload ?? null) as any,
+          },
+        });
+      });
+
+      return {
+        paymentSessionId: session.id,
+        provider: providerPrimary,
+        status: "providerRedirected",
+        checkoutUrl: result.checkoutUrl ?? null,
+      };
+    } catch (error) {
+      const lastError = error as Error;
+
+      await prisma.paymentSession.update({
+        where: { id: session.id },
+        data: {
+          status: "failed",
+          failedAt: new Date(),
+        },
+      });
+
+      throw lastError;
     }
-
-    await prisma.paymentSession.update({
-      where: { id: session.id },
-      data: {
-        status: "failed",
-        failedAt: new Date(),
-      },
-    });
-
-    throw lastError ?? new Error("Unable to create payment session");
   }
 
   static async getSessionById(

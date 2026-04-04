@@ -148,7 +148,7 @@ export type PaymentSessionDetailsResponse = z.infer<
 
 export const createPaymentSessionResultSchema = z.object({
   paymentSessionId: z.string().uuid(),
-  provider: paymentProviderSchema,
+  provider: z.literal("flutterwave"),
   status: paymentSessionStatusSchema,
   checkoutUrl: z.string().url().nullable(),
 });

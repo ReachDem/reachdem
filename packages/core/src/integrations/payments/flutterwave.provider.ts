@@ -37,13 +37,19 @@ function getBaseUrl(): string {
 }
 
 function getSecretKey(): string {
-  const value =
-    process.env.FLUTTERWAVE_SECRET_KEY ??
-    process.env.FLUTTERWAVE_V4_CLIENT_SECRET;
-  if (!value) {
+  const value = process.env.FLUTTERWAVE_SECRET_KEY?.trim();
+  if (value) {
+    return value;
+  }
+
+  if (process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim()) {
     throw new PaymentConfigurationError(
-      "Missing FLUTTERWAVE_SECRET_KEY / FLUTTERWAVE_V4_CLIENT_SECRET"
+      "Flutterwave v3 payments require FLUTTERWAVE_SECRET_KEY. FLUTTERWAVE_V4_CLIENT_SECRET is an OAuth client secret and cannot be used as a v3 Bearer key."
     );
+  }
+
+  if (!value) {
+    throw new PaymentConfigurationError("Missing FLUTTERWAVE_SECRET_KEY");
   }
   return value;
 }
@@ -56,6 +62,21 @@ function getWebhookSecret(): string {
     );
   }
   return value;
+}
+
+function getPaymentOptions(): string | undefined {
+  const value = process.env.FLUTTERWAVE_PAYMENT_OPTIONS?.trim();
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .join(",");
+
+  return normalized || undefined;
 }
 
 export class FlutterwavePaymentProvider implements PaymentProviderPort {
@@ -84,6 +105,7 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     input: CreateProviderCheckoutSessionInput
   ): Promise<CreateProviderCheckoutSessionResult> {
     const txRef = `pay_${input.paymentSessionId}`;
+    const paymentOptions = getPaymentOptions();
     const response = await fetch(
       `${getBaseUrl().replace(/\/+$/, "")}/payments`,
       {
@@ -107,6 +129,7 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
             title: "ReachDem Payment",
             description: input.description,
           },
+          ...(paymentOptions ? { payment_options: paymentOptions } : {}),
           configurations: {
             session_duration: Number(
               process.env.PAYMENT_SESSION_DURATION_MINUTES ?? "30"
@@ -125,8 +148,10 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     );
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      const details = errorText.trim() ? ` - ${errorText.trim()}` : "";
       throw new Error(
-        `Flutterwave create payment failed with HTTP ${response.status}`
+        `Flutterwave create payment failed with HTTP ${response.status}${details}`
       );
     }
 
@@ -163,14 +188,15 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
       return false;
     }
 
-    const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-    const provided = signature.trim().toLowerCase();
-    const normalizedExpected = expected.toLowerCase();
+    const provided = signature.trim();
+    const expected = createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("base64");
 
     try {
       return timingSafeEqual(
         Buffer.from(provided, "utf8"),
-        Buffer.from(normalizedExpected, "utf8")
+        Buffer.from(expected, "utf8")
       );
     } catch {
       return false;
@@ -255,8 +281,10 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     );
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      const details = errorText.trim() ? ` - ${errorText.trim()}` : "";
       throw new PaymentVerificationError(
-        `Flutterwave verify payment failed with HTTP ${response.status}`
+        `Flutterwave verify payment failed with HTTP ${response.status}${details}`
       );
     }
 

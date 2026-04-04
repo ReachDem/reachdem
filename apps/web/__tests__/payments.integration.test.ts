@@ -14,7 +14,6 @@ import { POST as createPaymentSessionHandler } from "../app/api/v1/payments/sess
 import { GET as getPaymentSessionHandler } from "../app/api/v1/payments/session/[id]/route";
 import { POST as reconcilePaymentSessionHandler } from "../app/api/v1/payments/session/[id]/route";
 import { POST as flutterwaveWebhookHandler } from "../app/api/v1/payments/webhooks/flutterwave/route";
-import { POST as stripeWebhookHandler } from "../app/api/v1/payments/webhooks/stripe/route";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Map()),
@@ -41,10 +40,12 @@ if (!REAL_ORG_ID || !TEST_USER_ID || !TEST_USER_EMAIL) {
 
 describe("Payments API - integration", () => {
   const createdPaymentSessionIds: string[] = [];
+  let flutterwavePaymentRequestBody: Record<string, unknown> | null = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    flutterwavePaymentRequestBody = null;
 
     authMock.api.getSession.mockResolvedValue({
       user: { id: TEST_USER_ID, email: TEST_USER_EMAIL } as any,
@@ -60,8 +61,8 @@ describe("Payments API - integration", () => {
     process.env.FLUTTERWAVE_V4_BASE_URL = "https://api.flutterwave.com/v3";
     process.env.FLUTTERWAVE_SECRET_KEY = "flw-secret";
     process.env.FLUTTERWAVE_WEBHOOK_SECRET_HASH = "flw-webhook-secret";
-    process.env.STRIPE_SECRET_KEY = "stripe-secret";
-    process.env.STRIPE_WEBHOOK_SECRET = "stripe-webhook-secret";
+    process.env.FLUTTERWAVE_PAYMENT_OPTIONS =
+      "card,banktransfer,ussd,mobilemoneyghana";
 
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
@@ -70,6 +71,9 @@ describe("Payments API - integration", () => {
         const url = String(input);
 
         if (url === "https://api.flutterwave.com/v3/payments") {
+          flutterwavePaymentRequestBody = init?.body
+            ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+            : null;
           return new Response(
             JSON.stringify({
               data: {
@@ -77,20 +81,6 @@ describe("Payments API - integration", () => {
                 tx_ref: `flw-${Date.now()}`,
                 link: "https://checkout.flutterwave.test/session",
               },
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        if (url === "https://api.stripe.com/v1/checkout/sessions") {
-          return new Response(
-            JSON.stringify({
-              id: `cs_test_${Date.now()}`,
-              url: "https://checkout.stripe.test/session",
-              payment_intent: `pi_${Date.now()}`,
             }),
             {
               status: 200,
@@ -170,28 +160,18 @@ describe("Payments API - integration", () => {
     expect(session?.amountMinor).toBe(15000);
     expect(session?.providerSelected).toBe("flutterwave");
     expect(session?.transactions).toHaveLength(1);
+    expect(flutterwavePaymentRequestBody?.payment_options).toBe(
+      "card,banktransfer,ussd,mobilemoneyghana"
+    );
   });
 
-  it("falls back to Stripe when Flutterwave session creation fails", async () => {
+  it("returns an error when Flutterwave session creation fails", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url === "https://api.flutterwave.com/v3/payments") {
           return new Response("upstream error", { status: 502 });
-        }
-        if (url === "https://api.stripe.com/v1/checkout/sessions") {
-          return new Response(
-            JSON.stringify({
-              id: `cs_test_${Date.now()}`,
-              url: "https://checkout.stripe.test/fallback",
-              payment_intent: `pi_${Date.now()}`,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
         }
         return new Response("not found", { status: 404 });
       })
@@ -210,15 +190,27 @@ describe("Payments API - integration", () => {
     const res = await createPaymentSessionHandler(req, {} as any);
     const body = await res.json();
 
-    expect(res.status).toBe(201);
-    expect(body.provider).toBe("stripe");
-    createdPaymentSessionIds.push(body.paymentSessionId);
+    expect(res.status).toBe(500);
+    expect(body.error).toBe("Internal Server Error");
 
-    const session = await prisma.paymentSession.findUnique({
-      where: { id: body.paymentSessionId },
+    const session = await prisma.paymentSession.findFirst({
+      where: {
+        organizationId: REAL_ORG_ID,
+        initiatedByUserId: TEST_USER_ID,
+        kind: "creditPurchase",
+        currency: "USD",
+      },
+      orderBy: { createdAt: "desc" },
     });
+
+    expect(session).toBeTruthy();
     expect(session?.amountMinor).toBe(5000);
-    expect(session?.providerSelected).toBe("stripe");
+    expect(session?.providerSelected).toBeNull();
+    expect(session?.status).toBe("failed");
+
+    if (session) {
+      createdPaymentSessionIds.push(session.id);
+    }
   });
 
   it("GET /payments/session/:id returns the stored session and transactions", async () => {
@@ -318,13 +310,18 @@ describe("Payments API - integration", () => {
       },
     };
 
+    const rawBody = JSON.stringify(payload);
+    const signature = createHmac("sha256", "flw-webhook-secret")
+      .update(rawBody)
+      .digest("base64");
+
     const res = await flutterwaveWebhookHandler(
       new NextRequest("http://localhost/api/v1/payments/webhooks/flutterwave", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: rawBody,
         headers: {
           "Content-Type": "application/json",
-          "verif-hash": "flw-webhook-secret",
+          "flutterwave-signature": signature,
         },
       })
     );
@@ -419,114 +416,5 @@ describe("Payments API - integration", () => {
       where: { id: REAL_ORG_ID },
     });
     expect(organization?.creditBalance).toBeGreaterThanOrEqual(250);
-  });
-
-  it("Stripe webhook with invalid signature is rejected", async () => {
-    const payload = JSON.stringify({
-      id: "evt_invalid",
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          id: "cs_invalid",
-          payment_intent: "pi_invalid",
-        },
-      },
-    });
-
-    const res = await stripeWebhookHandler(
-      new NextRequest("http://localhost/api/v1/payments/webhooks/stripe", {
-        method: "POST",
-        body: payload,
-        headers: {
-          "Content-Type": "application/json",
-          "stripe-signature": "t=1,v1=bad",
-        },
-      })
-    );
-
-    expect(res.status).toBe(401);
-  });
-
-  it("Stripe webhook marks credit purchase succeeded and increments balance", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url === "https://api.flutterwave.com/v3/payments") {
-          return new Response("upstream error", { status: 502 });
-        }
-        if (url === "https://api.stripe.com/v1/checkout/sessions") {
-          return new Response(
-            JSON.stringify({
-              id: `cs_test_${Date.now()}`,
-              url: "https://checkout.stripe.test/fallback",
-              payment_intent: `pi_${Date.now()}`,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        }
-        return new Response("not found", { status: 404 });
-      })
-    );
-
-    const createReq = new NextRequest(
-      "http://localhost/api/v1/payments/session",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          kind: "creditPurchase",
-          creditsQuantity: 200,
-          currency: "USD",
-        }),
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-    const createRes = await createPaymentSessionHandler(createReq, {} as any);
-    const created = await createRes.json();
-    createdPaymentSessionIds.push(created.paymentSessionId);
-
-    const session = await prisma.paymentSession.findUniqueOrThrow({
-      where: { id: created.paymentSessionId },
-    });
-
-    const event = {
-      id: `evt_${Date.now()}`,
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          id: session.providerSessionId,
-          payment_intent: session.providerReference,
-          metadata: {
-            paymentSessionId: session.id,
-          },
-        },
-      },
-    };
-    const rawBody = JSON.stringify(event);
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = createHmac("sha256", "stripe-webhook-secret")
-      .update(`${timestamp}.${rawBody}`)
-      .digest("hex");
-
-    const res = await stripeWebhookHandler(
-      new NextRequest("http://localhost/api/v1/payments/webhooks/stripe", {
-        method: "POST",
-        body: rawBody,
-        headers: {
-          "Content-Type": "application/json",
-          "stripe-signature": `t=${timestamp},v1=${signature}`,
-        },
-      })
-    );
-
-    expect(res.status).toBe(200);
-
-    const organization = await prisma.organization.findUnique({
-      where: { id: REAL_ORG_ID },
-    });
-    expect(organization?.creditBalance).toBeGreaterThanOrEqual(200);
   });
 });
