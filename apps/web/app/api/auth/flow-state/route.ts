@@ -8,6 +8,8 @@ export async function GET() {
   return NextResponse.json({
     hasSession: flow.hasSession,
     isReady: flow.isReady,
+    nextStep: flow.nextStep,
     nextPath: flow.nextPath,
+    onboardingState: flow.onboardingState,
   });
 }

@@ -17,6 +17,10 @@ model User {
   email                 String   @unique
   emailVerified         Boolean  @default(false)
   image                 String?
+  firstName             String?
+  lastName              String?
+  termsAcceptedAt       DateTime?
+  privacyAcceptedAt     DateTime?
   role                  String? // Added for new onboarding flow
   defaultOrganizationId String? // Added for new onboarding flow
   createdAt             DateTime @default(now())
@@ -29,6 +33,7 @@ model User {
   paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
   paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
   feedbacks           Feedback[]
+  onboardingState     OnboardingState?
 
   @@map("user")
 }
@@ -92,6 +97,8 @@ model Organization {
   slug                        String                      @unique
   logo                        String?
   metadata                    String?
+  companyName                 String?
+  country                     String?
   planCode                    String                      @default("free")
   creditBalance               Int                         @default(0)
   smsQuotaUsed                Int                         @default(0)
@@ -117,6 +124,7 @@ model Organization {
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
   feedbacks           Feedback[]
+  onboardingStates    OnboardingState[]
 
   @@map("organization")
 }
@@ -170,6 +178,57 @@ enum ContactFieldType {
   BOOLEAN
   URL
   SELECT
+}
+
+enum ReachDemRole {
+  ENTREPRENEUR
+  MARKETER
+  SALES
+  DEVELOPER
+}
+
+enum OnboardingStep {
+  register
+  verify_email
+  workspace
+  profile
+  acquisition
+  transition
+  dashboard_checklist
+}
+
+enum AcquisitionSource {
+  linkedin
+  facebook
+  google
+  tiktok
+  friend_colleague
+  other
+}
+
+model OnboardingState {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  organizationId    String?
+  role              ReachDemRole?
+  acquisitionSource AcquisitionSource?
+  acquisitionOther  String?
+  status            String            @default("in_progress") // in_progress | completed | skipped
+  currentStep       OnboardingStep    @default(register)
+  step1CompletedAt  DateTime?         // workspace
+  step2CompletedAt  DateTime?         // profile
+  step3CompletedAt  DateTime?         // acquisition
+  skippedAt         DateTime?
+  completedAt       DateTime?
+  uiState           Json?             // { lastTooltipSeen, tooltipDismissedAt, resumeAnchor }
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("onboarding_state")
 }
 
 // ─── ReachDem App Models ──────────────────────────────────────────────────────

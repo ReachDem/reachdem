@@ -4,3 +4,4 @@ export * from "./groups";
 export * from "./segments";
 export * from "./activity";
 export * from "./messages";
+export * from "./onboarding";

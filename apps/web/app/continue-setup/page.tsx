@@ -8,16 +8,12 @@ export default async function ContinueSetupPage() {
   const flow = await getAuthFlowState();
 
   if (!flow.hasSession || !flow.session) {
-    redirect("/register");
-  }
-
-  if (flow.isReady) {
-    redirect("/dashboard");
+    redirect("/login");
   }
 
   if (flow.hasCompletedSetup && !flow.hasActiveOrganization) {
     if (!flow.defaultOrganizationId) {
-      redirect("/register");
+      redirect("/login");
     }
 
     return (
@@ -25,21 +21,9 @@ export default async function ContinueSetupPage() {
     );
   }
 
-  if (!flow.isEmailVerified) {
-    return (
-      <OnboardingWizard
-        mode="verify-email"
-        initialName={flow.session.user.name ?? ""}
-        initialEmail={flow.session.user.email ?? ""}
-      />
-    );
+  if (flow.nextPath && flow.nextPath !== "/continue-setup") {
+    redirect(flow.nextPath);
   }
 
-  return (
-    <OnboardingWizard
-      mode="account-setup"
-      initialName={flow.session.user.name ?? ""}
-      initialEmail={flow.session.user.email ?? ""}
-    />
-  );
+  redirect("/dashboard");
 }

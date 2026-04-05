@@ -19,6 +19,8 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import { TipsCard } from "@/components/onboarding/tips-card";
+import { getTipContent } from "@/components/onboarding/tips-engine";
 
 export function NavMain({
   items,
@@ -85,7 +87,7 @@ export function NavMain({
                 </SidebarMenuSub>
               </div>
             ) : (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={item.title} className="relative">
                 <SidebarMenuButton tooltip={item.title} asChild>
                   <Link href={item.url}>
                     {item.icon && <item.icon />}
@@ -100,6 +102,23 @@ export function NavMain({
                     )}
                   </Link>
                 </SidebarMenuButton>
+
+                {item.title === "Campaigns" && (
+                  <TipsCard
+                    tipId="step3"
+                    title={getTipContent("step3").title}
+                    description={getTipContent("step3").description}
+                    position="right"
+                  />
+                )}
+                {item.title === "Contacts" && (
+                  <TipsCard
+                    tipId="step2"
+                    title={getTipContent("step2").title}
+                    description={getTipContent("step2").description}
+                    position="right"
+                  />
+                )}
               </SidebarMenuItem>
             )
           )}

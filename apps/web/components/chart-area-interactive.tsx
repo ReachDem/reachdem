@@ -74,7 +74,9 @@ export function ChartAreaInteractive() {
         });
 
         if (!response.ok) {
-          throw new Error("Unable to load dashboard activity");
+          // Non-OK (e.g. no active workspace yet) — just show empty chart
+          if (!cancelled) setChartData([]);
+          return;
         }
 
         const payload = (await response.json()) as { data?: ChartPoint[] };

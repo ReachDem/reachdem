@@ -10,6 +10,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { TipsCard } from "@/components/onboarding/tips-card";
+import { getTipContent } from "@/components/onboarding/tips-engine";
 
 export function NavSecondary({
   items,
@@ -26,13 +28,22 @@ export function NavSecondary({
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
+            <SidebarMenuItem key={item.title} className="relative">
               <SidebarMenuButton asChild>
                 <a href={item.url}>
                   <item.icon />
                   <span>{item.title}</span>
                 </a>
               </SidebarMenuButton>
+
+              {item.title === "Billing" && (
+                <TipsCard
+                  tipId="step1"
+                  title={getTipContent("step1").title}
+                  description={getTipContent("step1").description}
+                  position="right"
+                />
+              )}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>

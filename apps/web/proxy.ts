@@ -23,7 +23,9 @@ export default async function authProxy(request: NextRequest) {
   }
 
   if (!flow.isReady) {
-    return NextResponse.redirect(new URL("/continue-setup", request.url));
+    if (flow.nextPath && new URL(request.url).pathname !== flow.nextPath) {
+      return NextResponse.redirect(new URL(flow.nextPath, request.url));
+    }
   }
 
   return NextResponse.next();
