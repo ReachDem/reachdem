@@ -95,7 +95,7 @@ interface OnboardingStepProps {
 
 const OnboardingStep = ({ children }: OnboardingStepProps) => {
   return (
-    <div className="flex w-full flex-col-reverse gap-10 sm:rounded-2xl sm:border md:min-h-[85dvh] md:flex-row lg:rounded-3xl">
+    <div className="bg-background/80 flex w-full flex-col-reverse gap-10 shadow-xl backdrop-blur-sm sm:rounded-2xl sm:border md:min-h-[85dvh] md:flex-row lg:rounded-3xl">
       {children}
     </div>
   );
