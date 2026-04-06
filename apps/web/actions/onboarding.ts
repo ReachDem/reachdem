@@ -8,6 +8,38 @@ import { z } from "zod";
 import { ReachDemRole, AcquisitionSource } from "@reachdem/shared";
 import { getAuthFlowState } from "../lib/auth-flow";
 
+const legacyBootstrapSchema = z.object({
+  workspaceName: z.string().min(1, "Workspace name is required"),
+  role: z.enum([
+    "Software Engineer",
+    "Product Manager",
+    "Designer",
+    "Founder",
+    "Sales",
+    "Marketing",
+    "Other",
+  ]),
+});
+
+function mapLegacyRoleToReachDemRole(
+  role: z.infer<typeof legacyBootstrapSchema>["role"]
+): ReachDemRole {
+  switch (role) {
+    case "Software Engineer":
+      return "DEVELOPER";
+    case "Sales":
+      return "SALES";
+    case "Marketing":
+      return "MARKETER";
+    case "Founder":
+    case "Product Manager":
+    case "Designer":
+    case "Other":
+    default:
+      return "ENTREPRENEUR";
+  }
+}
+
 export async function completeRegistrationConsent(data: {
   firstName: string;
   lastName: string;
@@ -241,4 +273,44 @@ export async function completeOnboarding() {
 export async function resumeOnboarding() {
   const flow = await getAuthFlowState();
   return { nextPath: flow.nextPath };
+}
+
+export async function bootstrapWorkspace(
+  payload: z.infer<typeof legacyBootstrapSchema>
+) {
+  try {
+    const validatedData = legacyBootstrapSchema.parse(payload);
+
+    const workspaceResult = await createWorkspace({
+      companyName: validatedData.workspaceName,
+      workspaceName: validatedData.workspaceName,
+      country: "Cameroon",
+    });
+
+    if (workspaceResult.error) {
+      return { error: workspaceResult.error };
+    }
+
+    const roleResult = await savePrimaryRole(
+      mapLegacyRoleToReachDemRole(validatedData.role)
+    );
+
+    if (roleResult.error) {
+      return { error: roleResult.error };
+    }
+
+    const completionResult = await completeOnboarding();
+
+    if (completionResult.error) {
+      return { error: completionResult.error };
+    }
+
+    return {
+      success: true,
+      organizationId: workspaceResult.organizationId,
+    };
+  } catch (error) {
+    console.error("bootstrapWorkspace failed", error);
+    return { error: "Unable to finish workspace setup." };
+  }
 }
