@@ -3,6 +3,7 @@
 import { prisma, Prisma } from "@reachdem/database";
 import { auth } from "@reachdem/auth";
 import { computeContactChannelFlags } from "@reachdem/shared";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { promises as dns } from "node:dns";
 import validator from "validator";
@@ -345,6 +346,9 @@ export async function importContactsBulk(
     successCount += toUpdate.length;
   }
 
+  revalidatePath("/dashboard");
+  revalidatePath("/contacts");
+
   return {
     success: true,
     count: successCount,
@@ -429,6 +433,9 @@ export async function updateContact(
       data: updateData,
     });
 
+    revalidatePath("/dashboard");
+    revalidatePath("/contacts");
+
     return { success: true, contact: updated };
   } catch (error) {
     console.error("Error updating contact:", error);
@@ -457,6 +464,9 @@ export async function deleteContacts(ids: string[]) {
       deletedAt: new Date(),
     },
   });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/contacts");
 
   return { success: true, count: result.count };
 }

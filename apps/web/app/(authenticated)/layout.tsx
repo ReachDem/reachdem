@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAuthFlowState } from "@/lib/auth-flow";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { OrganizationVerificationBanner } from "@/components/organization-verification-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TipsProvider } from "@/components/onboarding/tips-engine";
@@ -24,6 +25,24 @@ export default async function AuthenticatedLayout({
     redirect("/continue-setup");
   }
 
+  const activeOrganizationId =
+    flow.session?.session.activeOrganizationId ?? flow.defaultOrganizationId;
+
+  const activeOrganization = activeOrganizationId
+    ? await prisma.organization.findUnique({
+        where: { id: activeOrganizationId },
+        select: {
+          senderId: true,
+          workspaceVerificationStatus: true,
+        },
+      })
+    : null;
+
+  const showVerificationBanner = Boolean(
+    activeOrganization?.senderId &&
+    activeOrganization.workspaceVerificationStatus !== "verified"
+  );
+
   return (
     <TipsProvider>
       <SidebarProvider
@@ -36,6 +55,18 @@ export default async function AuthenticatedLayout({
       >
         <AppSidebar variant="inset" />
         <SidebarInset>
+          {showVerificationBanner ? (
+            <OrganizationVerificationBanner
+              senderId={activeOrganization!.senderId!}
+              verificationStatus={
+                activeOrganization!.workspaceVerificationStatus as
+                  | "not_submitted"
+                  | "pending"
+                  | "verified"
+                  | "rejected"
+              }
+            />
+          ) : null}
           <SiteHeader />
           {children}
         </SidebarInset>

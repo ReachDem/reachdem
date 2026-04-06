@@ -6,4 +6,8 @@ declare module "@reachdem/core" {
   }
 
   export function classifyError(errorCode: string): "retryable" | "final";
+  export function getDownloadPresignedUrl(
+    key: string,
+    expiresIn?: number
+  ): Promise<string>;
 }

@@ -106,6 +106,9 @@ model Organization {
   workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
   workspaceVerifiedAt         DateTime?
   senderId                    String?                     @unique
+  websiteUrl                  String?
+  idDocumentKey               String?
+  businessDocumentKey         String?
   createdAt                   DateTime                    @default(now())
 
   members             Member[]

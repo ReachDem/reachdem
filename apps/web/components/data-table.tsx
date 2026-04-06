@@ -495,7 +495,7 @@ export function DataTable({
                       colSpan={columns.length}
                       className="h-24 text-center"
                     >
-                      No results.
+                      It looks like you don't have any contacts yet.
                     </TableCell>
                   </TableRow>
                 )}

@@ -5,29 +5,18 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DashboardChecklistStep } from "@reachdem/shared";
 import { useTipsEngine } from "./tips-engine";
-import { SenderIdDialog } from "./sender-id-dialog";
-import { useState } from "react";
 
 function StepItem({
   step,
   index,
   activeIndex,
-  onOpenStep1Dialog,
 }: {
   step: DashboardChecklistStep;
   index: number;
   activeIndex: number;
-  onOpenStep1Dialog: () => void;
 }) {
   const isDone = step.status === "done";
   const isActive = !isDone && index === activeIndex;
-
-  const handleContinue = (e: React.MouseEvent) => {
-    if (step.id === "step1") {
-      e.preventDefault();
-      onOpenStep1Dialog();
-    }
-  };
 
   return (
     <div className="relative flex items-start gap-4 sm:gap-5">
@@ -56,25 +45,17 @@ function StepItem({
           </div>
 
           <div className="relative">
-            {step.href ? (
+            {step.href && !isDone ? (
               <Button
-                variant={isDone ? "ghost" : "secondary"}
+                variant="secondary"
                 size="sm"
                 className="h-8 w-fit rounded-full px-4 text-xs font-medium"
-                onClick={handleContinue}
-                asChild={step.id !== "step1"}
+                asChild
               >
-                {step.id === "step1" ? (
-                  <>
-                    {isDone ? "Review" : "Continue"}
-                    <ChevronRight className="ml-1 size-3.5" />
-                  </>
-                ) : (
-                  <Link href={step.href}>
-                    {isDone ? "Review" : "Continue"}
-                    <ChevronRight className="ml-1 size-3.5" />
-                  </Link>
-                )}
+                <Link href={step.href}>
+                  Continue
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
               </Button>
             ) : null}
           </div>
@@ -91,31 +72,18 @@ export function ChecklistStepsClient({
 }) {
   const currentStepIndex = steps.findIndex((step) => step.status !== "done");
   const activeIndex = currentStepIndex === -1 ? 0 : currentStepIndex;
-  const [isSenderIdDialogOpen, setIsSenderIdDialogOpen] = useState(false);
 
   return (
-    <>
-      <div className="relative flex flex-col gap-6 sm:gap-8">
-        {steps.map((step, index) => (
-          <div key={step.id} className="relative">
-            {/* Vertical connecting line */}
-            {index < steps.length - 1 && (
-              <div className="bg-border absolute top-10 left-4 h-[calc(100%+0.5rem)] w-px -translate-x-1/2 sm:h-[calc(100%+1rem)]" />
-            )}
-            <StepItem
-              step={step}
-              index={index}
-              activeIndex={activeIndex}
-              onOpenStep1Dialog={() => setIsSenderIdDialogOpen(true)}
-            />
-          </div>
-        ))}
-      </div>
-
-      <SenderIdDialog
-        open={isSenderIdDialogOpen}
-        onOpenChange={setIsSenderIdDialogOpen}
-      />
-    </>
+    <div className="relative flex flex-col gap-6 sm:gap-8">
+      {steps.map((step, index) => (
+        <div key={step.id} className="relative">
+          {/* Vertical connecting line */}
+          {index < steps.length - 1 && (
+            <div className="bg-border absolute top-10 left-4 h-[calc(100%+0.5rem)] w-px -translate-x-1/2 sm:h-[calc(100%+1rem)]" />
+          )}
+          <StepItem step={step} index={index} activeIndex={activeIndex} />
+        </div>
+      ))}
+    </div>
   );
 }

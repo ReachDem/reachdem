@@ -39,7 +39,7 @@ export async function getDashboardChecklistState() {
   // Step 1: Configure a channel (Sender ID)
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { senderId: true },
+    select: { senderId: true, workspaceVerificationStatus: true },
   });
   const step1Done = Boolean(org?.senderId);
 
@@ -65,9 +65,9 @@ export async function getDashboardChecklistState() {
     {
       id: "step1",
       title: "Configure a channel",
-      description: "Approve your sender ID to send messages.",
+      description: "Request your sender ID to start the activation flow.",
       status: step1Done ? "done" : "pending",
-      href: "/settings/billing", // example route
+      href: "/settings/workspace",
     },
     {
       id: "step2",
@@ -129,4 +129,38 @@ export async function markChecklistStepSeen(stepId: string) {
   });
 
   return { success: true };
+}
+
+export async function submitSenderId(senderId: string) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) return { error: "Unauthorized" };
+
+  const userWithState = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  });
+
+  const organizationId =
+    session.session.activeOrganizationId ??
+    userWithState?.defaultOrganizationId ??
+    null;
+
+  if (!organizationId) {
+    return { error: "No organization found" };
+  }
+
+  try {
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        senderId,
+      },
+    });
+    return { success: true };
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return { error: "This Sender ID is already registered." };
+    }
+    console.error("Failed to save Sender ID:", error);
+    return { error: "Failed to submit sender ID." };
+  }
 }

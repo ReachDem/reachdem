@@ -11,8 +11,11 @@ import {
   ShieldCheck,
   ArrowRight,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { submitSenderId } from "@/actions/dashboard-onboarding";
+import { useRouter } from "next/navigation";
 
 interface SenderIdDialogProps {
   open: boolean;
@@ -28,16 +31,25 @@ export function SenderIdDialog({
   const [step, setStep] = useState(1);
   const [senderId, setSenderId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const nextStep = () => setStep((p) => p + 1);
   const prevStep = () => setStep((p) => Math.max(1, p - 1));
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    // Fake API call for the demo
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setError(null);
+    const result = await submitSenderId(senderId);
     setIsSubmitting(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
     nextStep();
+    router.refresh();
     if (onSuccess) onSuccess();
   };
 
@@ -156,6 +168,13 @@ export function SenderIdDialog({
                       </div>
                     </div>
                   </div>
+
+                  {error && (
+                    <div className="bg-destructive/10 text-destructive mt-4 flex items-center gap-2 rounded-md p-3 text-sm">
+                      <AlertCircle className="size-4 shrink-0" />
+                      <p>{error}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-auto flex justify-between border-t pt-4">

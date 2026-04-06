@@ -92,10 +92,12 @@ export function RegisterForm() {
       });
 
       if (signUpError) {
-        if (signUpError.message.includes("exists")) {
+        const signUpErrorMessage = signUpError.message ?? "";
+
+        if (signUpErrorMessage.includes("exists")) {
           setServerError("An account already exists with this email address.");
         } else {
-          setServerError(signUpError.message || "Error during signup.");
+          setServerError(signUpErrorMessage || "Error during signup.");
         }
         setIsSubmitting(false);
         return;

@@ -35,6 +35,7 @@ export * from "./errors/messaging.errors";
 export * from "./errors/payment.errors";
 export * from "./integrations/sink.client";
 export * from "./integrations/redis-cache.client";
+export * from "./integrations/r2";
 export * from "./integrations/payments/flutterwave.provider";
 export * from "./integrations/payments/stripe.provider";
 export * from "./utils/segment-compiler";

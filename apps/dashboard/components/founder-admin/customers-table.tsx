@@ -23,7 +23,14 @@ export interface CustomerTableRow {
   ownerEmail: string;
   planCode: string;
   creditBalance: number;
-  workspaceVerificationStatus: string;
+  workspaceVerificationStatus:
+    | "not_submitted"
+    | "pending"
+    | "verified"
+    | "rejected";
+  websiteUrl: string | null;
+  idDocumentKey: string | null;
+  businessDocumentKey: string | null;
   activated: boolean;
   lastPaymentAt: Date | null;
   createdAt: Date;

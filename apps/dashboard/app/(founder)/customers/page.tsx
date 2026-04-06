@@ -4,6 +4,7 @@ import {
   CustomersTable,
   type CustomerTableRow,
 } from "@/components/founder-admin/customers-table";
+import { KybActions } from "./kyb-actions";
 import { listFeedbacks } from "@/lib/founder-admin/feedbacks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,9 @@ async function getCustomers(): Promise<CustomerTableRow[]> {
       planCode: true,
       creditBalance: true,
       workspaceVerificationStatus: true,
+      websiteUrl: true,
+      idDocumentKey: true,
+      businessDocumentKey: true,
       createdAt: true,
       members: {
         where: { role: "owner" },
@@ -58,6 +62,9 @@ async function getCustomers(): Promise<CustomerTableRow[]> {
     planCode: org.planCode,
     creditBalance: org.creditBalance,
     workspaceVerificationStatus: org.workspaceVerificationStatus,
+    websiteUrl: org.websiteUrl,
+    idDocumentKey: org.idDocumentKey,
+    businessDocumentKey: org.businessDocumentKey,
     activated: org.campaigns.length > 0 || org.planCode !== "free",
     lastPaymentAt: org.paymentTransactions[0]?.confirmedAt ?? null,
     createdAt: org.createdAt,
@@ -105,6 +112,9 @@ export default async function CustomersPage() {
                 <TableHead className="text-base">Owner</TableHead>
                 <TableHead className="w-28 text-base">Status</TableHead>
                 <TableHead className="w-24 text-base">Plan</TableHead>
+                <TableHead className="w-48 text-right text-base">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,6 +158,15 @@ export default async function CustomersPage() {
                       <Badge variant="outline" className="text-base capitalize">
                         {org.planCode}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <KybActions
+                        organizationId={org.id}
+                        websiteUrl={org.websiteUrl}
+                        idDocumentKey={org.idDocumentKey}
+                        businessDocumentKey={org.businessDocumentKey}
+                        verificationStatus={org.workspaceVerificationStatus}
+                      />
                     </TableCell>
                   </TableRow>
                 ))

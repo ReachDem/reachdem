@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 import "./fonts.css";
 import { Providers } from "@/components/providers";
+import { getThemeScript } from "@/lib/theme";
 
 const neueMontreal = localFont({
   src: [
@@ -37,6 +39,12 @@ export const metadata: Metadata = {
   },
 };
 
+const themeScript = getThemeScript({
+  attribute: "class",
+  defaultTheme: "system",
+  enableSystem: true,
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,6 +54,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${neueMontreal.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
+        <Script id="theme-script" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
       </body>
     </html>
   );
