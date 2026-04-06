@@ -31,7 +31,7 @@ const Cta18 = ({ className }: Cta18Props) => {
               alt="placeholder"
               className="absolute -bottom-12 left-4 h-48 -translate-x-1/2 -rotate-[120deg]"
             />
-            <div className="bg-muted/50 relative z-10 flex aspect-video h-full w-full flex-col justify-end overflow-hidden rounded-tl-xl border-t border-l pt-4 pr-4 backdrop-blur-sm md:pt-8">
+            <div className="bg-muted/50 relative z-10 flex aspect-video h-full w-full flex-col justify-end overflow-hidden rounded-tl-xl border-t border-l pt-4 pr-4 backdrop-blur-md md:pt-8">
               <img
                 src="/avatar-founder.png"
                 alt="Founder Avatar"
