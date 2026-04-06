@@ -1,4 +1,3 @@
-import { prisma } from "@reachdem/database";
 import {
   PricingPlansEditor,
   type PricingPlanRow,
@@ -7,8 +6,7 @@ import {
   AnnouncementsEditor,
   type AnnouncementRow,
 } from "@/components/founder-admin/announcements-editor";
-
-// ─── Pricing Plans (from PlanEntitlements config — hardcoded defaults) ───────
+import { FounderPageShell } from "@/components/founder-admin/page-shell";
 
 const DEFAULT_PLANS: PricingPlanRow[] = [
   {
@@ -23,7 +21,7 @@ const DEFAULT_PLANS: PricingPlanRow[] = [
   {
     code: "basic",
     name: "Basic",
-    priceMonthlyMinor: 500000, // 5000 XAF
+    priceMonthlyMinor: 500000,
     currency: "XAF",
     status: "active",
     smsQuota: 1000,
@@ -32,7 +30,7 @@ const DEFAULT_PLANS: PricingPlanRow[] = [
   {
     code: "growth",
     name: "Growth",
-    priceMonthlyMinor: 1500000, // 15000 XAF
+    priceMonthlyMinor: 1500000,
     currency: "XAF",
     status: "active",
     smsQuota: 5000,
@@ -41,7 +39,7 @@ const DEFAULT_PLANS: PricingPlanRow[] = [
   {
     code: "pro",
     name: "Pro",
-    priceMonthlyMinor: 5000000, // 50000 XAF
+    priceMonthlyMinor: 5000000,
     currency: "XAF",
     status: "active",
     smsQuota: null,
@@ -49,11 +47,8 @@ const DEFAULT_PLANS: PricingPlanRow[] = [
   },
 ];
 
-// Server actions
 async function updatePlan(plan: PricingPlanRow): Promise<void> {
   "use server";
-  // Persist to DB when pricing_plan table is available
-  // For now: log for audit trail
   console.info(`[apps-config] Plan updated: ${plan.code}`, {
     name: plan.name,
     price: plan.priceMonthlyMinor,
@@ -62,7 +57,6 @@ async function updatePlan(plan: PricingPlanRow): Promise<void> {
 }
 
 async function getAnnouncements(): Promise<AnnouncementRow[]> {
-  // Will query announcement table once migration applied
   return [];
 }
 
@@ -71,7 +65,6 @@ async function createAnnouncement(
 ): Promise<AnnouncementRow> {
   "use server";
   console.info("[apps-config] Announcement created", input);
-  // Return mock with generated ID until DB table is ready
   return {
     ...input,
     id: `ann_${Date.now()}`,
@@ -79,32 +72,42 @@ async function createAnnouncement(
   };
 }
 
-async function updateAnnouncement(ann: AnnouncementRow): Promise<void> {
+async function updateAnnouncement(
+  announcement: AnnouncementRow
+): Promise<void> {
   "use server";
-  console.info(`[apps-config] Announcement updated: ${ann.id}`);
+  console.info(`[apps-config] Announcement updated: ${announcement.id}`);
 }
 
 export default async function AppsPage() {
   const announcements = await getAnnouncements();
+  const activePlans = DEFAULT_PLANS.filter((plan) => plan.status === "active");
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          Apps Configuration
-        </h2>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          Manage pricing plans, quotas, and marketing announcements.
-        </p>
+    <FounderPageShell
+      title="Apps"
+      description="Tune the commercial surface area of the product: plan packaging, usage quotas, and the announcements customers see."
+      facts={[
+        {
+          label: "Plans",
+          value: DEFAULT_PLANS.length.toLocaleString(),
+          detail: `${activePlans.length.toLocaleString()} active for sale`,
+        },
+        {
+          label: "Announcements",
+          value: announcements.length.toLocaleString(),
+          detail: "In-app promos, notices, and feature updates",
+        },
+      ]}
+    >
+      <div className="grid gap-6">
+        <PricingPlansEditor plans={DEFAULT_PLANS} onUpdate={updatePlan} />
+        <AnnouncementsEditor
+          announcements={announcements}
+          onCreate={createAnnouncement}
+          onUpdate={updateAnnouncement}
+        />
       </div>
-
-      <PricingPlansEditor plans={DEFAULT_PLANS} onUpdate={updatePlan} />
-
-      <AnnouncementsEditor
-        announcements={announcements}
-        onCreate={createAnnouncement}
-        onUpdate={updateAnnouncement}
-      />
-    </div>
+    </FounderPageShell>
   );
 }

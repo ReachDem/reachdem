@@ -4,7 +4,7 @@ import { organization, emailOTP } from "better-auth/plugins";
 import { prisma } from "@reachdem/database";
 import { ac, owner, admin, member } from "./permissions";
 import { render } from "@react-email/render";
-import { VerificationEmail } from "@reachdem/transactional";
+import { VerificationEmail } from "@reachdem/transactional/emails/verification";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 

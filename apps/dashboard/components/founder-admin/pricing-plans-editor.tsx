@@ -24,18 +24,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Pencil, Plus, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
+import { Pencil, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PricingPlanRow {
@@ -63,10 +57,11 @@ export function PricingPlansEditor({
 
   const handleSave = () => {
     if (!editing) return;
+
     startTransition(async () => {
       await onUpdate(editing);
-      setList((prev) =>
-        prev.map((p) => (p.code === editing.code ? editing : p))
+      setList((previous) =>
+        previous.map((plan) => (plan.code === editing.code ? editing : plan))
       );
       setEditing(null);
     });
@@ -78,21 +73,34 @@ export function PricingPlansEditor({
       status:
         plan.status === "active" ? ("disabled" as const) : ("active" as const),
     };
+
     startTransition(async () => {
       await onUpdate(updated);
-      setList((prev) => prev.map((p) => (p.code === plan.code ? updated : p)));
+      setList((previous) =>
+        previous.map((current) =>
+          current.code === plan.code ? updated : current
+        )
+      );
     });
   };
 
   return (
     <>
-      <Card>
+      <Card className="rounded-[26px] border border-white/6">
         <CardHeader>
           <CardTitle className="text-sm font-medium">Pricing Plans</CardTitle>
           <CardDescription className="text-sm">
             Manage plan names, prices, quotas, and activation status
           </CardDescription>
+          <p
+            aria-live="polite"
+            className="text-sm text-[color:var(--founder-muted-foreground)]"
+          >
+            {list.length.toLocaleString()} plan{list.length === 1 ? "" : "s"}{" "}
+            configured
+          </p>
         </CardHeader>
+
         <CardContent className="p-0 sm:p-4">
           <div className="w-full overflow-hidden">
             <ScrollArea className="w-full whitespace-nowrap">
@@ -115,7 +123,7 @@ export function PricingPlansEditor({
                       <TableHead className="border-border bg-muted/50 relative h-11 w-20 border-y px-3 text-left font-medium select-none">
                         Status
                       </TableHead>
-                      <TableHead className="border-border bg-muted/50 relative h-11 w-24 border-y px-3 text-left text-right font-medium select-none last:rounded-r-lg last:border-r last:pr-6">
+                      <TableHead className="border-border bg-muted/50 relative h-11 w-24 border-y px-3 text-right font-medium select-none last:rounded-r-lg last:border-r last:pr-6">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -165,23 +173,31 @@ export function PricingPlansEditor({
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0"
+                              aria-label={`Edit ${plan.name} plan`}
                               onClick={() => setEditing({ ...plan })}
                               title="Edit"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0"
+                              aria-label={`${plan.status === "active" ? "Disable" : "Enable"} ${plan.name} plan`}
                               onClick={() => handleToggle(plan)}
                               title="Toggle status"
                               disabled={isPending}
                             >
                               {plan.status === "active" ? (
-                                <ToggleRight className="h-4 w-4 text-emerald-400" />
+                                <ToggleRight
+                                  className="h-4 w-4 text-emerald-400"
+                                  aria-hidden="true"
+                                />
                               ) : (
-                                <ToggleLeft className="text-muted-foreground h-4 w-4" />
+                                <ToggleLeft
+                                  className="text-muted-foreground h-4 w-4"
+                                  aria-hidden="true"
+                                />
                               )}
                             </Button>
                           </div>
@@ -197,7 +213,6 @@ export function PricingPlansEditor({
         </CardContent>
       </Card>
 
-      {/* Edit dialog */}
       <Dialog
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
@@ -207,65 +222,87 @@ export function PricingPlansEditor({
             <DialogTitle className="text-sm">
               Edit Plan — {editing?.name}
             </DialogTitle>
+            <DialogDescription className="text-sm text-[color:var(--founder-muted-foreground)]">
+              Update pricing and quotas for this founder-managed plan.
+            </DialogDescription>
           </DialogHeader>
-          {editing && (
+
+          {editing ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <Label className="text-sm">Plan Name</Label>
+                <Label htmlFor="plan-name" className="text-sm">
+                  Plan Name
+                </Label>
                 <Input
+                  id="plan-name"
+                  name="plan-name"
+                  autoComplete="off"
                   className="h-9 text-sm"
                   value={editing.name}
-                  onChange={(e) =>
-                    setEditing({ ...editing, name: e.target.value })
+                  onChange={(event) =>
+                    setEditing({ ...editing, name: event.target.value })
                   }
                 />
               </div>
+
               <div className="space-y-1">
-                <Label className="text-sm">Price / Month (minor units)</Label>
+                <Label htmlFor="plan-price" className="text-sm">
+                  Price / Month (minor units)
+                </Label>
                 <Input
+                  id="plan-price"
+                  name="plan-price"
                   className="h-9 text-sm"
                   type="number"
                   value={editing.priceMonthlyMinor}
-                  onChange={(e) =>
+                  onChange={(event) =>
                     setEditing({
                       ...editing,
-                      priceMonthlyMinor: Number(e.target.value),
+                      priceMonthlyMinor: Number(event.target.value),
                     })
                   }
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-sm">
+                  <Label htmlFor="plan-sms-quota" className="text-sm">
                     SMS Quota (blank = unlimited)
                   </Label>
                   <Input
+                    id="plan-sms-quota"
+                    name="plan-sms-quota"
                     className="h-9 text-sm"
                     type="number"
                     placeholder="Unlimited"
                     value={editing.smsQuota ?? ""}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setEditing({
                         ...editing,
-                        smsQuota: e.target.value
-                          ? Number(e.target.value)
+                        smsQuota: event.target.value
+                          ? Number(event.target.value)
                           : null,
                       })
                     }
                   />
                 </div>
+
                 <div className="space-y-1">
-                  <Label className="text-sm">Email Quota</Label>
+                  <Label htmlFor="plan-email-quota" className="text-sm">
+                    Email Quota
+                  </Label>
                   <Input
+                    id="plan-email-quota"
+                    name="plan-email-quota"
                     className="h-9 text-sm"
                     type="number"
                     placeholder="Unlimited"
                     value={editing.emailQuota ?? ""}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setEditing({
                         ...editing,
-                        emailQuota: e.target.value
-                          ? Number(e.target.value)
+                        emailQuota: event.target.value
+                          ? Number(event.target.value)
                           : null,
                       })
                     }
@@ -273,7 +310,8 @@ export function PricingPlansEditor({
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -289,7 +327,12 @@ export function PricingPlansEditor({
               onClick={handleSave}
               disabled={isPending}
             >
-              {isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              {isPending ? (
+                <Loader2
+                  className="mr-1.5 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+              ) : null}
               Save changes
             </Button>
           </DialogFooter>

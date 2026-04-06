@@ -62,44 +62,65 @@ export function KpiCard({
         : "text-muted-foreground";
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className="flex items-center gap-2 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-          {value}
-        </CardTitle>
-        <CardAction>
-          {badge || trend ? (
-            <Badge variant={badgeVariant || "outline"}>
-              {trend ? (
-                <>
-                  <TrendIcon className="mr-1 size-3" />
-                  {trend.value > 0 ? "+" : ""}
-                  {trend.value}%
-                </>
-              ) : (
-                badge
-              )}
-            </Badge>
-          ) : (
-            icon && <div className="text-muted-foreground">{icon}</div>
-          )}
-        </CardAction>
+    <Card className="@container/card rounded-[24px] border border-white/6">
+      <CardHeader className="gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardDescription className="text-[0.72rem] tracking-[0.22em] text-[color:var(--founder-quiet-foreground)] uppercase">
+              {title}
+            </CardDescription>
+            <CardTitle className="flex items-center gap-2 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {value}
+            </CardTitle>
+          </div>
+
+          <CardAction className="col-auto row-auto">
+            {badge || trend ? (
+              <Badge
+                variant={badgeVariant || "outline"}
+                className="rounded-full border-white/10 bg-white/[0.04] px-2.5 py-1"
+              >
+                {trend ? (
+                  <>
+                    <TrendIcon className="mr-1 size-3" aria-hidden="true" />
+                    {trend.value > 0 ? "+" : ""}
+                    {trend.value}%
+                  </>
+                ) : (
+                  badge
+                )}
+              </Badge>
+            ) : icon ? (
+              <div
+                aria-hidden="true"
+                className="flex size-10 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.05] text-[color:var(--founder-muted-foreground)]"
+              >
+                {icon}
+              </div>
+            ) : null}
+          </CardAction>
+        </div>
+
+        {subtext ? (
+          <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2 text-sm leading-6 text-[color:var(--founder-muted-foreground)]">
+            {subtext}
+          </div>
+        ) : null}
       </CardHeader>
 
-      {(subtext || trend) && (
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          {trend && (
-            <div
-              className={cn("line-clamp-1 flex gap-2 font-medium", trendColor)}
-            >
-              {trend.label}
-              <TrendIcon className="size-4" />
-            </div>
-          )}
-          {subtext && <div className="text-muted-foreground">{subtext}</div>}
+      {trend ? (
+        <CardFooter className="items-center justify-between gap-3 px-4 py-3">
+          <div
+            className={cn("flex items-center gap-2 font-medium", trendColor)}
+          >
+            <TrendIcon className="size-4" aria-hidden="true" />
+            <span>{trend.label}</span>
+          </div>
+          <span className="text-xs tracking-[0.18em] text-[color:var(--founder-quiet-foreground)] uppercase">
+            Trend
+          </span>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   );
 }

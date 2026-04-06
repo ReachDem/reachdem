@@ -21,17 +21,26 @@ export default async function FounderLayout({
         } as React.CSSProperties
       }
     >
-      <FounderSidebar variant="inset" email={session.email} />
-      <SidebarInset>
-        <FounderHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
-              {children}
+      <div className="founder-admin flex min-h-svh w-full">
+        <a href="#founder-main" className="skip-link">
+          Skip to Main Content
+        </a>
+        <FounderSidebar variant="inset" email={session.email} />
+        <SidebarInset
+          id="founder-main"
+          tabIndex={-1}
+          className="bg-transparent outline-none md:rounded-[28px] md:border md:border-white/8 md:shadow-[0_24px_100px_rgba(0,0,0,0.24)]"
+        >
+          <FounderHeader />
+          <div className="flex flex-1 flex-col">
+            <div className="@container/main flex flex-1 flex-col">
+              <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-4 md:gap-8 md:px-6 md:py-6 xl:px-8">
+                {children}
+              </div>
             </div>
           </div>
-        </div>
-      </SidebarInset>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   Table,
   TableBody,
@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Search, Star, MessageSquare } from "lucide-react";
 import type { FeedbackRow, FeedbackStatus } from "@/lib/founder-admin/types";
 import { cn } from "@/lib/utils";
@@ -38,39 +39,69 @@ export function FeedbackList({ feedbacks }: FeedbackListProps) {
     "all"
   );
   const [query, setQuery] = useState("");
+  const searchId = useId();
 
-  const filtered = feedbacks.filter((f) => {
-    const matchStatus = statusFilter === "all" || f.status === statusFilter;
+  const filtered = feedbacks.filter((feedback) => {
+    const matchStatus =
+      statusFilter === "all" || feedback.status === statusFilter;
     const matchQuery =
       !query ||
-      f.message.toLowerCase().includes(query.toLowerCase()) ||
-      (f.organizationName ?? "").toLowerCase().includes(query.toLowerCase());
+      feedback.message.toLowerCase().includes(query.toLowerCase()) ||
+      (feedback.organizationName ?? "")
+        .toLowerCase()
+        .includes(query.toLowerCase());
+
     return matchStatus && matchQuery;
   });
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-medium">
-            <MessageSquare className="h-5 w-5" />
-            Customer Feedback
-          </CardTitle>
+    <Card className="rounded-[26px] border border-white/6">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-base font-medium">
+              <MessageSquare className="h-5 w-5" aria-hidden="true" />
+              Customer Feedback
+            </CardTitle>
+            <p
+              aria-live="polite"
+              className="text-sm text-[color:var(--founder-muted-foreground)]"
+            >
+              {filtered.length.toLocaleString()} feedback item
+              {filtered.length === 1 ? "" : "s"} match the current view
+            </p>
+          </div>
+
           <div className="flex gap-2">
-            <div className="relative min-w-[160px] flex-1">
-              <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-5 w-5" />
+            <div className="relative min-w-[180px] flex-1">
+              <Label htmlFor={searchId} className="sr-only">
+                Search customer feedback
+              </Label>
+              <Search
+                className="text-muted-foreground absolute top-2.5 left-2.5 h-5 w-5"
+                aria-hidden="true"
+              />
               <Input
+                id={searchId}
+                name="feedback-search"
+                type="search"
+                autoComplete="off"
+                inputMode="search"
                 placeholder="Search…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="h-9 pl-8 text-base"
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-9 pl-8 text-sm"
               />
             </div>
+
             <Select
               value={statusFilter}
               onValueChange={(value) => setStatusFilter(value ?? "all")}
             >
-              <SelectTrigger className="h-9 w-[110px] text-base">
+              <SelectTrigger
+                aria-label="Filter feedback by status"
+                className="h-9 w-[120px] text-sm"
+              >
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -83,6 +114,7 @@ export function FeedbackList({ feedbacks }: FeedbackListProps) {
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -106,22 +138,27 @@ export function FeedbackList({ feedbacks }: FeedbackListProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((f) => (
-                <TableRow key={f.id} className="hover:bg-muted/30">
+              filtered.map((feedback) => (
+                <TableRow key={feedback.id} className="hover:bg-muted/30">
                   <TableCell className="text-muted-foreground text-base capitalize">
-                    {f.source}
+                    {feedback.source}
                   </TableCell>
                   <TableCell className="text-base font-medium">
-                    {f.organizationName ?? f.email ?? "—"}
+                    {feedback.organizationName ?? feedback.email ?? "—"}
                   </TableCell>
                   <TableCell className="max-w-xs">
-                    <p className="truncate text-base">{f.message}</p>
+                    <p className="line-clamp-2 text-sm leading-6 whitespace-normal">
+                      {feedback.message}
+                    </p>
                   </TableCell>
                   <TableCell>
-                    {f.rating != null ? (
+                    {feedback.rating != null ? (
                       <span className="flex items-center gap-0.5 text-base text-amber-400">
-                        <Star className="h-3 w-3 fill-amber-400" />
-                        {f.rating}
+                        <Star
+                          className="h-3 w-3 fill-amber-400"
+                          aria-hidden="true"
+                        />
+                        {feedback.rating}
                       </span>
                     ) : (
                       <span className="text-muted-foreground text-base">—</span>
@@ -130,13 +167,16 @@ export function FeedbackList({ feedbacks }: FeedbackListProps) {
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={cn("text-base", STATUS_COLORS[f.status])}
+                      className={cn(
+                        "text-base",
+                        STATUS_COLORS[feedback.status]
+                      )}
                     >
-                      {f.status}
+                      {feedback.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-base">
-                    {new Date(f.createdAt).toLocaleDateString("en-US", {
+                    {new Date(feedback.createdAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",

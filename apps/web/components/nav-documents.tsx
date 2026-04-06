@@ -43,17 +43,19 @@ export function NavDocuments({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      {sectionBadge ? (
-        <div className="px-2 pb-2">
+      <div className="flex items-center gap-1.5 px-2 pb-2">
+        <SidebarGroupLabel className="h-auto px-0 py-0">
+          {label}
+        </SidebarGroupLabel>
+        {sectionBadge ? (
           <Badge
             variant="secondary"
-            className="rounded-full px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase"
+            className="rounded-full px-1.5 py-0 text-[9px] leading-4 tracking-[0.04em]"
           >
             {sectionBadge}
           </Badge>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.name}>

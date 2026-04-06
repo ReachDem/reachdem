@@ -2,6 +2,9 @@
 
 import { getDownloadPresignedUrl } from "@reachdem/core";
 import { prisma } from "@reachdem/database";
+import { OrganizationVerificationApprovedEmail } from "@reachdem/transactional/emails/organization-verification-approved";
+import { OrganizationVerificationRejectedEmail } from "@reachdem/transactional/emails/organization-verification-rejected";
+import { sendTransactionalEmail } from "@reachdem/transactional/mailer";
 import { getServerSession } from "@/lib/founder-admin/auth";
 
 async function requireFounderSession() {
@@ -46,9 +49,21 @@ export async function approveKybVerification(organizationId: string) {
       where: { id: organizationId },
       select: {
         id: true,
+        name: true,
         workspaceVerificationStatus: true,
         idDocumentKey: true,
         businessDocumentKey: true,
+        members: {
+          where: { role: "owner" },
+          take: 1,
+          select: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -60,6 +75,12 @@ export async function approveKybVerification(organizationId: string) {
       return { error: "Missing verification documents" };
     }
 
+    const ownerEmail = organization.members[0]?.user.email;
+
+    if (!ownerEmail) {
+      return { error: "Organization owner email not found" };
+    }
+
     await prisma.organization.update({
       where: { id: organizationId },
       data: {
@@ -68,24 +89,69 @@ export async function approveKybVerification(organizationId: string) {
       },
     });
 
-    return { success: true };
+    try {
+      await sendTransactionalEmail({
+        to: ownerEmail,
+        subject: "Your organization has been verified",
+        react: OrganizationVerificationApprovedEmail({
+          organizationName: organization.name,
+        }),
+      });
+
+      return { success: true };
+    } catch (emailError) {
+      console.error("Failed to send KYB approval email:", emailError);
+      return {
+        success: true,
+        warning: "Verification approved, but the email could not be sent.",
+      };
+    }
   } catch (error) {
     console.error("Failed to approve KYB verification:", error);
     return { error: "Failed to approve verification" };
   }
 }
 
-export async function rejectKybVerification(organizationId: string) {
+export async function rejectKybVerification(
+  organizationId: string,
+  reason: string
+) {
   try {
     await requireFounderSession();
 
+    const trimmedReason = reason.trim();
+
+    if (!trimmedReason) {
+      return { error: "A rejection reason is required" };
+    }
+
     const organization = await prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        members: {
+          where: { role: "owner" },
+          take: 1,
+          select: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!organization) {
       return { error: "Organization not found" };
+    }
+
+    const ownerEmail = organization.members[0]?.user.email;
+
+    if (!ownerEmail) {
+      return { error: "Organization owner email not found" };
     }
 
     await prisma.organization.update({
@@ -96,7 +162,24 @@ export async function rejectKybVerification(organizationId: string) {
       },
     });
 
-    return { success: true };
+    try {
+      await sendTransactionalEmail({
+        to: ownerEmail,
+        subject: "Your organization verification needs updates",
+        react: OrganizationVerificationRejectedEmail({
+          organizationName: organization.name,
+          reason: trimmedReason,
+        }),
+      });
+
+      return { success: true };
+    } catch (emailError) {
+      console.error("Failed to send KYB rejection email:", emailError);
+      return {
+        success: true,
+        warning: "Verification rejected, but the email could not be sent.",
+      };
+    }
   } catch (error) {
     console.error("Failed to reject KYB verification:", error);
     return { error: "Failed to reject verification" };

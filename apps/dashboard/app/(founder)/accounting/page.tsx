@@ -4,6 +4,7 @@ import {
 } from "@/lib/founder-admin/reporting";
 import { KpiCard } from "@/components/founder-admin/kpi-card";
 import { PdfReportGenerator } from "@/components/founder-admin/pdf-report-generator";
+import { FounderPageShell } from "@/components/founder-admin/page-shell";
 import {
   Card,
   CardContent,
@@ -14,7 +15,6 @@ import {
 import { TrendingUp, DollarSign, BarChart2, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Build a date range helper
 function trailingDays(days: number) {
   const end = new Date();
   const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -40,7 +40,6 @@ function rangeFromKey(key: string) {
   }
 }
 
-// Server action for PDF generation
 async function generatePdf(
   rangeKey: string
 ): Promise<{ fileName: string; base64: string }> {
@@ -48,7 +47,6 @@ async function generatePdf(
   const range = rangeFromKey(rangeKey);
   const snapshot = await buildAccountingSnapshot(range);
   const result = await generateAccountingPdfReport({ snapshot });
-  // Convert Uint8Array to base64
   const base64 = Buffer.from(result.bytes).toString("base64");
   return { fileName: result.fileName, base64 };
 }
@@ -68,50 +66,67 @@ export default async function AccountingPage() {
   const isMock = snapshot.sources.revenue === "mock";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Accounting</h2>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          Financial overview for the last 30 days.
-          {isMock && (
-            <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-sm font-medium text-amber-400">
-              Sample data
-            </span>
-          )}
-        </p>
-      </div>
-
-      {snapshot.warnings.length > 0 && (
-        <Alert className="border-amber-400/30 bg-amber-400/10 text-amber-400 [&>svg]:text-amber-400">
+    <FounderPageShell
+      title="Accounting"
+      description="Follow revenue quality, direct message costs, and the margin envelope that supports founder decisions."
+      facts={[
+        {
+          label: "Reporting Window",
+          value: range.label,
+          detail: isMock
+            ? "Financial data is currently mocked"
+            : "Live accounting snapshot",
+        },
+        {
+          label: "Collected Revenue",
+          value: formatCurrency(
+            snapshot.collectedRevenueMinor,
+            snapshot.currency
+          ),
+          detail: `${snapshot.successfulPaymentsCount.toLocaleString()} successful payments`,
+        },
+        {
+          label: "Gross Margin",
+          value: formatPercent(snapshot.grossMarginEstimateRatio),
+          detail: formatCurrency(
+            snapshot.grossMarginEstimateMinor,
+            snapshot.currency
+          ),
+          tone:
+            snapshot.grossMarginEstimateRatio >= 0.5 ? "success" : "warning",
+        },
+      ]}
+    >
+      {snapshot.warnings.length > 0 ? (
+        <Alert className="rounded-[24px] border-amber-400/30 bg-amber-400/10 text-amber-200 [&>svg]:text-amber-300">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-sm">
             {snapshot.warnings[0]}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
-      {/* 3 core widgets */}
-      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <KpiCard
-          title="Collected Revenue (30d)"
+          title="Collected Revenue"
           value={formatCurrency(
             snapshot.collectedRevenueMinor,
             snapshot.currency
           )}
-          subtext={`${snapshot.successfulPaymentsCount} successful payments`}
+          subtext={`${snapshot.successfulPaymentsCount} successful payments in 30 days`}
           icon={<DollarSign className="h-4 w-4" />}
         />
         <KpiCard
-          title="Direct Messaging Costs (30d)"
+          title="Direct Messaging Costs"
           value={formatCurrency(
             snapshot.directMessagingCostsMinor,
             snapshot.currency
           )}
-          subtext="Estimated cost per sent message by channel"
+          subtext="Estimated cost per sent message by channel."
           icon={<BarChart2 className="h-4 w-4" />}
         />
         <KpiCard
-          title="Gross Margin Estimate (30d)"
+          title="Gross Margin Estimate"
           value={formatCurrency(
             snapshot.grossMarginEstimateMinor,
             snapshot.currency
@@ -120,41 +135,45 @@ export default async function AccountingPage() {
           icon={<TrendingUp className="h-4 w-4" />}
           trend={{
             value: Math.round(snapshot.grossMarginEstimateRatio * 100),
-            label: "margin",
+            label: "Margin rate",
           }}
         />
       </div>
 
-      {/* Messages breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">
-            Messages Sent by Channel (30d)
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Volume used to estimate direct messaging costs
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-4">
-            {Object.entries(snapshot.sentMessagesByChannel).map(
-              ([ch, count]) => (
-                <div key={ch} className="rounded-lg border p-3">
-                  <p className="text-muted-foreground text-sm font-medium uppercase">
-                    {ch}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold">
-                    {count.toLocaleString()}
-                  </p>
-                </div>
-              )
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <Card className="rounded-[26px] border border-white/6">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">
+              Messages Sent by Channel
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Volume used to estimate direct messaging costs
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Object.entries(snapshot.sentMessagesByChannel).map(
+                ([channel, count]) => (
+                  <div
+                    key={channel}
+                    data-founder-surface="tile"
+                    className="rounded-2xl px-3 py-3"
+                  >
+                    <p className="text-[0.68rem] tracking-[0.2em] text-[color:var(--founder-quiet-foreground)] uppercase">
+                      {channel}
+                    </p>
+                    <p className="mt-2 text-xl font-semibold tabular-nums">
+                      {count.toLocaleString()}
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* PDF Generator */}
-      <PdfReportGenerator snapshot={snapshot} onGenerate={generatePdf} />
-    </div>
+        <PdfReportGenerator snapshot={snapshot} onGenerate={generatePdf} />
+      </div>
+    </FounderPageShell>
   );
 }

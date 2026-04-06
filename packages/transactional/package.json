@@ -4,7 +4,11 @@
   "private": true,
   "main": "index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./mailer": "./mailer.ts",
+    "./emails/verification": "./emails/VerificationEmail.tsx",
+    "./emails/organization-verification-approved": "./emails/OrganizationVerificationApprovedEmail.tsx",
+    "./emails/organization-verification-rejected": "./emails/OrganizationVerificationRejectedEmail.tsx"
   },
   "scripts": {
     "dev": "email dev"

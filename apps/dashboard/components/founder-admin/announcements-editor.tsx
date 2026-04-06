@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -29,6 +30,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Plus,
   Pencil,
@@ -55,7 +63,7 @@ interface AnnouncementsEditorProps {
   onCreate: (
     input: Omit<AnnouncementRow, "id" | "createdAt">
   ) => Promise<AnnouncementRow>;
-  onUpdate: (ann: AnnouncementRow) => Promise<void>;
+  onUpdate: (announcement: AnnouncementRow) => Promise<void>;
 }
 
 const TYPE_COLORS: Record<AnnouncementRow["type"], string> = {
@@ -88,58 +96,74 @@ export function AnnouncementsEditor({
 
   const handleSave = () => {
     if (!modalData) return;
+
     startTransition(async () => {
       if (isNew) {
         const created = await onCreate(
           modalData as Omit<AnnouncementRow, "id" | "createdAt">
         );
-        setList((prev) => [created, ...prev]);
+        setList((previous) => [created, ...previous]);
       } else {
         await onUpdate(modalData as AnnouncementRow);
-        setList((prev) =>
-          prev.map((a) =>
-            a.id === (modalData as AnnouncementRow).id
+        setList((previous) =>
+          previous.map((announcement) =>
+            announcement.id === (modalData as AnnouncementRow).id
               ? (modalData as AnnouncementRow)
-              : a
+              : announcement
           )
         );
       }
+
       setModalData(null);
     });
   };
 
-  const handleToggle = (ann: AnnouncementRow) => {
-    const updated = { ...ann, active: !ann.active };
+  const handleToggle = (announcement: AnnouncementRow) => {
+    const updated = { ...announcement, active: !announcement.active };
+
     startTransition(async () => {
       await onUpdate(updated);
-      setList((prev) => prev.map((a) => (a.id === ann.id ? updated : a)));
+      setList((previous) =>
+        previous.map((current) =>
+          current.id === announcement.id ? updated : current
+        )
+      );
     });
   };
 
   return (
     <>
-      <Card>
+      <Card className="rounded-[26px] border border-white/6">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <Megaphone className="h-4 w-4" />
+                <Megaphone className="h-4 w-4" aria-hidden="true" />
                 Announcements & Promotions
               </CardTitle>
               <CardDescription className="text-sm">
                 Manage in-app announcements, offers, and maintenance notices
               </CardDescription>
+              <p
+                aria-live="polite"
+                className="mt-2 text-sm text-[color:var(--founder-muted-foreground)]"
+              >
+                {list.length.toLocaleString()} announcement
+                {list.length === 1 ? "" : "s"} available
+              </p>
             </div>
+
             <Button
               size="sm"
               className="h-9 gap-1.5 text-sm"
               onClick={() => setModalData({ ...BLANK })}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               New
             </Button>
           </div>
         </CardHeader>
+
         <CardContent className="p-0 sm:p-4">
           <div className="w-full overflow-hidden">
             <ScrollArea className="w-full whitespace-nowrap">
@@ -162,7 +186,7 @@ export function AnnouncementsEditor({
                       <TableHead className="border-border bg-muted/50 relative h-11 w-28 border-y px-3 text-left font-medium select-none">
                         Ends
                       </TableHead>
-                      <TableHead className="border-border bg-muted/50 relative h-11 w-20 border-y px-3 text-left text-right font-medium select-none last:rounded-r-lg last:border-r last:pr-6">
+                      <TableHead className="border-border bg-muted/50 relative h-11 w-20 border-y px-3 text-right font-medium select-none last:rounded-r-lg last:border-r last:pr-6">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -178,45 +202,49 @@ export function AnnouncementsEditor({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      list.map((ann) => (
+                      list.map((announcement) => (
                         <TableRow
-                          key={ann.id}
+                          key={announcement.id}
                           className="hover:bg-muted/30 border-0 [&:first-child>td:first-child]:rounded-tl-lg [&:first-child>td:last-child]:rounded-tr-lg [&:last-child>td:first-child]:rounded-bl-lg [&:last-child>td:last-child]:rounded-br-lg"
                         >
                           <TableCell className="px-3 py-3 font-medium first:pl-6 last:pr-6">
-                            {ann.title}
+                            {announcement.title}
                           </TableCell>
                           <TableCell className="px-3 py-3">
                             <Badge
                               variant="outline"
                               className={cn(
                                 "capitalize",
-                                TYPE_COLORS[ann.type]
+                                TYPE_COLORS[announcement.type]
                               )}
                             >
-                              {ann.type}
+                              {announcement.type}
                             </Badge>
                           </TableCell>
                           <TableCell className="px-3 py-3">
                             <Badge
                               variant="outline"
                               className={cn(
-                                ann.active
+                                announcement.active
                                   ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
                                   : "border-muted text-muted-foreground"
                               )}
                             >
-                              {ann.active ? "Active" : "Off"}
+                              {announcement.active ? "Active" : "Off"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground px-3 py-3">
-                            {ann.startsAt
-                              ? new Date(ann.startsAt).toLocaleDateString()
+                            {announcement.startsAt
+                              ? new Date(
+                                  announcement.startsAt
+                                ).toLocaleDateString()
                               : "—"}
                           </TableCell>
                           <TableCell className="text-muted-foreground px-3 py-3">
-                            {ann.endsAt
-                              ? new Date(ann.endsAt).toLocaleDateString()
+                            {announcement.endsAt
+                              ? new Date(
+                                  announcement.endsAt
+                                ).toLocaleDateString()
                               : "—"}
                           </TableCell>
                           <TableCell className="px-3 py-3 text-right last:pr-6">
@@ -225,21 +253,34 @@ export function AnnouncementsEditor({
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0"
-                                onClick={() => setModalData({ ...ann })}
+                                aria-label={`Edit announcement ${announcement.title}`}
+                                onClick={() =>
+                                  setModalData({ ...announcement })
+                                }
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Pencil
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0"
-                                onClick={() => handleToggle(ann)}
+                                aria-label={`${announcement.active ? "Turn off" : "Turn on"} announcement ${announcement.title}`}
+                                onClick={() => handleToggle(announcement)}
                                 disabled={isPending}
                               >
-                                {ann.active ? (
-                                  <ToggleRight className="h-4 w-4 text-emerald-400" />
+                                {announcement.active ? (
+                                  <ToggleRight
+                                    className="h-4 w-4 text-emerald-400"
+                                    aria-hidden="true"
+                                  />
                                 ) : (
-                                  <ToggleLeft className="text-muted-foreground h-4 w-4" />
+                                  <ToggleLeft
+                                    className="text-muted-foreground h-4 w-4"
+                                    aria-hidden="true"
+                                  />
                                 )}
                               </Button>
                             </div>
@@ -265,34 +306,80 @@ export function AnnouncementsEditor({
             <DialogTitle className="text-sm">
               {isNew ? "New Announcement" : "Edit Announcement"}
             </DialogTitle>
+            <DialogDescription className="text-sm text-[color:var(--founder-muted-foreground)]">
+              Set the message, audience tone, and schedule for this in-product
+              update.
+            </DialogDescription>
           </DialogHeader>
-          {modalData && (
+
+          {modalData ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <Label className="text-sm">Title</Label>
+                <Label htmlFor="announcement-title" className="text-sm">
+                  Title
+                </Label>
                 <Input
+                  id="announcement-title"
+                  name="announcement-title"
+                  autoComplete="off"
                   className="h-9 text-sm"
                   value={modalData.title ?? ""}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, title: e.target.value })
+                  onChange={(event) =>
+                    setModalData({ ...modalData, title: event.target.value })
                   }
                 />
               </div>
+
               <div className="space-y-1">
-                <Label className="text-sm">Body</Label>
+                <Label htmlFor="announcement-body" className="text-sm">
+                  Body
+                </Label>
                 <Textarea
+                  id="announcement-body"
+                  name="announcement-body"
                   className="text-sm"
                   rows={3}
                   value={modalData.body ?? ""}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, body: e.target.value })
+                  onChange={(event) =>
+                    setModalData({ ...modalData, body: event.target.value })
                   }
                 />
               </div>
+
+              <div className="space-y-1">
+                <Label className="text-sm">Type</Label>
+                <Select
+                  value={modalData.type ?? "info"}
+                  onValueChange={(value) =>
+                    setModalData({
+                      ...modalData,
+                      type: (value ?? "info") as AnnouncementRow["type"],
+                    })
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Select announcement type"
+                    className="h-9 w-full text-sm"
+                  >
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="info">Info</SelectItem>
+                    <SelectItem value="promo">Promo</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="feature">Feature</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-sm">Starts</Label>
+                  <Label htmlFor="announcement-starts" className="text-sm">
+                    Starts
+                  </Label>
                   <Input
+                    id="announcement-starts"
+                    name="announcement-starts"
                     className="h-9 text-sm"
                     type="date"
                     value={
@@ -302,19 +389,24 @@ export function AnnouncementsEditor({
                             .slice(0, 10)
                         : ""
                     }
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setModalData({
                         ...modalData,
-                        startsAt: e.target.value
-                          ? new Date(e.target.value)
+                        startsAt: event.target.value
+                          ? new Date(event.target.value)
                           : null,
                       })
                     }
                   />
                 </div>
+
                 <div className="space-y-1">
-                  <Label className="text-sm">Ends</Label>
+                  <Label htmlFor="announcement-ends" className="text-sm">
+                    Ends
+                  </Label>
                   <Input
+                    id="announcement-ends"
+                    name="announcement-ends"
                     className="h-9 text-sm"
                     type="date"
                     value={
@@ -322,11 +414,11 @@ export function AnnouncementsEditor({
                         ? new Date(modalData.endsAt).toISOString().slice(0, 10)
                         : ""
                     }
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setModalData({
                         ...modalData,
-                        endsAt: e.target.value
-                          ? new Date(e.target.value)
+                        endsAt: event.target.value
+                          ? new Date(event.target.value)
                           : null,
                       })
                     }
@@ -334,7 +426,8 @@ export function AnnouncementsEditor({
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -350,7 +443,12 @@ export function AnnouncementsEditor({
               onClick={handleSave}
               disabled={isPending}
             >
-              {isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              {isPending ? (
+                <Loader2
+                  className="mr-1.5 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+              ) : null}
               {isNew ? "Create" : "Save"}
             </Button>
           </DialogFooter>

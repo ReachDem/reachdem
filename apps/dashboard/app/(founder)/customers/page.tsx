@@ -4,6 +4,7 @@ import {
   CustomersTable,
   type CustomerTableRow,
 } from "@/components/founder-admin/customers-table";
+import { FounderPageShell } from "@/components/founder-admin/page-shell";
 import { KybActions } from "./kyb-actions";
 import { listFeedbacks } from "@/lib/founder-admin/feedbacks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-// KYB status color helper
 const KYB_STATUS: Record<string, string> = {
   not_submitted: "border-muted text-muted-foreground",
   pending: "border-amber-400/30 bg-amber-400/10 text-amber-400",
@@ -27,7 +27,7 @@ const KYB_STATUS: Record<string, string> = {
 };
 
 async function getCustomers(): Promise<CustomerTableRow[]> {
-  const orgs = await prisma.organization.findMany({
+  const organizations = await prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
@@ -55,19 +55,20 @@ async function getCustomers(): Promise<CustomerTableRow[]> {
     },
   });
 
-  return orgs.map((org: (typeof orgs)[number]) => ({
-    id: org.id,
-    name: org.name,
-    ownerEmail: org.members[0]?.user?.email ?? "—",
-    planCode: org.planCode,
-    creditBalance: org.creditBalance,
-    workspaceVerificationStatus: org.workspaceVerificationStatus,
-    websiteUrl: org.websiteUrl,
-    idDocumentKey: org.idDocumentKey,
-    businessDocumentKey: org.businessDocumentKey,
-    activated: org.campaigns.length > 0 || org.planCode !== "free",
-    lastPaymentAt: org.paymentTransactions[0]?.confirmedAt ?? null,
-    createdAt: org.createdAt,
+  return organizations.map((organization) => ({
+    id: organization.id,
+    name: organization.name,
+    ownerEmail: organization.members[0]?.user?.email ?? "—",
+    planCode: organization.planCode,
+    creditBalance: organization.creditBalance,
+    workspaceVerificationStatus: organization.workspaceVerificationStatus,
+    websiteUrl: organization.websiteUrl,
+    idDocumentKey: organization.idDocumentKey,
+    businessDocumentKey: organization.businessDocumentKey,
+    activated:
+      organization.campaigns.length > 0 || organization.planCode !== "free",
+    lastPaymentAt: organization.paymentTransactions[0]?.confirmedAt ?? null,
+    createdAt: organization.createdAt,
   }));
 }
 
@@ -77,104 +78,137 @@ export default async function CustomersPage() {
     listFeedbacks(),
   ]);
 
-  // KYB orgs: those pending / verified / rejected
-  const kybOrgs = customers.filter(
-    (c) => c.workspaceVerificationStatus !== "not_submitted"
+  const kybOrganizations = customers.filter(
+    (customer) => customer.workspaceVerificationStatus !== "not_submitted"
+  );
+  const activatedCustomers = customers.filter((customer) => customer.activated);
+  const pendingKyb = kybOrganizations.filter(
+    (customer) => customer.workspaceVerificationStatus === "pending"
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-4xl font-semibold tracking-tight">Customers</h2>
-        <p className="text-md text-muted-foreground mt-0.5">
-          {customers.length} workspaces — KYB reviews, feedback, and account
-          details.
-        </p>
-      </div>
+    <FounderPageShell
+      title="Customers"
+      description="Review customer quality, unblock identity verification, and keep a pulse on how workspaces are responding to the product."
+      facts={[
+        {
+          label: "Workspaces",
+          value: customers.length.toLocaleString(),
+          detail: `${activatedCustomers.length.toLocaleString()} activated`,
+        },
+        {
+          label: "KYB Queue",
+          value: kybOrganizations.length.toLocaleString(),
+          detail: `${pendingKyb.length.toLocaleString()} pending review`,
+          tone: pendingKyb.length > 0 ? "warning" : "default",
+        },
+        {
+          label: "Feedback",
+          value: feedbacks.length.toLocaleString(),
+          detail: "Founder-visible customer sentiment",
+        },
+      ]}
+    >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <FeedbackList feedbacks={feedbacks} />
 
-      {/* Feedback section */}
-      <FeedbackList feedbacks={feedbacks} />
-
-      {/* Customers table */}
-      <CustomersTable customers={customers} />
-
-      {/* KYB Review table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">KYB Reviews</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-32 text-base">Submitted</TableHead>
-                <TableHead className="text-base">Workspace</TableHead>
-                <TableHead className="text-base">Owner</TableHead>
-                <TableHead className="w-28 text-base">Status</TableHead>
-                <TableHead className="w-24 text-base">Plan</TableHead>
-                <TableHead className="w-48 text-right text-base">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {kybOrgs.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-muted-foreground h-24 text-center"
-                  >
-                    No KYB submissions yet
-                  </TableCell>
+        <Card className="rounded-[26px] border border-white/6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">KYB Reviews</CardTitle>
+            <p className="text-sm text-[color:var(--founder-muted-foreground)]">
+              High-trust checks for submitted workspace verification documents.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-32 text-sm">Submitted</TableHead>
+                  <TableHead className="text-sm">Workspace</TableHead>
+                  <TableHead className="text-sm">Owner</TableHead>
+                  <TableHead className="w-28 text-sm">Status</TableHead>
+                  <TableHead className="w-24 text-sm">Plan</TableHead>
+                  <TableHead className="w-48 text-right text-sm">
+                    Actions
+                  </TableHead>
                 </TableRow>
-              ) : (
-                kybOrgs.map((org) => (
-                  <TableRow key={org.id} className="hover:bg-muted/30">
-                    <TableCell className="text-muted-foreground">
-                      {new Date(org.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell className="text-base font-medium">
-                      {org.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-base">
-                      {org.ownerEmail}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-base capitalize",
-                          KYB_STATUS[org.workspaceVerificationStatus] ?? ""
-                        )}
-                      >
-                        {org.workspaceVerificationStatus.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-base capitalize">
-                        {org.planCode}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <KybActions
-                        organizationId={org.id}
-                        websiteUrl={org.websiteUrl}
-                        idDocumentKey={org.idDocumentKey}
-                        businessDocumentKey={org.businessDocumentKey}
-                        verificationStatus={org.workspaceVerificationStatus}
-                      />
+              </TableHeader>
+              <TableBody>
+                {kybOrganizations.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-muted-foreground h-24 text-center text-sm"
+                    >
+                      No KYB submissions yet
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+                ) : (
+                  kybOrganizations.map((organization) => (
+                    <TableRow
+                      key={organization.id}
+                      className="hover:bg-muted/30"
+                    >
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(organization.createdAt).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          }
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {organization.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[14rem] truncate text-sm">
+                        {organization.ownerEmail}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-sm capitalize",
+                            KYB_STATUS[
+                              organization.workspaceVerificationStatus
+                            ] ?? ""
+                          )}
+                        >
+                          {organization.workspaceVerificationStatus.replace(
+                            "_",
+                            " "
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-sm capitalize">
+                          {organization.planCode}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <KybActions
+                          organizationId={organization.id}
+                          organizationName={organization.name}
+                          ownerEmail={organization.ownerEmail}
+                          websiteUrl={organization.websiteUrl}
+                          idDocumentKey={organization.idDocumentKey}
+                          businessDocumentKey={organization.businessDocumentKey}
+                          verificationStatus={
+                            organization.workspaceVerificationStatus
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <CustomersTable customers={customers} />
+    </FounderPageShell>
   );
 }

@@ -1,13 +1,12 @@
-import { Suspense } from "react";
 import { TrendingUp, Users, Activity, CreditCard } from "lucide-react";
 import { KpiCard } from "@/components/founder-admin/kpi-card";
 import { VisitorsBarChart } from "@/components/founder-admin/visitors-bar-chart";
 import { SystemLogsTable } from "@/components/founder-admin/system-logs-table";
+import { FounderPageShell } from "@/components/founder-admin/page-shell";
 import { getOverviewMetrics } from "@/lib/founder-admin/analytics";
 import { listSystemLogs } from "@/lib/founder-admin/monitoring";
 import type { FounderAdminLogLevel } from "@/lib/founder-admin/types";
 
-// Server action for log pagination
 async function fetchLogs(params: {
   page: number;
   level?: FounderAdminLogLevel;
@@ -19,9 +18,11 @@ async function fetchLogs(params: {
 
 function formatCurrency(amountMinor: number, currency = "XAF"): string {
   const amount = amountMinor / 100;
+
   if (currency === "XAF") {
     return `${amount.toLocaleString("fr-FR")} XAF`;
   }
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -38,35 +39,49 @@ export default async function OverviewPage() {
   const { revenue, customerAcquisition } = metrics;
   const estimatedAnnual = revenue.estimatedAnnualRevenueMinor;
   const collected30d = revenue.collectedRevenueMinor;
+  const dataIsMock = metrics.sources.revenue === "mock";
+  const snapshotLabel = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(metrics.generatedAt));
 
   return (
-    <div className="space-y-6">
-      {/* Page title */}
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Overview</h2>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          Key metrics as of{" "}
-          {new Date(metrics.generatedAt).toLocaleString("en-US", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-          {metrics.sources.revenue === "mock" && (
-            <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-sm font-medium text-amber-400">
-              Sample data
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-4">
+    <FounderPageShell
+      title="Overview"
+      description="Get the founder readout for growth, revenue posture, and platform health without hopping between surfaces."
+      facts={[
+        {
+          label: "Snapshot",
+          value: snapshotLabel,
+          detail: dataIsMock
+            ? "Using sample financial inputs"
+            : "Live founder analytics",
+        },
+        {
+          label: "Collected Revenue",
+          value: formatCurrency(collected30d, metrics.currency),
+          detail: "Trailing 30 days",
+        },
+        {
+          label: "Active Accounts",
+          value: metrics.activeAccounts30d.toLocaleString(),
+          detail: "Accounts with meaningful activity",
+        },
+        {
+          label: "Acquisition",
+          value: `${customerAcquisition.monthlyNewCustomers.toLocaleString()} new`,
+          detail: `${customerAcquisition.weeklyNewCustomers.toLocaleString()} added this week`,
+          tone: "success",
+        },
+      ]}
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <KpiCard
-          title="Est. Annual Revenue"
+          title="Estimated Annual Revenue"
           value={formatCurrency(estimatedAnnual, metrics.currency)}
-          subtext="Annualized from last 30 days"
+          subtext="Annualized from the latest 30-day collection window."
           icon={<TrendingUp className="h-4 w-4" />}
         />
-
         <KpiCard
           title="New Customers"
           value={
@@ -74,7 +89,7 @@ export default async function OverviewPage() {
               <span className="text-2xl font-bold">
                 {customerAcquisition.monthlyNewCustomers}
               </span>
-              <span className="text-muted-foreground text-sm font-normal">
+              <span className="text-sm font-normal text-[color:var(--founder-muted-foreground)]">
                 monthly
               </span>
             </div>
@@ -82,30 +97,27 @@ export default async function OverviewPage() {
           subtext={`${customerAcquisition.weeklyNewCustomers} new this week`}
           icon={<Users className="h-4 w-4" />}
         />
-
         <KpiCard
           title="Active Accounts"
           value={metrics.activeAccounts30d.toLocaleString()}
-          subtext="Meaningful activity in 30 days"
+          subtext="Meaningful product activity in the last 30 days."
           icon={<Activity className="h-4 w-4" />}
         />
-
         <KpiCard
           title="Paying Users"
           value={metrics.payingUsersCount.toLocaleString()}
-          subtext={`Collected ${formatCurrency(collected30d, metrics.currency)} in 30d`}
+          subtext={`Collected ${formatCurrency(collected30d, metrics.currency)} in 30 days`}
           icon={<CreditCard className="h-4 w-4" />}
         />
       </div>
 
-      {/* Visitors bar chart */}
-      <VisitorsBarChart
-        data={metrics.uniqueVisitorsLast10Days}
-        source={metrics.sources.uniqueVisitorsLast10Days}
-      />
-
-      {/* System logs */}
-      <SystemLogsTable initialData={initialLogs} onFetch={fetchLogs} />
-    </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <VisitorsBarChart
+          data={metrics.uniqueVisitorsLast10Days}
+          source={metrics.sources.uniqueVisitorsLast10Days}
+        />
+        <SystemLogsTable initialData={initialLogs} onFetch={fetchLogs} />
+      </div>
+    </FounderPageShell>
   );
 }
