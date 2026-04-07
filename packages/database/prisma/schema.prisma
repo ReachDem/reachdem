@@ -111,23 +111,25 @@ model Organization {
   businessDocumentKey         String?
   createdAt                   DateTime                    @default(now())
 
-  members             Member[]
-  invitations         Invitation[]
-  sessions            Session[]
-  contacts            Contact[]
-  contactFields       ContactFieldDefinition[]
-  groups              Group[]
-  segments            Segment[]
-  activityEvents      ActivityEvent[]
-  smsConfig           WorkspaceSmsConfig?
-  messages            Message[]
-  campaigns           Campaign[]
-  trackedLinks        TrackedLink[]
-  emailDeliveryEvents EmailDeliveryEvent[]
-  paymentSessions     PaymentSession[]
-  paymentTransactions PaymentTransaction[]
-  feedbacks           Feedback[]
-  onboardingStates    OnboardingState[]
+  members               Member[]
+  invitations           Invitation[]
+  sessions              Session[]
+  contacts              Contact[]
+  contactFields         ContactFieldDefinition[]
+  groups                Group[]
+  segments              Segment[]
+  activityEvents        ActivityEvent[]
+  smsConfig             WorkspaceSmsConfig?
+  messages              Message[]
+  campaigns             Campaign[]
+  trackedLinks          TrackedLink[]
+  emailDeliveryEvents   EmailDeliveryEvent[]
+  paymentSessions       PaymentSession[]
+  paymentTransactions   PaymentTransaction[]
+  feedbacks             Feedback[]
+  onboardingStates      OnboardingState[]
+  apiKeys               ApiKey[]
+  apiIdempotencyRecords ApiIdempotencyRecord[]
 
   @@map("organization")
 }
@@ -638,6 +640,17 @@ enum WorkspaceVerificationStatus {
   rejected
 }
 
+enum ApiKeyEnvironment {
+  test
+  live
+}
+
+enum ApiIdempotencyStatus {
+  processing
+  completed
+  failed
+}
+
 enum AudienceSourceType {
   group
   segment
@@ -872,4 +885,51 @@ model PaymentWebhookEvent {
   @@index([provider, receivedAt])
   @@index([provider, processed])
   @@map("payment_webhook_event")
+}
+
+model ApiKey {
+  id               String            @id @default(uuid())
+  organizationId   String
+  name             String
+  keyPrefix        String            @unique
+  keyHash          String            @unique
+  environment      ApiKeyEnvironment @default(live)
+  scopes           String[]
+  pricingProfileId String?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  idempotencyRecords ApiIdempotencyRecord[]
+
+  @@index([organizationId])
+  @@index([organizationId, environment])
+  @@index([organizationId, revokedAt])
+  @@map("api_key")
+}
+
+model ApiIdempotencyRecord {
+  id             String               @id @default(uuid())
+  organizationId String
+  apiKeyId       String
+  idempotencyKey String
+  method         String
+  path           String
+  requestHash    String
+  status         ApiIdempotencyStatus @default(processing)
+  responseStatus Int?
+  responseBody   Json?
+  expiresAt      DateTime
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey       @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, apiKeyId, method, path, idempotencyKey])
+  @@index([organizationId, expiresAt])
+  @@index([apiKeyId, createdAt])
+  @@map("api_idempotency_record")
 }
