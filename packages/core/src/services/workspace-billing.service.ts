@@ -3,6 +3,20 @@ import type { WorkspaceBillingSummary } from "@reachdem/shared";
 import { BillingCatalogService } from "./billing-catalog.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
 
+function startOfUtcDay(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+}
+
+function startOfUtcMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function isSameInstant(left: Date | null, right: Date): boolean {
+  return left?.getTime() === right.getTime();
+}
+
 export class WorkspaceBillingService {
   static async getSummary(
     organizationId: string
@@ -13,11 +27,14 @@ export class WorkspaceBillingService {
         id: true,
         planCode: true,
         creditBalance: true,
+        creditCurrency: true,
         workspaceVerificationStatus: true,
         workspaceVerifiedAt: true,
         senderId: true,
         smsQuotaUsed: true,
+        smsQuotaPeriodStartedAt: true,
         emailQuotaUsed: true,
+        emailQuotaPeriodStartedAt: true,
       },
     });
 
@@ -28,53 +45,51 @@ export class WorkspaceBillingService {
     const normalizedPlanCode = BillingCatalogService.normalizePlanCode(
       organization.planCode
     );
-
-    const totalPurchasesResult = await prisma.paymentSession.aggregate({
-      where: {
-        organizationId,
-        status: "succeeded",
-      },
-      _sum: {
-        amountMinor: true,
-      },
-    });
-    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
-
-    const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
-      PlanEntitlementsService.get(normalizedPlanCode),
-      { totalPurchasedMinor }
-    );
+    const entitlements = PlanEntitlementsService.get(normalizedPlanCode);
+    const now = new Date();
+    const smsQuotaPeriodStartedAt = startOfUtcMonth(now);
+    const emailQuotaPeriodStartedAt = startOfUtcDay(now);
+    const smsQuotaUsed = isSameInstant(
+      organization.smsQuotaPeriodStartedAt,
+      smsQuotaPeriodStartedAt
+    )
+      ? organization.smsQuotaUsed
+      : 0;
+    const emailQuotaUsed = isSameInstant(
+      organization.emailQuotaPeriodStartedAt,
+      emailQuotaPeriodStartedAt
+    )
+      ? organization.emailQuotaUsed
+      : 0;
 
     return {
       organizationId: organization.id,
       planCode: normalizedPlanCode,
       creditBalance: organization.creditBalance,
+      creditCurrency: organization.creditCurrency,
       workspaceVerificationStatus: organization.workspaceVerificationStatus,
       workspaceVerifiedAt: organization.workspaceVerifiedAt,
       senderId: organization.senderId,
-      smsQuotaUsed: organization.smsQuotaUsed,
-      emailQuotaUsed: organization.emailQuotaUsed,
+      smsQuotaUsed,
+      smsQuotaPeriodStartedAt,
+      emailQuotaUsed,
+      emailQuotaPeriodStartedAt,
       smsIncludedLimit: entitlements.smsIncludedLimit,
       emailIncludedLimit: entitlements.emailIncludedLimit,
-      smsQuotaRemaining: PlanEntitlementsService.getRemainingIncluded(
-        entitlements,
-        {
-          smsQuotaUsed: organization.smsQuotaUsed,
-          emailQuotaUsed: organization.emailQuotaUsed,
-        },
-        "sms"
-      ),
-      emailQuotaRemaining: PlanEntitlementsService.getRemainingIncluded(
-        entitlements,
-        {
-          smsQuotaUsed: organization.smsQuotaUsed,
-          emailQuotaUsed: organization.emailQuotaUsed,
-        },
-        "email"
-      ),
+      smsQuotaRemaining:
+        entitlements.smsIncludedLimit == null
+          ? null
+          : Math.max(0, entitlements.smsIncludedLimit - smsQuotaUsed),
+      emailQuotaRemaining:
+        entitlements.emailIncludedLimit == null
+          ? null
+          : Math.max(0, entitlements.emailIncludedLimit - emailQuotaUsed),
       usesSharedCredits: true,
       availablePlans: BillingCatalogService.getPlanCatalog(),
       creditPricing: BillingCatalogService.getCreditPricing(),
+      messagePricing: BillingCatalogService.getMessagePricing(
+        organization.creditCurrency
+      ),
     };
   }
 }

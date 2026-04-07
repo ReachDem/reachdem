@@ -396,23 +396,34 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
             <div className="bg-background/80 rounded-md border p-3">
               <p className="text-sm font-medium">Credit Balance</p>
               <p className="text-muted-foreground mt-1 text-sm">
-                {billing.creditBalance.toLocaleString()} credits available
+                {formatMoney(billing.creditBalance, billing.creditCurrency)}{" "}
+                available
               </p>
             </div>
             <div className="bg-background/80 rounded-md border p-3">
-              <p className="text-sm font-medium">SMS Included</p>
+              <p className="text-sm font-medium">SMS</p>
               <p className="text-muted-foreground mt-1 text-sm">
+                {formatMoney(
+                  billing.messagePricing.smsUnitAmountMinor,
+                  billing.messagePricing.currency
+                )}{" "}
+                per SMS
                 {billing.smsIncludedLimit != null
-                  ? `${billing.smsQuotaRemaining}/${billing.smsIncludedLimit} remaining`
-                  : "Uses shared credits"}
+                  ? ` after ${billing.smsQuotaRemaining}/${billing.smsIncludedLimit} monthly included`
+                  : ""}
               </p>
             </div>
             <div className="bg-background/80 rounded-md border p-3">
-              <p className="text-sm font-medium">Email Included</p>
+              <p className="text-sm font-medium">Email</p>
               <p className="text-muted-foreground mt-1 text-sm">
+                {formatMoney(
+                  billing.messagePricing.emailUnitAmountMinor,
+                  billing.messagePricing.currency
+                )}{" "}
+                per email
                 {billing.emailIncludedLimit != null
-                  ? `${billing.emailQuotaRemaining}/${billing.emailIncludedLimit} remaining`
-                  : "Uses shared credits"}
+                  ? ` after ${billing.emailQuotaRemaining}/${billing.emailIncludedLimit} daily included`
+                  : ""}
               </p>
             </div>
           </div>
@@ -437,7 +448,7 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                       disabled={Boolean(busyKey)}
                       onClick={() => setCreditsQuantity(quantity)}
                     >
-                      {quantity.toLocaleString()} SMS
+                      {formatMoney(quantity, billing.creditPricing.currency)}
                     </Button>
                   ))}
                 </div>
@@ -473,7 +484,8 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                 <div>
                   <p className="text-sm font-medium">Order summary</p>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Pricing is based on your selected message volume.
+                    1 paid unit becomes 1 wallet credit in the selected
+                    currency.
                   </p>
                 </div>
 
@@ -481,7 +493,10 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                   <div className="flex items-center justify-between">
                     <span>Credits selected</span>
                     <span className="font-medium">
-                      {creditsQuantity.toLocaleString()} SMS
+                      {formatMoney(
+                        creditsQuantity,
+                        billing.creditPricing.currency
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

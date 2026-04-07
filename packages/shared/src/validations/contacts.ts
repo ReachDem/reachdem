@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const contactUnsubscribeStateSchema = z.object({
+  email: z.boolean().default(false),
+  sms: z.boolean().default(false),
+});
+export type ContactUnsubscribeState = z.infer<
+  typeof contactUnsubscribeStateSchema
+>;
+
 export const baseContactSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters long"),
   phoneE164: z.string().trim().nullable().optional(),
@@ -10,6 +18,7 @@ export const baseContactSchema = z.object({
   work: z.string().nullable().optional(),
   enterprise: z.string().nullable().optional(),
   customFields: z.record(z.string(), z.any()).nullable().optional(),
+  hasUnsubscribed: contactUnsubscribeStateSchema.optional(),
 });
 
 export const createContactSchema = baseContactSchema.refine(

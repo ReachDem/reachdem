@@ -101,8 +101,11 @@ model Organization {
   country                     String?
   planCode                    String                      @default("free")
   creditBalance               Int                         @default(0)
+  creditCurrency              String                      @default("XAF")
   smsQuotaUsed                Int                         @default(0)
+  smsQuotaPeriodStartedAt     DateTime?
   emailQuotaUsed              Int                         @default(0)
+  emailQuotaPeriodStartedAt   DateTime?
   workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
   workspaceVerifiedAt         DateTime?
   senderId                    String?                     @unique
@@ -264,6 +267,7 @@ model Contact {
   hasValidEmail       Boolean?
   hasEmailableAddress Boolean?
   hasValidNumber      Boolean?
+  hasUnsubscribed     Json      @default("{\"email\":false,\"sms\":false}")
   gender              Gender?   @default(UNKNOWN)
   birthdate           DateTime? @db.Date // Only store date component
   address             String?

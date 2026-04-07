@@ -204,7 +204,7 @@ describe("Payments API - integration", () => {
     });
 
     expect(session).toBeTruthy();
-    expect(session?.amountMinor).toBe(5000);
+    expect(session?.amountMinor).toBe(500);
     expect(session?.providerSelected).toBeNull();
     expect(session?.status).toBe("failed");
 

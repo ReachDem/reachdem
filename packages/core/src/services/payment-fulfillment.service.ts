@@ -14,7 +14,7 @@ export class PaymentFulfillmentService {
     await prisma.$transaction(async (tx) => {
       const session = await tx.paymentSession.findUnique({
         where: { id: input.paymentSessionId },
-        select: { activatedAt: true },
+        select: { activatedAt: true, currency: true },
       });
 
       if (!session || session.activatedAt) {
@@ -32,6 +32,7 @@ export class PaymentFulfillmentService {
         await tx.organization.update({
           where: { id: input.organizationId },
           data: {
+            creditCurrency: session.currency,
             creditBalance: {
               increment: input.creditsQuantity ?? 0,
             },

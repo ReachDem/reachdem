@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const billingPlanCodeSchema = z.enum([
   "free",
+  "experimental",
   "basic",
   "growth",
   "pro",
@@ -36,3 +37,12 @@ export const creditPricingSchema = z.object({
   tiers: z.array(creditPricingTierSchema).min(1),
 });
 export type CreditPricing = z.infer<typeof creditPricingSchema>;
+
+export const messagePricingSchema = z.object({
+  currency: z.string(),
+  smsUnitAmountMinor: z.number().int().positive(),
+  emailUnitAmountMinor: z.number().int().positive(),
+  smsTiers: z.array(creditPricingTierSchema).min(1),
+  emailTiers: z.array(creditPricingTierSchema).min(1),
+});
+export type MessagePricing = z.infer<typeof messagePricingSchema>;

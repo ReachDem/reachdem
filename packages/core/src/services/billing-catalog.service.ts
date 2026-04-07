@@ -2,14 +2,26 @@ import type {
   BillingPlan,
   BillingPlanCode,
   CreditPricing,
+  MessagePricing,
 } from "@reachdem/shared";
 
 const DEFAULT_CURRENCY = "XAF";
 const DEFAULT_CREDIT_MINIMUM_QUANTITY = 250;
 const DEFAULT_CREDIT_SUGGESTIONS = [250, 500, 1000];
+const DEFAULT_SMS_PRICE_TIERS = [
+  { minimumQuantity: 1, unitAmountMinor: 25 },
+  { minimumQuantity: 5_001, unitAmountMinor: 22 },
+  { minimumQuantity: 20_001, unitAmountMinor: 20 },
+  { minimumQuantity: 100_001, unitAmountMinor: 18 },
+];
+const DEFAULT_EMAIL_PRICE_TIERS = [
+  { minimumQuantity: 1, unitAmountMinor: 7 },
+  { minimumQuantity: 10_001, unitAmountMinor: 5 },
+  { minimumQuantity: 50_001, unitAmountMinor: 4 },
+  { minimumQuantity: 200_001, unitAmountMinor: 3 },
+];
 
 const PLAN_ALIASES: Record<string, BillingPlanCode> = {
-  experimental: "basic",
   starter: "basic",
   scale: "pro",
 };
@@ -49,6 +61,7 @@ export class BillingCatalogService {
 
     switch (normalized) {
       case "free":
+      case "experimental":
       case "basic":
       case "growth":
       case "pro":
@@ -63,6 +76,22 @@ export class BillingCatalogService {
     const currency = getCurrency();
 
     return [
+      {
+        code: "experimental",
+        name: "Experimental",
+        description:
+          "Early tester plan backed by a promotional wallet credit instead of channel-specific quotas.",
+        priceMinor: null,
+        currency,
+        interval: "none",
+        features: [
+          "Promotional credit for product testing",
+          "SMS and email usage billed from the shared wallet",
+          "No separate SMS/email quota counters",
+        ],
+        highlighted: false,
+        contactSales: false,
+      },
       {
         code: "basic",
         name: "Basic",
@@ -88,7 +117,7 @@ export class BillingCatalogService {
       },
       {
         code: "growth",
-        name: "Growth",
+        name: "Starter",
         description:
           "The core package for businesses that want multichannel campaigns and measurable ROI.",
         priceMinor:
@@ -178,16 +207,6 @@ export class BillingCatalogService {
         ["PAYMENT_CREDIT_MINIMUM_QUANTITY"],
         DEFAULT_CREDIT_MINIMUM_QUANTITY
       ) ?? DEFAULT_CREDIT_MINIMUM_QUANTITY;
-    const standardUnitAmount =
-      readPositiveIntEnv(["PAYMENT_CREDIT_UNIT_AMOUNT_MINOR"], 20) ?? 20;
-    const discountThreshold =
-      readPositiveIntEnv(["PAYMENT_CREDIT_VOLUME_DISCOUNT_THRESHOLD"], 500) ??
-      500;
-    const discountUnitAmount =
-      readPositiveIntEnv(
-        ["PAYMENT_CREDIT_VOLUME_DISCOUNT_UNIT_AMOUNT_MINOR"],
-        16
-      ) ?? 16;
     const suggestionValues = (
       process.env.PAYMENT_CREDIT_SUGGESTED_QUANTITIES ??
       DEFAULT_CREDIT_SUGGESTIONS.join(",")
@@ -207,26 +226,52 @@ export class BillingCatalogService {
       tiers: [
         {
           minimumQuantity: 1,
-          unitAmountMinor: standardUnitAmount,
-          label: `Base rate: ${standardUnitAmount.toLocaleString()} ${currency} per credit`,
-        },
-        {
-          minimumQuantity: discountThreshold,
-          unitAmountMinor: discountUnitAmount,
-          label: `Volume rate from ${discountThreshold.toLocaleString()} credits`,
+          unitAmountMinor: 1,
+          label: `Wallet top-up: 1 ${currency} paid = 1 ${currency} credit`,
         },
       ],
     };
   }
 
   static calculateCreditAmountMinor(quantity: number): number {
-    const pricing = this.getCreditPricing();
-    const tier =
-      [...pricing.tiers]
-        .sort((left, right) => right.minimumQuantity - left.minimumQuantity)
-        .find((candidate) => quantity >= candidate.minimumQuantity) ??
-      pricing.tiers[0];
+    return quantity;
+  }
 
-    return tier.unitAmountMinor * quantity;
+  static getMessagePricing(currency = getCurrency()): MessagePricing {
+    const smsTiers = DEFAULT_SMS_PRICE_TIERS.map((tier) => ({
+      ...tier,
+      label: `From ${tier.minimumQuantity.toLocaleString()} SMS: ${tier.unitAmountMinor.toLocaleString()} ${currency.toUpperCase()} / SMS`,
+    }));
+    const emailTiers = DEFAULT_EMAIL_PRICE_TIERS.map((tier) => ({
+      ...tier,
+      label: `From ${tier.minimumQuantity.toLocaleString()} emails: ${tier.unitAmountMinor.toLocaleString()} ${currency.toUpperCase()} / email`,
+    }));
+
+    return {
+      currency: currency.toUpperCase(),
+      smsUnitAmountMinor: smsTiers[0].unitAmountMinor,
+      emailUnitAmountMinor: emailTiers[0].unitAmountMinor,
+      smsTiers,
+      emailTiers,
+    };
+  }
+
+  static calculateMessageChargeMinor(input: {
+    channel: "sms" | "email";
+    units: number;
+    currency?: string | null;
+  }): number {
+    const pricing = this.getMessagePricing(input.currency ?? undefined);
+    const tiers =
+      input.channel === "sms" ? pricing.smsTiers : pricing.emailTiers;
+    const unitAmount =
+      [...tiers]
+        .sort((left, right) => right.minimumQuantity - left.minimumQuantity)
+        .find((tier) => input.units >= tier.minimumQuantity)?.unitAmountMinor ??
+      (input.channel === "sms"
+        ? pricing.smsUnitAmountMinor
+        : pricing.emailUnitAmountMinor);
+
+    return unitAmount * input.units;
   }
 }

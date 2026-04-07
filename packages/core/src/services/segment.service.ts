@@ -112,6 +112,7 @@ export class SegmentService {
           email: true,
           hasValidNumber: true,
           hasEmailableAddress: true,
+          hasUnsubscribed: true,
           gender: true,
           enterprise: true,
         },

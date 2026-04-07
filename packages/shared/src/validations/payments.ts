@@ -61,7 +61,9 @@ export const createPaymentSessionSchema = z
 
     if (
       value.kind === "subscription" &&
-      (value.planCode === "free" || value.planCode === "custom")
+      (value.planCode === "free" ||
+        value.planCode === "experimental" ||
+        value.planCode === "custom")
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

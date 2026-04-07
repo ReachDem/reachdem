@@ -40,6 +40,7 @@ describe("Workspace billing API - integration", () => {
       data: {
         planCode: "growth",
         creditBalance: 42,
+        creditCurrency: "XAF",
         smsQuotaUsed: 2,
         emailQuotaUsed: 7,
         workspaceVerificationStatus: "verified",
@@ -58,14 +59,17 @@ describe("Workspace billing API - integration", () => {
     expect(body.organizationId).toBe(REAL_ORG_ID);
     expect(body.planCode).toBe("growth");
     expect(body.creditBalance).toBe(42);
+    expect(body.creditCurrency).toBe("XAF");
     expect(body.senderId).toBe("REACHDEM");
     expect(body.workspaceVerificationStatus).toBe("verified");
-    expect(body.smsIncludedLimit).toBeNull();
-    expect(body.emailIncludedLimit).toBeNull();
-    expect(body.smsQuotaRemaining).toBeNull();
-    expect(body.emailQuotaRemaining).toBeNull();
+    expect(body.smsIncludedLimit).toBe(500);
+    expect(body.emailIncludedLimit).toBe(1000);
+    expect(body.smsQuotaRemaining).toBe(500);
+    expect(body.emailQuotaRemaining).toBe(1000);
     expect(body.usesSharedCredits).toBe(true);
-    expect(body.availablePlans).toHaveLength(4);
+    expect(body.availablePlans).toHaveLength(5);
     expect(body.creditPricing.currency).toBe("XAF");
+    expect(body.messagePricing.smsUnitAmountMinor).toBe(25);
+    expect(body.messagePricing.emailUnitAmountMinor).toBe(7);
   });
 });

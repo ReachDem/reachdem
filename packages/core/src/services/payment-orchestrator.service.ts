@@ -112,7 +112,7 @@ function resolveDescription(data: CreatePaymentSessionDto): string {
     return `ReachDem ${plan?.name ?? data.planCode} subscription`;
   }
 
-  return `ReachDem credits purchase (${data.creditsQuantity} credits)`;
+  return `ReachDem wallet top-up (${data.creditsQuantity} credits)`;
 }
 
 function createProvider(provider: PaymentProvider): PaymentProviderPort {
@@ -486,11 +486,11 @@ export class PaymentOrchestratorService {
 
     const existingEvent = parsed.providerEventId
       ? await prisma.paymentWebhookEvent.findFirst({
-        where: {
-          provider: providerName,
-          providerEventId: parsed.providerEventId,
-        },
-      })
+          where: {
+            provider: providerName,
+            providerEventId: parsed.providerEventId,
+          },
+        })
       : null;
 
     if (existingEvent?.processed) {
@@ -499,26 +499,26 @@ export class PaymentOrchestratorService {
 
     const webhookEvent = existingEvent
       ? await prisma.paymentWebhookEvent.update({
-        where: { id: existingEvent.id },
-        data: {
-          signatureValid,
-          rawPayload: parsed.rawPayload as any,
-          providerReference: parsed.providerReference ?? null,
-          providerSignature:
-            headers.get("verif-hash") ?? headers.get("stripe-signature"),
-        },
-      })
+          where: { id: existingEvent.id },
+          data: {
+            signatureValid,
+            rawPayload: parsed.rawPayload as any,
+            providerReference: parsed.providerReference ?? null,
+            providerSignature:
+              headers.get("verif-hash") ?? headers.get("stripe-signature"),
+          },
+        })
       : await prisma.paymentWebhookEvent.create({
-        data: {
-          provider: providerName,
-          providerEventId: parsed.providerEventId ?? null,
-          providerReference: parsed.providerReference ?? null,
-          providerSignature:
-            headers.get("verif-hash") ?? headers.get("stripe-signature"),
-          signatureValid,
-          rawPayload: parsed.rawPayload as any,
-        },
-      });
+          data: {
+            provider: providerName,
+            providerEventId: parsed.providerEventId ?? null,
+            providerReference: parsed.providerReference ?? null,
+            providerSignature:
+              headers.get("verif-hash") ?? headers.get("stripe-signature"),
+            signatureValid,
+            rawPayload: parsed.rawPayload as any,
+          },
+        });
 
     const transaction = await prisma.paymentTransaction.findFirst({
       where: {

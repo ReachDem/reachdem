@@ -3,6 +3,7 @@ import type { CampaignLaunchJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignService } from "./campaign.service";
 import { SegmentService } from "./segment.service";
+import { BillingCatalogService } from "./billing-catalog.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
 import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
@@ -15,6 +16,31 @@ import {
 // URL regex for detecting URLs in content
 const URL_REGEX =
   /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s<>"']*))/g;
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+}
+
+function startOfUtcMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function isSameInstant(left: Date | null, right: Date): boolean {
+  return left?.getTime() === right.getTime();
+}
+
+function isUnsubscribedFromChannel(
+  hasUnsubscribed: unknown,
+  channel: "sms" | "email"
+): boolean {
+  return (
+    typeof hasUnsubscribed === "object" &&
+    hasUnsubscribed !== null &&
+    (hasUnsubscribed as Record<string, unknown>)[channel] === true
+  );
+}
 
 export class RequestCampaignLaunchUseCase {
   private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
@@ -43,8 +69,11 @@ export class RequestCampaignLaunchUseCase {
       select: {
         planCode: true,
         creditBalance: true,
+        creditCurrency: true,
         smsQuotaUsed: true,
+        smsQuotaPeriodStartedAt: true,
         emailQuotaUsed: true,
+        emailQuotaPeriodStartedAt: true,
         senderId: true,
         workspaceVerificationStatus: true,
       },
@@ -54,45 +83,44 @@ export class RequestCampaignLaunchUseCase {
       throw new CampaignNotFoundError("Organization not found");
     }
 
-    const totalPurchasesResult = await prisma.paymentSession.aggregate({
-      where: {
-        organizationId,
-        status: "succeeded",
-      },
-      _sum: {
-        amountMinor: true,
-      },
-    });
-    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
-
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
       campaignId,
       campaign.channel
     );
 
-    const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
-      PlanEntitlementsService.get(organization.planCode),
-      { totalPurchasedMinor }
-    );
-    const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
-      entitlements,
+    const now = new Date();
+    const entitlements = PlanEntitlementsService.get(organization.planCode);
+    const smsPeriodStart = startOfUtcMonth(now);
+    const emailPeriodStart = startOfUtcDay(now);
+    const currentUsage =
+      campaign.channel === "sms"
+        ? isSameInstant(organization.smsQuotaPeriodStartedAt, smsPeriodStart)
+          ? organization.smsQuotaUsed
+          : 0
+        : isSameInstant(
+              organization.emailQuotaPeriodStartedAt,
+              emailPeriodStart
+            )
+          ? organization.emailQuotaUsed
+          : 0;
+    const includedLimit =
+      campaign.channel === "sms"
+        ? entitlements.smsIncludedLimit
+        : entitlements.emailIncludedLimit;
+    const includedRemaining =
+      includedLimit == null ? 0 : Math.max(0, includedLimit - currentUsage);
+    const billableUnits = Math.max(0, eligibleTargetCount - includedRemaining);
+
+    const chargeAmountMinor = BillingCatalogService.calculateMessageChargeMinor(
       {
-        smsQuotaUsed: organization.smsQuotaUsed,
-        emailQuotaUsed: organization.emailQuotaUsed,
-      },
-      campaign.channel
+        channel: campaign.channel,
+        units: billableUnits,
+        currency: organization.creditCurrency,
+      }
     );
 
-    if (remainingIncluded != null) {
-      if (eligibleTargetCount > remainingIncluded) {
-        throw new CampaignInsufficientCreditsError(
-          `Sending limit reached for ${campaign.channel} under plan ${entitlements.planCode}.`
-        );
-      }
-    }
-
-    if (eligibleTargetCount > organization.creditBalance) {
+    if (chargeAmountMinor > organization.creditBalance) {
       throw new CampaignInsufficientCreditsError(
         `Insufficient credit balance.`
       );
@@ -108,37 +136,39 @@ export class RequestCampaignLaunchUseCase {
       const updateContent =
         campaign.channel === "sms"
           ? {
-            ...(campaign.content as any),
-            from:
-              organization.workspaceVerificationStatus === "verified" &&
+              ...(campaign.content as any),
+              from:
+                organization.workspaceVerificationStatus === "verified" &&
                 organization.senderId
-                ? organization.senderId
-                : this.DEFAULT_SMS_SENDER_ID,
-            senderId:
-              organization.workspaceVerificationStatus === "verified" &&
+                  ? organization.senderId
+                  : this.DEFAULT_SMS_SENDER_ID,
+              senderId:
+                organization.workspaceVerificationStatus === "verified" &&
                 organization.senderId
-                ? organization.senderId
-                : this.DEFAULT_SMS_SENDER_ID,
-          }
+                  ? organization.senderId
+                  : this.DEFAULT_SMS_SENDER_ID,
+            }
           : undefined;
 
       await tx.organization.update({
         where: { id: organizationId },
         data: {
-          creditBalance: {
-            decrement: eligibleTargetCount,
-          },
+          ...(chargeAmountMinor > 0
+            ? {
+                creditBalance: {
+                  decrement: chargeAmountMinor,
+                },
+              }
+            : {}),
           ...(campaign.channel === "sms"
             ? {
-              smsQuotaUsed: {
-                increment: eligibleTargetCount,
-              },
-            }
+                smsQuotaPeriodStartedAt: smsPeriodStart,
+                smsQuotaUsed: currentUsage + eligibleTargetCount,
+              }
             : {
-              emailQuotaUsed: {
-                increment: eligibleTargetCount,
-              },
-            }),
+                emailQuotaPeriodStartedAt: emailPeriodStart,
+                emailQuotaUsed: currentUsage + eligibleTargetCount,
+              }),
         },
       });
 
@@ -200,6 +230,7 @@ export class RequestCampaignLaunchUseCase {
             email: true,
             hasValidNumber: true,
             hasEmailableAddress: true,
+            hasUnsubscribed: true,
           },
         });
 
@@ -237,14 +268,19 @@ export class RequestCampaignLaunchUseCase {
       email?: string | null;
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
+      hasUnsubscribed?: unknown;
     }>,
     channel: "sms" | "email"
   ): void {
     for (const contact of contacts) {
       const eligible =
         channel === "sms"
-          ? Boolean(contact.phoneE164) && contact.hasValidNumber !== false
-          : Boolean(contact.email) && contact.hasEmailableAddress !== false;
+          ? Boolean(contact.phoneE164) &&
+            contact.hasValidNumber !== false &&
+            !isUnsubscribedFromChannel(contact.hasUnsubscribed, "sms")
+          : Boolean(contact.email) &&
+            contact.hasEmailableAddress !== false &&
+            !isUnsubscribedFromChannel(contact.hasUnsubscribed, "email");
 
       if (!eligible) continue;
       uniqueContacts.add(contact.id);

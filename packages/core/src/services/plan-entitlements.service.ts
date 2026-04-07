@@ -6,6 +6,8 @@ export interface PlanEntitlements {
   planCode: string;
   smsIncludedLimit: number | null;
   emailIncludedLimit: number | null;
+  smsQuotaPeriod: "monthly" | null;
+  emailQuotaPeriod: "daily" | null;
 }
 
 export class PlanEntitlementsService {
@@ -15,8 +17,20 @@ export class PlanEntitlementsService {
     if (normalized === "free") {
       return {
         planCode: normalized,
-        smsIncludedLimit: 5,
-        emailIncludedLimit: 5,
+        smsIncludedLimit: null,
+        emailIncludedLimit: null,
+        smsQuotaPeriod: null,
+        emailQuotaPeriod: null,
+      };
+    }
+
+    if (normalized === "experimental") {
+      return {
+        planCode: normalized,
+        smsIncludedLimit: null,
+        emailIncludedLimit: null,
+        smsQuotaPeriod: null,
+        emailQuotaPeriod: null,
       };
     }
 
@@ -25,6 +39,8 @@ export class PlanEntitlementsService {
         planCode: normalized,
         smsIncludedLimit: 150,
         emailIncludedLimit: 250,
+        smsQuotaPeriod: "monthly",
+        emailQuotaPeriod: "daily",
       };
     }
 
@@ -33,6 +49,8 @@ export class PlanEntitlementsService {
         planCode: normalized,
         smsIncludedLimit: 500,
         emailIncludedLimit: 1000,
+        smsQuotaPeriod: "monthly",
+        emailQuotaPeriod: "daily",
       };
     }
 
@@ -40,7 +58,9 @@ export class PlanEntitlementsService {
       return {
         planCode: normalized,
         smsIncludedLimit: 2000,
-        emailIncludedLimit: 4000,
+        emailIncludedLimit: 5000,
+        smsQuotaPeriod: "monthly",
+        emailQuotaPeriod: "daily",
       };
     }
 
@@ -48,6 +68,8 @@ export class PlanEntitlementsService {
       planCode: normalized,
       smsIncludedLimit: null,
       emailIncludedLimit: null,
+      smsQuotaPeriod: null,
+      emailQuotaPeriod: null,
     };
   }
 
@@ -60,6 +82,8 @@ export class PlanEntitlementsService {
         ...plan,
         smsIncludedLimit: null,
         emailIncludedLimit: null,
+        smsQuotaPeriod: null,
+        emailQuotaPeriod: null,
       };
     }
 

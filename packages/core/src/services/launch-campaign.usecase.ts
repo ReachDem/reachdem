@@ -17,7 +17,19 @@ type ResolvedContact = {
   email?: string;
   hasValidNumber?: boolean | null;
   hasEmailableAddress?: boolean | null;
+  hasUnsubscribed?: unknown;
 };
+
+function isUnsubscribedFromChannel(
+  hasUnsubscribed: unknown,
+  channel: "sms" | "email"
+): boolean {
+  return (
+    typeof hasUnsubscribed === "object" &&
+    hasUnsubscribed !== null &&
+    (hasUnsubscribed as Record<string, unknown>)[channel] === true
+  );
+}
 
 export class LaunchCampaignUseCase {
   private static resolveMessageScheduledAt(
@@ -261,6 +273,7 @@ export class LaunchCampaignUseCase {
             email: true,
             hasValidNumber: true,
             hasEmailableAddress: true,
+            hasUnsubscribed: true,
           },
         });
         this.collectContacts(uniqueContacts, contacts, channel);
@@ -312,6 +325,7 @@ export class LaunchCampaignUseCase {
       email?: string | null;
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
+      hasUnsubscribed?: unknown;
     }>,
     channel: "sms" | "email"
   ): void {
@@ -329,6 +343,7 @@ export class LaunchCampaignUseCase {
         email: contact.email ?? undefined,
         hasValidNumber: contact.hasValidNumber,
         hasEmailableAddress: contact.hasEmailableAddress,
+        hasUnsubscribed: contact.hasUnsubscribed,
       });
     }
   }
@@ -339,15 +354,22 @@ export class LaunchCampaignUseCase {
       email?: string | null;
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
+      hasUnsubscribed?: unknown;
     },
     channel: "sms" | "email"
   ): boolean {
     if (channel === "sms") {
       if (!contact.phoneE164) return false;
+      if (isUnsubscribedFromChannel(contact.hasUnsubscribed, "sms")) {
+        return false;
+      }
       return contact.hasValidNumber !== false;
     }
 
     if (!contact.email) return false;
+    if (isUnsubscribedFromChannel(contact.hasUnsubscribed, "email")) {
+      return false;
+    }
     return contact.hasEmailableAddress !== false;
   }
 

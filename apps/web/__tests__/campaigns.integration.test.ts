@@ -449,7 +449,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     expect(processedMessage!.status).toBe("sent");
   }, 40000);
 
-  it("POST /campaigns/:id/launch -> consumes experimental SMS quota instead of shared credits", async () => {
+  it("POST /campaigns/:id/launch -> charges experimental SMS usage from shared credits", async () => {
     await prisma.organization.update({
       where: { id: REAL_ORG_ID },
       data: {
@@ -510,7 +510,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
       where: { id: REAL_ORG_ID },
     });
     expect(organization?.smsQuotaUsed).toBe(1);
-    expect(organization?.creditBalance).toBe(5000);
+    expect(organization?.creditBalance).toBe(4975);
 
     const updatedCampaign = await prisma.campaign.findUnique({
       where: { id: createdCampaign.id },
@@ -522,6 +522,8 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
   });
 
   it("POST /campaigns and launch -> supports email campaigns through async processing", async () => {
+    queuedCampaignLaunchJobs.splice(0);
+
     const createReq = new NextRequest("http://localhost/api/v1/campaigns", {
       method: "POST",
       body: JSON.stringify({
