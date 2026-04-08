@@ -1,0 +1,107 @@
+﻿"use client";
+
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+
+function BillingSuccessContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const method = searchParams.get("method");
+  const isCard = method === "card";
+
+  return (
+    <main className="bg-background fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden px-8 text-center">
+      {/* Container */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 relative z-10 mx-auto flex w-full max-w-sm flex-col items-center duration-500">
+        {/* Success Icon */}
+        <div className="bg-foreground text-background mb-8 flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-8 w-8 font-bold"
+          >
+            <path
+              fillRule="evenodd"
+              d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z"
+              clipRule="evenodd"
+              strokeWidth="1"
+              stroke="currentColor"
+            />
+          </svg>
+        </div>
+
+        {/* Typography */}
+        <h1 className="text-foreground mb-4 text-5xl font-medium tracking-tight">
+          Success
+        </h1>
+        <p className="text-muted-foreground mb-16">
+          Your payment was successful
+        </p>
+
+        {isCard ? (
+          <div className="mt-4 flex w-full flex-col gap-4">
+            <p className="dark:text-muted-foreground mb-2 text-[0.6875rem] font-semibold tracking-widest text-[#747474] uppercase">
+              Save these payment cards?
+            </p>
+
+            <Button
+              onClick={() => router.push("/settings/workspace")}
+              className="h-[3.5rem] w-full rounded-md border-none bg-[#ff751f] font-medium text-white transition-all hover:bg-[#e66a1c] active:scale-[0.98]"
+            >
+              Yes, Save
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => router.push("/settings/workspace")}
+              className="text-foreground border-border hover:bg-muted h-[3.5rem] w-full rounded-md bg-transparent font-medium transition-all active:scale-[0.98]"
+            >
+              No, thanks
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 flex w-full flex-col items-center gap-4">
+            <button
+              onClick={() => router.push("/campaigns/new")}
+              className="text-foreground text-sm font-medium underline-offset-4 transition-colors hover:underline"
+            >
+              Create your campaign
+            </button>
+            <button
+              onClick={() => router.push("/settings/workspace")}
+              className="text-muted-foreground hover:text-foreground text-sm font-medium underline-offset-4 transition-colors hover:underline"
+            >
+              Go strictly to Dashboard
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer minimal info */}
+      <div className="text-muted-foreground border-border absolute right-8 bottom-8 left-8 flex items-center justify-between border-t pt-8 text-[0.625rem] font-semibold tracking-widest uppercase">
+        <span>© 2024 REACHDEM. MINIMALIST AUTHORITY.</span>
+        <div className="flex gap-6">
+          <span className="hover:text-foreground cursor-pointer transition-colors">
+            Terms
+          </span>
+          <span className="hover:text-foreground cursor-pointer transition-colors">
+            Privacy
+          </span>
+          <span className="hover:text-foreground cursor-pointer transition-colors">
+            Support
+          </span>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function BillingSuccessPage() {
+  return (
+    <Suspense fallback={<div className="bg-background min-h-screen" />}>
+      <BillingSuccessContent />
+    </Suspense>
+  );
+}

@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+﻿import type { ReactElement } from "react";
 import { render } from "@react-email/render";
 import nodemailer from "nodemailer";
 
@@ -6,6 +6,7 @@ interface SendTransactionalEmailOptions {
   to: string;
   subject: string;
   react: ReactElement;
+  attachments?: any[];
 }
 
 function getTransporter() {
@@ -34,6 +35,7 @@ export async function sendTransactionalEmail({
   to,
   subject,
   react,
+  attachments,
 }: SendTransactionalEmailOptions) {
   const html = await render(react);
   const transporter = getTransporter();
@@ -43,5 +45,6 @@ export async function sendTransactionalEmail({
     to,
     subject,
     html,
+    attachments,
   });
 }

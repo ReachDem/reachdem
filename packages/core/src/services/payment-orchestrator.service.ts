@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "@reachdem/database";
 import type {
   CreatePaymentSessionDto,
@@ -115,6 +116,43 @@ function resolveDescription(data: CreatePaymentSessionDto): string {
   return `ReachDem credits purchase (${data.creditsQuantity} credits)`;
 }
 
+function normalizeProviderStatus(status: string | null | undefined): {
+  sessionStatus: MutableSessionStatus;
+  transactionStatus: MutableTransactionStatus;
+} {
+  const normalized = String(status ?? "").toLowerCase();
+
+  if (
+    normalized === "successful" ||
+    normalized === "succeeded" ||
+    normalized === "completed"
+  ) {
+    return {
+      sessionStatus: "succeeded",
+      transactionStatus: "succeeded",
+    };
+  }
+
+  if (normalized === "failed") {
+    return {
+      sessionStatus: "failed",
+      transactionStatus: "failed",
+    };
+  }
+
+  if (normalized === "cancelled") {
+    return {
+      sessionStatus: "cancelled",
+      transactionStatus: "cancelled",
+    };
+  }
+
+  return {
+    sessionStatus: "processing",
+    transactionStatus: "processing",
+  };
+}
+
 function createProvider(provider: PaymentProvider): PaymentProviderPort {
   switch (provider) {
     case "flutterwave":
@@ -149,6 +187,7 @@ export class PaymentOrchestratorService {
     provider: PaymentProvider;
     sessionStatus: MutableSessionStatus;
     transactionStatus: MutableTransactionStatus;
+    providerSessionId?: string | null;
     providerTransactionId?: string | null;
     providerEventId?: string | null;
     providerReference?: string | null;
@@ -170,6 +209,10 @@ export class PaymentOrchestratorService {
         where: { id: args.transactionId },
         data: {
           status: args.transactionStatus,
+          providerSessionId:
+            args.providerSessionId !== undefined
+              ? args.providerSessionId
+              : undefined,
           providerTransactionId:
             args.providerTransactionId !== undefined
               ? args.providerTransactionId
@@ -199,6 +242,10 @@ export class PaymentOrchestratorService {
         data: {
           status: args.sessionStatus,
           providerSelected: args.provider,
+          providerSessionId:
+            args.providerSessionId !== undefined
+              ? args.providerSessionId
+              : undefined,
           providerReference:
             args.providerReference !== undefined
               ? args.providerReference
@@ -219,6 +266,182 @@ export class PaymentOrchestratorService {
         creditsQuantity: session.creditsQuantity,
       });
     }
+  }
+
+  static async createDirectChargeSession(
+    organizationId: string,
+    initiatedByUserId: string,
+    data: CreatePaymentSessionDto
+  ): Promise<{
+    paymentSessionId: string;
+    transactionId: string;
+    amountMinor: number;
+    currency: string;
+    provider: PaymentProvider;
+    providerReference: string;
+    description: string;
+  }> {
+    const amountMinor = resolveAmountMinor(data);
+    const providerPrimary: PaymentProvider = "flutterwave";
+    const normalizedPlanCode =
+      data.kind === "subscription"
+        ? BillingCatalogService.normalizePlanCode(data.planCode)
+        : null;
+    const paymentSessionId = randomUUID();
+    const transactionId = randomUUID();
+    const providerReference = `pay${paymentSessionId.replace(/-/g, "")}`;
+    const description = resolveDescription(data);
+
+    await prisma.paymentSession.create({
+      data: {
+        id: paymentSessionId,
+        organizationId,
+        initiatedByUserId,
+        kind: data.kind,
+        providerPrimary,
+        providerSelected: providerPrimary,
+        status: "pending",
+        currency: data.currency,
+        amountMinor,
+        planCode: normalizedPlanCode,
+        creditsQuantity: data.creditsQuantity ?? null,
+        providerReference,
+        metadata: (data.metadata ?? null) as any,
+      },
+    });
+
+    try {
+      await prisma.paymentTransaction.create({
+        data: {
+          id: transactionId,
+          paymentSessionId,
+          organizationId,
+          initiatedByUserId,
+          provider: providerPrimary,
+          status: "initiated",
+          amountMinor,
+          currency: data.currency,
+          providerReference,
+          rawPayload: (data.metadata ?? null) as any,
+        },
+      });
+    } catch (error) {
+      await prisma.paymentSession
+        .delete({
+          where: { id: paymentSessionId },
+        })
+        .catch(() => undefined);
+
+      throw error;
+    }
+
+    return {
+      paymentSessionId,
+      transactionId,
+      amountMinor,
+      currency: data.currency,
+      provider: providerPrimary,
+      providerReference,
+      description,
+    };
+  }
+
+  static async markDirectChargeInitiated(args: {
+    organizationId: string;
+    paymentSessionId: string;
+    transactionId: string;
+    providerTransactionId: string;
+    providerReference?: string | null;
+    rawStatus?: string | null;
+    rawPayload?: Record<string, unknown> | null;
+    nextActionType?: string | null;
+  }): Promise<void> {
+    void args.organizationId;
+    const normalized = normalizeProviderStatus(args.rawStatus);
+    const sessionStatus =
+      normalized.sessionStatus === "processing" &&
+      args.nextActionType === "redirect_url"
+        ? "providerRedirected"
+        : normalized.sessionStatus;
+
+    await this.markSessionAndTransaction({
+      paymentSessionId: args.paymentSessionId,
+      transactionId: args.transactionId,
+      provider: "flutterwave",
+      sessionStatus,
+      transactionStatus: normalized.transactionStatus,
+      providerSessionId: args.providerTransactionId,
+      providerTransactionId: args.providerTransactionId,
+      providerReference: args.providerReference,
+      rawStatus: args.rawStatus,
+      rawPayload: args.rawPayload,
+    });
+  }
+
+  static async markDirectChargeFailed(args: {
+    paymentSessionId: string;
+    transactionId: string;
+    providerReference?: string | null;
+    rawStatus?: string | null;
+    rawPayload?: Record<string, unknown> | null;
+  }): Promise<void> {
+    await this.markSessionAndTransaction({
+      paymentSessionId: args.paymentSessionId,
+      transactionId: args.transactionId,
+      provider: "flutterwave",
+      sessionStatus: "failed",
+      transactionStatus: "failed",
+      providerReference: args.providerReference,
+      rawStatus: args.rawStatus ?? "failed",
+      rawPayload: args.rawPayload,
+    });
+  }
+
+  static async reconcileDirectChargeVerification(args: {
+    organizationId: string;
+    providerTransactionId: string;
+    providerReference?: string | null;
+    rawStatus?: string | null;
+    rawPayload?: Record<string, unknown> | null;
+  }): Promise<PaymentSessionDetailsResponse> {
+    const transaction = await prisma.paymentTransaction.findFirst({
+      where: {
+        organizationId: args.organizationId,
+        provider: "flutterwave",
+        OR: [
+          { providerTransactionId: args.providerTransactionId },
+          { providerSessionId: args.providerTransactionId },
+          args.providerReference
+            ? { providerReference: args.providerReference }
+            : undefined,
+        ].filter(Boolean) as any,
+      },
+    });
+
+    if (!transaction) {
+      throw new PaymentSessionNotFoundError();
+    }
+
+    const normalized = normalizeProviderStatus(args.rawStatus);
+
+    await this.markSessionAndTransaction({
+      paymentSessionId: transaction.paymentSessionId,
+      transactionId: transaction.id,
+      provider: "flutterwave",
+      sessionStatus: normalized.sessionStatus,
+      transactionStatus: normalized.transactionStatus,
+      providerSessionId: args.providerTransactionId,
+      providerTransactionId: args.providerTransactionId,
+      providerReference:
+        args.providerReference ?? transaction.providerReference,
+      rawStatus: args.rawStatus,
+      rawPayload: args.rawPayload,
+    });
+
+    return this.getSessionById(
+      args.organizationId,
+      transaction.paymentSessionId
+    );
   }
 
   static async createSession(

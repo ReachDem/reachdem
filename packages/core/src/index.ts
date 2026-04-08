@@ -51,3 +51,4 @@ export * from "./adapters/sms/lmt.adapter";
 export * from "./adapters/sms/avlytext.adapter";
 export * from "./adapters/sms/mboa-sms.adapter";
 export * from "./adapters/sms/error-classifier";
+export * from "./integrations/payments/flutterwave-v4.provider";

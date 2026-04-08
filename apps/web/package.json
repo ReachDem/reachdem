@@ -56,6 +56,7 @@
     "@reachdem/database": "workspace:*",
     "@reachdem/email-ui": "workspace:*",
     "@reachdem/shared": "workspace:*",
+    "@reachdem/transactional": "workspace:*",
     "@react-email/components": "^1.0.8",
     "@react-email/render": "^2.0.4",
     "@react-three/fiber": "^9.5.0",

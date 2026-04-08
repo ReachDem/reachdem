@@ -178,16 +178,7 @@ export class BillingCatalogService {
         ["PAYMENT_CREDIT_MINIMUM_QUANTITY"],
         DEFAULT_CREDIT_MINIMUM_QUANTITY
       ) ?? DEFAULT_CREDIT_MINIMUM_QUANTITY;
-    const standardUnitAmount =
-      readPositiveIntEnv(["PAYMENT_CREDIT_UNIT_AMOUNT_MINOR"], 20) ?? 20;
-    const discountThreshold =
-      readPositiveIntEnv(["PAYMENT_CREDIT_VOLUME_DISCOUNT_THRESHOLD"], 500) ??
-      500;
-    const discountUnitAmount =
-      readPositiveIntEnv(
-        ["PAYMENT_CREDIT_VOLUME_DISCOUNT_UNIT_AMOUNT_MINOR"],
-        16
-      ) ?? 16;
+
     const suggestionValues = (
       process.env.PAYMENT_CREDIT_SUGGESTED_QUANTITIES ??
       DEFAULT_CREDIT_SUGGESTIONS.join(",")
@@ -207,13 +198,23 @@ export class BillingCatalogService {
       tiers: [
         {
           minimumQuantity: 1,
-          unitAmountMinor: standardUnitAmount,
-          label: `Base rate: ${standardUnitAmount.toLocaleString()} ${currency} per credit`,
+          unitAmountMinor: 25, // 30 XAF - 5 XAF
+          label: `0 - 5k SMS: 25 ${currency}/SMS`,
         },
         {
-          minimumQuantity: discountThreshold,
-          unitAmountMinor: discountUnitAmount,
-          label: `Volume rate from ${discountThreshold.toLocaleString()} credits`,
+          minimumQuantity: 5000,
+          unitAmountMinor: 22, // 27 XAF - 5 XAF
+          label: `5k - 20k SMS: 22 ${currency}/SMS`,
+        },
+        {
+          minimumQuantity: 20000,
+          unitAmountMinor: 20, // 25 XAF - 5 XAF
+          label: `20k - 100k SMS: 20 ${currency}/SMS`,
+        },
+        {
+          minimumQuantity: 100000,
+          unitAmountMinor: 18, // 23 XAF - 5 XAF
+          label: `100k+ SMS: 18 ${currency}/SMS`,
         },
       ],
     };
