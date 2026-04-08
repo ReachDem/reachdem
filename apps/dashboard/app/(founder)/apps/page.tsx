@@ -1,4 +1,8 @@
 import {
+  convertMinorToMajor,
+  getCurrencyMinorExponent,
+} from "@reachdem/shared";
+import {
   PricingPlansEditor,
   type PricingPlanRow,
 } from "@/components/founder-admin/pricing-plans-editor";
@@ -6,7 +10,28 @@ import {
   AnnouncementsEditor,
   type AnnouncementRow,
 } from "@/components/founder-admin/announcements-editor";
+import { WorkspaceSeedBalanceEditor } from "@/components/founder-admin/workspace-seed-balance-editor";
 import { FounderPageShell } from "@/components/founder-admin/page-shell";
+import { getServerSession } from "@/lib/founder-admin/auth";
+import type { WorkspaceInitialBalanceEntry } from "@reachdem/shared";
+import { BillingCatalogService } from "../../../../../packages/core/src/services/billing-catalog.service";
+import { PlatformBillingSettingsService } from "../../../../../packages/core/src/services/platform-billing-settings.service";
+
+function formatMoney(amountMinor: number, currency: string): string {
+  const amountMajor = convertMinorToMajor(amountMinor, currency);
+  const maximumFractionDigits = getCurrencyMinorExponent(currency);
+
+  if (maximumFractionDigits === 0) {
+    return `${amountMajor.toLocaleString("fr-FR")} ${currency}`;
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: maximumFractionDigits,
+    maximumFractionDigits,
+  }).format(amountMajor);
+}
 
 const DEFAULT_PLANS: PricingPlanRow[] = [
   {
@@ -79,9 +104,40 @@ async function updateAnnouncement(
   console.info(`[apps-config] Announcement updated: ${announcement.id}`);
 }
 
+async function updateWorkspaceInitialBalances(
+  entries: WorkspaceInitialBalanceEntry[]
+): Promise<void> {
+  "use server";
+
+  const session = await getServerSession();
+
+  if (!session) {
+    throw new Error("Unauthorized founder session.");
+  }
+
+  await PlatformBillingSettingsService.saveWorkspaceInitialBalanceSettings({
+    entries,
+    updatedBy: session.email,
+  });
+}
+
 export default async function AppsPage() {
-  const announcements = await getAnnouncements();
+  const [announcements, workspaceInitialBalances] = await Promise.all([
+    getAnnouncements(),
+    PlatformBillingSettingsService.getWorkspaceInitialBalanceSettings(),
+  ]);
   const activePlans = DEFAULT_PLANS.filter((plan) => plan.status === "active");
+  const currentBaseCurrency = BillingCatalogService.getBalanceCurrency();
+  const currentBaseEntry =
+    workspaceInitialBalances.entries.find(
+      (entry) => entry.currency === currentBaseCurrency
+    ) ?? workspaceInitialBalances.entries[0];
+  const lastUpdatedLabel = workspaceInitialBalances.updatedAt
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(workspaceInitialBalances.updatedAt)
+    : null;
 
   return (
     <FounderPageShell
@@ -98,9 +154,24 @@ export default async function AppsPage() {
           value: announcements.length.toLocaleString(),
           detail: "In-app promos, notices, and feature updates",
         },
+        {
+          label: "New Workspace Balance",
+          value: currentBaseEntry
+            ? formatMoney(currentBaseEntry.amountMinor, currentBaseCurrency)
+            : `0 ${currentBaseCurrency}`,
+          detail: "Applied to future workspace creation only",
+        },
       ]}
     >
       <div className="grid gap-6">
+        <WorkspaceSeedBalanceEditor
+          entries={workspaceInitialBalances.entries}
+          baseCurrency={currentBaseCurrency}
+          source={workspaceInitialBalances.source}
+          lastUpdatedLabel={lastUpdatedLabel}
+          lastUpdatedBy={workspaceInitialBalances.updatedBy}
+          onSave={updateWorkspaceInitialBalances}
+        />
         <PricingPlansEditor plans={DEFAULT_PLANS} onUpdate={updatePlan} />
         <AnnouncementsEditor
           announcements={announcements}

@@ -4,6 +4,7 @@ import {
   PaymentSuccessEmail,
   sendTransactionalEmail,
 } from "@reachdem/transactional";
+import { PaymentCurrencyService } from "./payment-currency.service";
 
 interface FulfillPaymentInput {
   paymentSessionId: string;
@@ -35,11 +36,17 @@ export class PaymentFulfillmentService {
           },
         });
       } else if (input.kind === "creditPurchase") {
+        const convertedBalanceMinor = PaymentCurrencyService.convertAmountMinor(
+          session.amountMinor,
+          session.currency,
+          PaymentCurrencyService.getBaseCurrency()
+        );
+
         await tx.organization.update({
           where: { id: input.organizationId },
           data: {
             creditBalance: {
-              increment: input.creditsQuantity ?? 0,
+              increment: convertedBalanceMinor,
             },
           },
         });

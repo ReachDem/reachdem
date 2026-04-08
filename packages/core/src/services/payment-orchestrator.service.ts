@@ -10,18 +10,14 @@ import type {
   PaymentTransactionResponse,
   ReconcilePaymentSessionDto,
 } from "@reachdem/shared";
-import { FlutterwavePaymentProvider } from "../integrations/payments/flutterwave.provider";
 import {
   PaymentSessionNotFoundError,
   PaymentVerificationError,
   PaymentWebhookSignatureError,
 } from "../errors/payment.errors";
-import type {
-  CreateProviderCheckoutSessionInput,
-  PaymentProviderPort,
-} from "../ports/payment-provider.port";
-import { StripePaymentProvider } from "../integrations/payments/stripe.provider";
+import type { CreateProviderCheckoutSessionInput } from "../ports/payment-provider.port";
 import { BillingCatalogService } from "./billing-catalog.service";
+import { PaymentAdapterRegistryService } from "./payment-adapter-registry.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 
 function getReturnUrl(): string {
@@ -153,15 +149,6 @@ function normalizeProviderStatus(status: string | null | undefined): {
   };
 }
 
-function createProvider(provider: PaymentProvider): PaymentProviderPort {
-  switch (provider) {
-    case "flutterwave":
-      return new FlutterwavePaymentProvider();
-    case "stripe":
-      return new StripePaymentProvider();
-  }
-}
-
 type MutableSessionStatus =
   | "pending"
   | "providerRedirected"
@@ -268,11 +255,17 @@ export class PaymentOrchestratorService {
     }
   }
 
-  static async createDirectChargeSession(
-    organizationId: string,
-    initiatedByUserId: string,
-    data: CreatePaymentSessionDto
-  ): Promise<{
+  static async createDirectChargeSession(args: {
+    organizationId: string;
+    initiatedByUserId: string;
+    kind: PaymentKind;
+    currency: string;
+    amountMinor: number;
+    creditsQuantity?: number | null;
+    planCode?: string | null;
+    metadata?: Record<string, unknown> | null;
+    description: string;
+  }): Promise<{
     paymentSessionId: string;
     transactionId: string;
     amountMinor: number;
@@ -281,32 +274,30 @@ export class PaymentOrchestratorService {
     providerReference: string;
     description: string;
   }> {
-    const amountMinor = resolveAmountMinor(data);
     const providerPrimary: PaymentProvider = "flutterwave";
     const normalizedPlanCode =
-      data.kind === "subscription"
-        ? BillingCatalogService.normalizePlanCode(data.planCode)
+      args.kind === "subscription"
+        ? BillingCatalogService.normalizePlanCode(args.planCode)
         : null;
     const paymentSessionId = randomUUID();
     const transactionId = randomUUID();
     const providerReference = `pay${paymentSessionId.replace(/-/g, "")}`;
-    const description = resolveDescription(data);
 
     await prisma.paymentSession.create({
       data: {
         id: paymentSessionId,
-        organizationId,
-        initiatedByUserId,
-        kind: data.kind,
+        organizationId: args.organizationId,
+        initiatedByUserId: args.initiatedByUserId,
+        kind: args.kind,
         providerPrimary,
         providerSelected: providerPrimary,
         status: "pending",
-        currency: data.currency,
-        amountMinor,
+        currency: args.currency,
+        amountMinor: args.amountMinor,
         planCode: normalizedPlanCode,
-        creditsQuantity: data.creditsQuantity ?? null,
+        creditsQuantity: args.creditsQuantity ?? null,
         providerReference,
-        metadata: (data.metadata ?? null) as any,
+        metadata: (args.metadata ?? null) as any,
       },
     });
 
@@ -315,14 +306,14 @@ export class PaymentOrchestratorService {
         data: {
           id: transactionId,
           paymentSessionId,
-          organizationId,
-          initiatedByUserId,
+          organizationId: args.organizationId,
+          initiatedByUserId: args.initiatedByUserId,
           provider: providerPrimary,
           status: "initiated",
-          amountMinor,
-          currency: data.currency,
+          amountMinor: args.amountMinor,
+          currency: args.currency,
           providerReference,
-          rawPayload: (data.metadata ?? null) as any,
+          rawPayload: (args.metadata ?? null) as any,
         },
       });
     } catch (error) {
@@ -338,11 +329,11 @@ export class PaymentOrchestratorService {
     return {
       paymentSessionId,
       transactionId,
-      amountMinor,
-      currency: data.currency,
+      amountMinor: args.amountMinor,
+      currency: args.currency,
       provider: providerPrimary,
       providerReference,
-      description,
+      description: args.description,
     };
   }
 
@@ -474,7 +465,8 @@ export class PaymentOrchestratorService {
       },
     });
 
-    const provider = createProvider(providerPrimary);
+    const provider =
+      PaymentAdapterRegistryService.getHostedProvider(providerPrimary);
 
     try {
       const providerInput: CreateProviderCheckoutSessionInput = {
@@ -630,7 +622,8 @@ export class PaymentOrchestratorService {
       return this.getSessionById(organizationId, id);
     }
 
-    const provider = createProvider(providerName);
+    const provider =
+      PaymentAdapterRegistryService.getHostedProvider(providerName);
     if (
       typeof provider.verifyTransaction !== "function" ||
       (!data.providerTransactionId && !transaction.providerTransactionId)
@@ -695,7 +688,8 @@ export class PaymentOrchestratorService {
     rawBody: string,
     headers: Headers
   ): Promise<void> {
-    const provider = createProvider(providerName);
+    const provider =
+      PaymentAdapterRegistryService.getHostedProvider(providerName);
     const signatureValid = await provider.verifyWebhookSignature(
       rawBody,
       headers

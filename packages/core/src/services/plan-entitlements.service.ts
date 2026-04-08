@@ -15,8 +15,8 @@ export class PlanEntitlementsService {
     if (normalized === "free") {
       return {
         planCode: normalized,
-        smsIncludedLimit: 5,
-        emailIncludedLimit: 5,
+        smsIncludedLimit: BillingCatalogService.getFreeTrialSmsLimit(),
+        emailIncludedLimit: null,
       };
     }
 
@@ -53,9 +53,9 @@ export class PlanEntitlementsService {
 
   static applyCreditPurchaseStatus(
     plan: PlanEntitlements,
-    options: { totalPurchasedMinor: number }
+    options: { hasSuccessfulTopUp: boolean }
   ): PlanEntitlements {
-    if (plan.planCode === "free" && options.totalPurchasedMinor > 2500) {
+    if (plan.planCode === "free" && options.hasSuccessfulTopUp) {
       return {
         ...plan,
         smsIncludedLimit: null,

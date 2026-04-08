@@ -3,7 +3,14 @@ import { billingPlanCodeSchema } from "./billing-catalog";
 
 export const paymentKindSchema = z.enum(["subscription", "creditPurchase"]);
 export const paymentProviderSchema = z.enum(["flutterwave", "stripe"]);
+export const paymentMethodTypeSchema = z.enum([
+  "card",
+  "opay",
+  "mobile_money",
+  "ussd",
+]);
 export type PaymentProvider = z.infer<typeof paymentProviderSchema>;
+export type PaymentMethodType = z.infer<typeof paymentMethodTypeSchema>;
 export const paymentSessionStatusSchema = z.enum([
   "pending",
   "providerRedirected",
@@ -28,21 +35,22 @@ export type PaymentTransactionStatus = z.infer<
   typeof paymentTransactionStatusSchema
 >;
 
-export const createPaymentSessionSchema = z
-  .object({
-    kind: paymentKindSchema,
-    organizationId: z.string().min(1, "organizationId is required"),
-    currency: z
-      .string()
-      .trim()
-      .min(3)
-      .max(3)
-      .transform((value) => value.toUpperCase()),
-    planCode: billingPlanCodeSchema.optional(),
-    creditsQuantity: z.number().int().positive().optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-  })
-  .superRefine((value, ctx) => {
+const paymentSessionBaseSchema = z.object({
+  kind: paymentKindSchema,
+  organizationId: z.string().min(1, "organizationId is required"),
+  currency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(3)
+    .transform((value) => value.toUpperCase()),
+  planCode: billingPlanCodeSchema.optional(),
+  creditsQuantity: z.number().int().positive().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const createPaymentSessionSchema = paymentSessionBaseSchema.superRefine(
+  (value, ctx) => {
     if (value.kind === "subscription" && !value.planCode) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -69,9 +77,110 @@ export const createPaymentSessionSchema = z
         path: ["planCode"],
       });
     }
-  });
+  }
+);
 export type CreatePaymentSessionDto = z.infer<
   typeof createPaymentSessionSchema
+>;
+
+export const paymentCustomerNameSchema = z.object({
+  first: z.string().trim().min(1),
+  last: z.string().trim().min(1),
+});
+
+export const paymentPhoneSchema = z.object({
+  countryCode: z.string().trim().min(1),
+  number: z.string().trim().min(1),
+});
+
+export const paymentAddressSchema = z.object({
+  city: z.string().trim().min(1),
+  country: z
+    .string()
+    .trim()
+    .min(2)
+    .max(2)
+    .transform((value) => value.toUpperCase()),
+  line1: z.string().trim().min(1),
+  line2: z.string().trim().optional(),
+  postalCode: z.string().trim().min(1),
+  state: z.string().trim().min(1),
+});
+
+export const paymentCardSchema = z.object({
+  number: z.string().trim().min(13).max(19),
+  expiryMonth: z.string().trim().min(2).max(2),
+  expiryYear: z.string().trim().min(2).max(4),
+  cvv: z.string().trim().min(3).max(4),
+  saveCard: z.boolean().optional(),
+});
+
+export const createDirectChargeSchema = paymentSessionBaseSchema
+  .extend({
+    kind: z.literal("creditPurchase"),
+    amountMinor: z.number().int().positive(),
+    paymentMethodType: paymentMethodTypeSchema,
+    customerName: paymentCustomerNameSchema,
+    email: z.string().trim().email(),
+    phone: paymentPhoneSchema,
+    address: paymentAddressSchema.optional(),
+    mobileMoneyNetwork: z.string().trim().min(1).optional(),
+    accountBank: z.string().trim().min(1).optional(),
+    card: paymentCardSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.planCode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "planCode is not supported for direct credit top ups",
+        path: ["planCode"],
+      });
+    }
+
+    if (value.creditsQuantity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "creditsQuantity is derived from the entered amount for direct top ups",
+        path: ["creditsQuantity"],
+      });
+    }
+
+    if (value.paymentMethodType === "card" && !value.address) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "address is required for card payments",
+        path: ["address"],
+      });
+    }
+  });
+export type CreateDirectChargeDto = z.infer<typeof createDirectChargeSchema>;
+
+export const authorizeDirectChargeSchema = z
+  .object({
+    type: z.enum(["pin", "otp"]),
+    pin: z.string().trim().min(4).max(12).optional(),
+    otp: z.string().trim().min(4).max(10).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === "pin" && !value.pin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "pin is required when type is pin",
+        path: ["pin"],
+      });
+    }
+
+    if (value.type === "otp" && !value.otp) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "otp is required when type is otp",
+        path: ["otp"],
+      });
+    }
+  });
+export type AuthorizeDirectChargeDto = z.infer<
+  typeof authorizeDirectChargeSchema
 >;
 
 export const reconcilePaymentSessionSchema = z.object({
@@ -160,3 +269,36 @@ export const paymentWebhookAckSchema = z.object({
   ok: z.literal(true),
 });
 export type PaymentWebhookAck = z.infer<typeof paymentWebhookAckSchema>;
+
+export const paymentNextActionSchema = z.object({
+  type: z.enum(["redirect_url", "payment_instruction"]),
+  redirect_url: z
+    .object({
+      url: z.string().url(),
+    })
+    .optional(),
+  payment_instruction: z
+    .object({
+      note: z.string(),
+    })
+    .optional(),
+});
+export type PaymentNextAction = z.infer<typeof paymentNextActionSchema>;
+
+export const directChargeResponseSchema = z.object({
+  success: z.literal(true),
+  paymentSessionId: z.string().uuid(),
+  next_action: paymentNextActionSchema.nullable().optional(),
+  data: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type DirectChargeResponse = z.infer<typeof directChargeResponseSchema>;
+
+export const verifyDirectChargeResponseSchema = z.object({
+  success: z.boolean(),
+  status: paymentSessionStatusSchema,
+  data: z.record(z.string(), z.unknown()).nullable().optional(),
+  paymentSessionId: z.string().uuid(),
+});
+export type VerifyDirectChargeResponse = z.infer<
+  typeof verifyDirectChargeResponseSchema
+>;

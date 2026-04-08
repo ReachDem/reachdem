@@ -6,6 +6,7 @@ import { generateUniqueOrganizationSlug } from "../lib/slugify";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { ReachDemRole, AcquisitionSource } from "@reachdem/shared";
+import { PlatformBillingSettingsService } from "@reachdem/core";
 import { getAuthFlowState } from "../lib/auth-flow";
 
 const legacyBootstrapSchema = z.object({
@@ -178,6 +179,8 @@ export async function createWorkspace(
         data: {
           companyName: validatedData.companyName,
           country: validatedData.country,
+          creditBalance:
+            await PlatformBillingSettingsService.getInitialWorkspaceBalanceMinor(),
         },
       });
 

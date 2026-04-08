@@ -1,4 +1,4 @@
-import { prisma } from "@reachdem/database";
+import { Prisma, prisma } from "@reachdem/database";
 import { founderAdminFeedbackFixtures } from "@/fixtures/founder-admin";
 import type {
   CreateFeedbackInput,
@@ -11,6 +11,24 @@ import type {
 export interface FeedbackRepository {
   create(input: CreateFeedbackInput): Promise<FeedbackRow>;
   list(): Promise<FeedbackRow[]>;
+}
+
+interface FeedbackRecordWithRelations {
+  id: string;
+  organizationId: string | null;
+  organization: { name: string } | null;
+  userId: string | null;
+  user: { name: string } | null;
+  source: FeedbackSource;
+  status: FeedbackStatus;
+  category: string | null;
+  rating: number | null;
+  pagePath: string | null;
+  message: string;
+  email: string | null;
+  metadata: unknown;
+  createdAt: Date;
+  reviewedAt: Date | null;
 }
 
 interface PrismaLikeError {
@@ -49,6 +67,12 @@ function logFeedbackFallback(error: unknown) {
   );
 }
 
+function toJsonInput(
+  metadata?: Record<string, unknown>
+): Prisma.InputJsonValue | undefined {
+  return metadata ? (metadata as Prisma.InputJsonValue) : undefined;
+}
+
 export function createMockFeedbackRepository(
   seed = founderAdminFeedbackFixtures
 ): FeedbackRepository {
@@ -85,7 +109,7 @@ export function createMockFeedbackRepository(
 export function createPrismaFeedbackRepository(): FeedbackRepository {
   return {
     async create(input) {
-      const feedback = await prisma.feedback.create({
+      const feedback = (await prisma.feedback.create({
         data: {
           organizationId: input.organizationId ?? null,
           userId: input.userId ?? null,
@@ -96,7 +120,7 @@ export function createPrismaFeedbackRepository(): FeedbackRepository {
           pagePath: input.pagePath ?? null,
           message: input.message,
           email: input.email ?? null,
-          metadata: input.metadata ?? undefined,
+          metadata: toJsonInput(input.metadata),
         },
         include: {
           organization: {
@@ -110,7 +134,7 @@ export function createPrismaFeedbackRepository(): FeedbackRepository {
             },
           },
         },
-      });
+      })) as FeedbackRecordWithRelations;
 
       return {
         id: feedback.id,
@@ -134,7 +158,7 @@ export function createPrismaFeedbackRepository(): FeedbackRepository {
       };
     },
     async list() {
-      const feedbacks = await prisma.feedback.findMany({
+      const feedbacks = (await prisma.feedback.findMany({
         include: {
           organization: {
             select: {
@@ -150,9 +174,9 @@ export function createPrismaFeedbackRepository(): FeedbackRepository {
         orderBy: {
           createdAt: "desc",
         },
-      });
+      })) as FeedbackRecordWithRelations[];
 
-      return feedbacks.map((feedback: any) => ({
+      return feedbacks.map((feedback) => ({
         id: feedback.id,
         organizationId: feedback.organizationId,
         organizationName: feedback.organization?.name ?? null,

@@ -212,32 +212,21 @@ export function createPrismaIncidentSource(): OpsIncidentSource {
         },
       });
 
-      return events.map(
-        (event: {
-          id: string;
-          organizationId: string;
-          organization: { name: string };
-          category: string;
-          status: string;
-          severity: "warn" | "error" | "info";
-          createdAt: Date;
-          meta: unknown;
-        }) => ({
-          id: event.id,
-          organizationId: event.organizationId,
-          organizationName: event.organization.name,
-          channel: null,
-          level: event.severity === "error" ? "critical" : "warning",
-          status: event.status === "completed" ? "resolved" : "open",
-          summary: `${event.category} event entered ${event.status} state`,
-          detectedAt: event.createdAt,
-          source: "business-db",
-          metadata:
-            event.meta && typeof event.meta === "object"
-              ? (event.meta as Record<string, unknown>)
-              : undefined,
-        })
-      );
+      return events.map((event) => ({
+        id: event.id,
+        organizationId: event.organizationId,
+        organizationName: event.organization.name,
+        channel: null,
+        level: event.severity === "error" ? "critical" : "warning",
+        status: event.status === "success" ? "resolved" : "open",
+        summary: `${event.category} event entered ${event.status} state`,
+        detectedAt: event.createdAt,
+        source: "business-db",
+        metadata:
+          event.meta && typeof event.meta === "object"
+            ? (event.meta as Record<string, unknown>)
+            : undefined,
+      }));
     },
   };
 }
@@ -269,35 +258,25 @@ export function createPrismaLogSource(): OpsLogSource {
         },
       });
 
-      return events.map(
-        (event: {
-          id: string;
-          createdAt: Date;
-          category: string;
-          status: string;
-          severity: "warn" | "error" | "info";
-          correlationId: string;
-          meta: unknown;
-        }) => ({
-          id: event.id,
-          timestamp: event.createdAt,
-          level:
-            event.severity === "error"
-              ? "error"
-              : event.severity === "warn"
-                ? "warn"
-                : "info",
-          category: event.category,
-          message: `Activity ${event.status} for ${event.category}`,
-          context:
-            event.meta && typeof event.meta === "object"
-              ? {
-                  correlationId: event.correlationId,
-                  ...(event.meta as Record<string, unknown>),
-                }
-              : { correlationId: event.correlationId },
-        })
-      );
+      return events.map((event) => ({
+        id: event.id,
+        timestamp: event.createdAt,
+        level:
+          event.severity === "error"
+            ? "error"
+            : event.severity === "warn"
+              ? "warn"
+              : "info",
+        category: event.category,
+        message: `Activity ${event.status} for ${event.category}`,
+        context:
+          event.meta && typeof event.meta === "object"
+            ? {
+                correlationId: event.correlationId,
+                ...(event.meta as Record<string, unknown>),
+              }
+            : { correlationId: event.correlationId },
+      }));
     },
   };
 }

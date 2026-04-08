@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@reachdem/auth/guards";
 import {
-  FlutterwaveV4PaymentProvider,
-  PaymentOrchestratorService,
+  DirectChargePaymentService,
   PaymentSessionNotFoundError,
 } from "@reachdem/core";
 
@@ -18,34 +17,12 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
       );
     }
 
-    const providerV4 = new FlutterwaveV4PaymentProvider();
-    const verificationResult = await providerV4.verifyTransaction(chargeId);
-    const status =
-      typeof verificationResult?.data?.status === "string"
-        ? verificationResult.data.status
-        : "processing";
-    const providerReference =
-      typeof verificationResult?.data?.reference === "string"
-        ? verificationResult.data.reference
-        : typeof verificationResult?.data?.tx_ref === "string"
-          ? verificationResult.data.tx_ref
-          : null;
+    const result = await DirectChargePaymentService.verify(
+      organizationId,
+      chargeId
+    );
 
-    const session =
-      await PaymentOrchestratorService.reconcileDirectChargeVerification({
-        organizationId,
-        providerTransactionId: chargeId,
-        providerReference,
-        rawStatus: status,
-        rawPayload: (verificationResult ?? null) as Record<string, unknown>,
-      });
-
-    return NextResponse.json({
-      success: session.session.status === "succeeded",
-      status: session.session.status,
-      data: verificationResult?.data,
-      paymentSessionId: session.session.id,
-    });
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("[Payments API - GET /verify] Error:", error);
 

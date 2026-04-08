@@ -1,6 +1,7 @@
 import { prisma } from "@reachdem/database";
 import type { WorkspaceBillingSummary } from "@reachdem/shared";
 import { BillingCatalogService } from "./billing-catalog.service";
+import { CreditTopUpService } from "./credit-top-up.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
 
 export class WorkspaceBillingService {
@@ -29,31 +30,33 @@ export class WorkspaceBillingService {
       organization.planCode
     );
 
-    const totalPurchasesResult = await prisma.paymentSession.aggregate({
+    const successfulTopUp = await prisma.paymentSession.findFirst({
       where: {
         organizationId,
+        kind: "creditPurchase",
         status: "succeeded",
       },
-      _sum: {
-        amountMinor: true,
-      },
+      select: { id: true },
     });
-    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
 
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(normalizedPlanCode),
-      { totalPurchasedMinor }
+      { hasSuccessfulTopUp: Boolean(successfulTopUp) }
     );
+    const usagePricing = BillingCatalogService.getUsagePricing();
 
     return {
       organizationId: organization.id,
       planCode: normalizedPlanCode,
+      balanceMinor: organization.creditBalance,
+      balanceCurrency: usagePricing.currency,
       creditBalance: organization.creditBalance,
       workspaceVerificationStatus: organization.workspaceVerificationStatus,
       workspaceVerifiedAt: organization.workspaceVerifiedAt,
       senderId: organization.senderId,
       smsQuotaUsed: organization.smsQuotaUsed,
       emailQuotaUsed: organization.emailQuotaUsed,
+      hasSuccessfulTopUp: Boolean(successfulTopUp),
       smsIncludedLimit: entitlements.smsIncludedLimit,
       emailIncludedLimit: entitlements.emailIncludedLimit,
       smsQuotaRemaining: PlanEntitlementsService.getRemainingIncluded(
@@ -74,7 +77,8 @@ export class WorkspaceBillingService {
       ),
       usesSharedCredits: true,
       availablePlans: BillingCatalogService.getPlanCatalog(),
-      creditPricing: BillingCatalogService.getCreditPricing(),
+      topUpConfig: CreditTopUpService.getTopUpConfig(),
+      usagePricing,
     };
   }
 }

@@ -19,7 +19,7 @@ export default async function BillingPage() {
           Plans & Credits
         </h2>
         <p className="text-muted-foreground mt-2">
-          Manage your usage, plan limits, and credit balances.
+          Manage your usage, plan limits, and shared message balance.
         </p>
       </div>
 

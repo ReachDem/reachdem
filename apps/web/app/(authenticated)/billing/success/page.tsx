@@ -8,7 +8,7 @@ function BillingSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const method = searchParams.get("method");
-  const isCard = method === "card";
+  const isCardPayment = method === "card";
 
   return (
     <main className="bg-background fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden px-8 text-center">
@@ -34,49 +34,32 @@ function BillingSuccessContent() {
 
         {/* Typography */}
         <h1 className="text-foreground mb-4 text-5xl font-medium tracking-tight">
-          Success
+          Payment received
         </h1>
         <p className="text-muted-foreground mb-16">
-          Your payment was successful
+          {isCardPayment
+            ? "You're all set. Next time, checkout will feel even faster."
+            : "Your payment was successful."}
         </p>
 
-        {isCard ? (
-          <div className="mt-4 flex w-full flex-col gap-4">
-            <p className="dark:text-muted-foreground mb-2 text-[0.6875rem] font-semibold tracking-widest text-[#747474] uppercase">
-              Save these payment cards?
-            </p>
-
-            <Button
-              onClick={() => router.push("/settings/workspace")}
-              className="h-[3.5rem] w-full rounded-md border-none bg-[#ff751f] font-medium text-white transition-all hover:bg-[#e66a1c] active:scale-[0.98]"
-            >
-              Yes, Save
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() => router.push("/settings/workspace")}
-              className="text-foreground border-border hover:bg-muted h-[3.5rem] w-full rounded-md bg-transparent font-medium transition-all active:scale-[0.98]"
-            >
-              No, thanks
-            </Button>
-          </div>
-        ) : (
-          <div className="mt-4 flex w-full flex-col items-center gap-4">
-            <button
-              onClick={() => router.push("/campaigns/new")}
-              className="text-foreground text-sm font-medium underline-offset-4 transition-colors hover:underline"
-            >
-              Create your campaign
-            </button>
-            <button
-              onClick={() => router.push("/settings/workspace")}
-              className="text-muted-foreground hover:text-foreground text-sm font-medium underline-offset-4 transition-colors hover:underline"
-            >
-              Go strictly to Dashboard
-            </button>
-          </div>
-        )}
+        <div className="mt-4 flex w-full flex-col items-center gap-4">
+          <Button
+            onClick={() =>
+              router.push(
+                method === "card" ? "/settings/workspace" : "/campaigns/new"
+              )
+            }
+            className="h-[3.5rem] w-full rounded-md border-none bg-[#ff751f] font-medium text-white transition-all hover:bg-[#e66a1c] active:scale-[0.98]"
+          >
+            {method === "card" ? "Back to workspace" : "Create your campaign"}
+          </Button>
+          <button
+            onClick={() => router.push("/settings/workspace")}
+            className="text-muted-foreground hover:text-foreground text-sm font-medium underline-offset-4 transition-colors hover:underline"
+          >
+            Go to dashboard
+          </button>
+        </div>
       </div>
 
       {/* Footer minimal info */}

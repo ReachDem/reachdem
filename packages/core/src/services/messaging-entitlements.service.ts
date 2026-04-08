@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@reachdem/database";
+import { BillingCatalogService } from "./billing-catalog.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
 import {
   MessageInsufficientCreditsError,
@@ -34,21 +35,19 @@ export class MessagingEntitlementsService {
     }
 
     // 1. Calculate historical purchases logic
-    const totalPurchasesResult = await db.paymentSession.aggregate({
+    const successfulTopUp = await db.paymentSession.findFirst({
       where: {
         organizationId,
+        kind: "creditPurchase",
         status: "succeeded",
       },
-      _sum: {
-        amountMinor: true,
-      },
+      select: { id: true },
     });
-    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
 
     // 2. Resolve final quotas
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(organization.planCode),
-      { totalPurchasedMinor }
+      { hasSuccessfulTopUp: Boolean(successfulTopUp) }
     );
 
     // 3. Verify maximum capacity restrictions (Quota Check)
@@ -70,9 +69,14 @@ export class MessagingEntitlementsService {
     }
 
     // 4. Verify account funding (Credit Check)
-    if (units > organization.creditBalance) {
+    const usageCostMinor = BillingCatalogService.getMessageUsageCostMinor(
+      channel,
+      units
+    );
+
+    if (usageCostMinor > organization.creditBalance) {
       throw new MessageInsufficientCreditsError(
-        `Insufficient credit balance to send ${units} ${channel} message(s).`
+        `Insufficient balance to send ${units} ${channel} message(s).`
       );
     }
 
@@ -81,7 +85,7 @@ export class MessagingEntitlementsService {
       where: { id: organizationId },
       data: {
         creditBalance: {
-          decrement: units,
+          decrement: usageCostMinor,
         },
         // We always track the usage regardless of if the limit is null
         ...(channel === "sms"

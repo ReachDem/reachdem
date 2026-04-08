@@ -6,8 +6,9 @@ import type {
 
 const DEFAULT_CURRENCY = "XAF";
 const DEFAULT_CREDIT_MINIMUM_QUANTITY = 250;
-const DEFAULT_CREDIT_SUGGESTIONS = [250, 500, 1000];
-
+const DEFAULT_CREDIT_MINIMUM_AMOUNT_MINOR = 250;
+const DEFAULT_EMAIL_UNIT_AMOUNT_MINOR = 5;
+const DEFAULT_FREE_TRIAL_SMS_LIMIT = 5;
 const PLAN_ALIASES: Record<string, BillingPlanCode> = {
   experimental: "basic",
   starter: "basic",
@@ -33,6 +34,22 @@ function getCurrency(): string {
   return (
     process.env.PAYMENT_DEFAULT_CURRENCY ?? DEFAULT_CURRENCY
   ).toUpperCase();
+}
+
+function formatTierLabel(args: {
+  minimumQuantity: number;
+  nextMinimumQuantity?: number;
+  unitAmountMinor: number;
+  currency: string;
+}): string {
+  const { currency, minimumQuantity, nextMinimumQuantity, unitAmountMinor } =
+    args;
+
+  if (!nextMinimumQuantity) {
+    return `${minimumQuantity.toLocaleString()}+ SMS: ${unitAmountMinor} ${currency}/SMS`;
+  }
+
+  return `${minimumQuantity.toLocaleString()} - ${(nextMinimumQuantity - 1).toLocaleString()} SMS: ${unitAmountMinor} ${currency}/SMS`;
 }
 
 export class BillingCatalogService {
@@ -171,6 +188,74 @@ export class BillingCatalogService {
     return plan.priceMinor;
   }
 
+  static getCreditMinimumAmountMinor(): number {
+    return (
+      readPositiveIntEnv(
+        ["PAYMENT_CREDIT_MINIMUM_AMOUNT_MINOR"],
+        DEFAULT_CREDIT_MINIMUM_AMOUNT_MINOR
+      ) ?? DEFAULT_CREDIT_MINIMUM_AMOUNT_MINOR
+    );
+  }
+
+  static getBalanceCurrency(): string {
+    return getCurrency();
+  }
+
+  static getSmsUnitAmountMinor(): number {
+    return (
+      readPositiveIntEnv(
+        ["PAYMENT_SMS_UNIT_AMOUNT_MINOR", "PAYMENT_CREDIT_UNIT_AMOUNT_MINOR"],
+        25
+      ) ?? 25
+    );
+  }
+
+  static getEmailUnitAmountMinor(): number {
+    return (
+      readPositiveIntEnv(
+        ["PAYMENT_EMAIL_UNIT_AMOUNT_MINOR"],
+        DEFAULT_EMAIL_UNIT_AMOUNT_MINOR
+      ) ?? DEFAULT_EMAIL_UNIT_AMOUNT_MINOR
+    );
+  }
+
+  static getFreeTrialSmsLimit(): number {
+    return (
+      readPositiveIntEnv(
+        ["PAYMENT_FREE_TRIAL_SMS_LIMIT"],
+        DEFAULT_FREE_TRIAL_SMS_LIMIT
+      ) ?? DEFAULT_FREE_TRIAL_SMS_LIMIT
+    );
+  }
+
+  static getFreeTrialBalanceMinor(): number {
+    return this.getFreeTrialSmsLimit() * this.getSmsUnitAmountMinor();
+  }
+
+  static getMessageUnitAmountMinor(channel: "sms" | "email"): number {
+    return channel === "sms"
+      ? this.getSmsUnitAmountMinor()
+      : this.getEmailUnitAmountMinor();
+  }
+
+  static getMessageUsageCostMinor(channel: "sms" | "email", units = 1): number {
+    if (units <= 0) {
+      return 0;
+    }
+
+    return this.getMessageUnitAmountMinor(channel) * units;
+  }
+
+  static getUsagePricing() {
+    return {
+      currency: this.getBalanceCurrency(),
+      smsUnitAmountMinor: this.getSmsUnitAmountMinor(),
+      emailUnitAmountMinor: this.getEmailUnitAmountMinor(),
+      freeTrialSmsLimit: this.getFreeTrialSmsLimit(),
+      freeTrialBalanceMinor: this.getFreeTrialBalanceMinor(),
+    };
+  }
+
   static getCreditPricing(): CreditPricing {
     const currency = getCurrency();
     const minimumQuantity =
@@ -178,23 +263,59 @@ export class BillingCatalogService {
         ["PAYMENT_CREDIT_MINIMUM_QUANTITY"],
         DEFAULT_CREDIT_MINIMUM_QUANTITY
       ) ?? DEFAULT_CREDIT_MINIMUM_QUANTITY;
+    const baseUnitAmountMinor = readPositiveIntEnv([
+      "PAYMENT_CREDIT_UNIT_AMOUNT_MINOR",
+    ]);
+    const volumeDiscountThreshold = readPositiveIntEnv([
+      "PAYMENT_CREDIT_VOLUME_DISCOUNT_THRESHOLD",
+    ]);
+    const volumeDiscountUnitAmountMinor = readPositiveIntEnv([
+      "PAYMENT_CREDIT_VOLUME_DISCOUNT_UNIT_AMOUNT_MINOR",
+    ]);
 
-    const suggestionValues = (
-      process.env.PAYMENT_CREDIT_SUGGESTED_QUANTITIES ??
-      DEFAULT_CREDIT_SUGGESTIONS.join(",")
-    )
-      .split(",")
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isFinite(value) && value >= minimumQuantity)
-      .map((value) => Math.round(value));
+    if (baseUnitAmountMinor) {
+      const tiers = [
+        {
+          minimumQuantity: 1,
+          unitAmountMinor: baseUnitAmountMinor,
+        },
+      ];
+
+      if (
+        volumeDiscountThreshold &&
+        volumeDiscountUnitAmountMinor &&
+        volumeDiscountThreshold > 1 &&
+        volumeDiscountUnitAmountMinor < baseUnitAmountMinor
+      ) {
+        tiers.push({
+          minimumQuantity: volumeDiscountThreshold,
+          unitAmountMinor: volumeDiscountUnitAmountMinor,
+        });
+      }
+
+      const sortedTiers = tiers.sort(
+        (left, right) => left.minimumQuantity - right.minimumQuantity
+      );
+
+      return {
+        currency,
+        minimumQuantity,
+        tiers: sortedTiers.map((tier, index) => ({
+          minimumQuantity: tier.minimumQuantity,
+          unitAmountMinor: tier.unitAmountMinor,
+          label: formatTierLabel({
+            minimumQuantity: tier.minimumQuantity,
+            nextMinimumQuantity: sortedTiers[index + 1]?.minimumQuantity,
+            unitAmountMinor: tier.unitAmountMinor,
+            currency,
+          }),
+        })),
+      };
+    }
 
     return {
       currency,
       minimumQuantity,
-      suggestedQuantities:
-        suggestionValues.length > 0
-          ? Array.from(new Set(suggestionValues)).sort((a, b) => a - b)
-          : [...DEFAULT_CREDIT_SUGGESTIONS],
       tiers: [
         {
           minimumQuantity: 1,

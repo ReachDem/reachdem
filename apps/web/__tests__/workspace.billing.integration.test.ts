@@ -66,6 +66,11 @@ describe("Workspace billing API - integration", () => {
     expect(body.emailQuotaRemaining).toBeNull();
     expect(body.usesSharedCredits).toBe(true);
     expect(body.availablePlans).toHaveLength(4);
-    expect(body.creditPricing.currency).toBe("XAF");
+    expect(body.topUpConfig.baseCurrency).toBe("XAF");
+    expect(body.topUpConfig.supportedCurrencies).toContain("USD");
+    expect(body.topUpConfig.supportedCurrencies).toContain("EUR");
+    expect(body.topUpConfig.minimumAmountMinorByCurrency.XAF).toBeGreaterThan(
+      0
+    );
   });
 });

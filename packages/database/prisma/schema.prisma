@@ -873,3 +873,12 @@ model PaymentWebhookEvent {
   @@index([provider, processed])
   @@map("payment_webhook_event")
 }
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_setting")
+}

@@ -1,6 +1,7 @@
 import { prisma } from "@reachdem/database";
 import type { CampaignLaunchJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
+import { BillingCatalogService } from "./billing-catalog.service";
 import { TrackedLinkService } from "./tracked-link.service";
 import { CampaignService } from "./campaign.service";
 import { SegmentService } from "./segment.service";
@@ -54,16 +55,14 @@ export class RequestCampaignLaunchUseCase {
       throw new CampaignNotFoundError("Organization not found");
     }
 
-    const totalPurchasesResult = await prisma.paymentSession.aggregate({
+    const successfulTopUp = await prisma.paymentSession.findFirst({
       where: {
         organizationId,
+        kind: "creditPurchase",
         status: "succeeded",
       },
-      _sum: {
-        amountMinor: true,
-      },
+      select: { id: true },
     });
-    const totalPurchasedMinor = totalPurchasesResult._sum.amountMinor || 0;
 
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
@@ -73,7 +72,7 @@ export class RequestCampaignLaunchUseCase {
 
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(organization.planCode),
-      { totalPurchasedMinor }
+      { hasSuccessfulTopUp: Boolean(successfulTopUp) }
     );
     const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
       entitlements,
@@ -92,10 +91,13 @@ export class RequestCampaignLaunchUseCase {
       }
     }
 
-    if (eligibleTargetCount > organization.creditBalance) {
-      throw new CampaignInsufficientCreditsError(
-        `Insufficient credit balance.`
-      );
+    const usageCostMinor = BillingCatalogService.getMessageUsageCostMinor(
+      campaign.channel,
+      eligibleTargetCount
+    );
+
+    if (usageCostMinor > organization.creditBalance) {
+      throw new CampaignInsufficientCreditsError(`Insufficient balance.`);
     }
 
     // Pre-process links before launching
@@ -126,7 +128,7 @@ export class RequestCampaignLaunchUseCase {
         where: { id: organizationId },
         data: {
           creditBalance: {
-            decrement: eligibleTargetCount,
+            decrement: usageCostMinor,
           },
           ...(campaign.channel === "sms"
             ? {
