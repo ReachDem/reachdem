@@ -5,6 +5,7 @@ import type { SmsExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignStatsService } from "./campaign-stats.service";
 import { personalizeTemplate } from "../utils/message-personalization";
+import { MessageEventService } from "./message-event.service";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
@@ -50,6 +51,14 @@ export class ProcessSmsMessageJobUseCase {
         where: { id: message.id },
         data: { status: "failed" },
       });
+      await MessageEventService.recordStatusTransition(prisma, {
+        organizationId: job.organization_id,
+        messageId: message.id,
+        status: "failed",
+        payload: {
+          reason: "incomplete_payload",
+        },
+      });
 
       await this.markCampaignTarget(message.id, "failed");
       await this.finalizeCampaignIfReady(message.campaignId);
@@ -72,6 +81,15 @@ export class ProcessSmsMessageJobUseCase {
     if (locked.count === 0) {
       return "skipped";
     }
+
+    await MessageEventService.recordStatusTransition(prisma, {
+      organizationId: job.organization_id,
+      messageId: message.id,
+      status: "sending",
+      payload: {
+        deliveryCycle: job.delivery_cycle,
+      },
+    });
 
     const baseAttemptNo = message.attempts.length;
     const campaignTarget = await prisma.campaignTarget.findFirst({
@@ -137,6 +155,14 @@ export class ProcessSmsMessageJobUseCase {
           providerSelected: result.providerName,
         },
       });
+      await MessageEventService.recordStatusTransition(prisma, {
+        organizationId: job.organization_id,
+        messageId: message.id,
+        status: "sent",
+        payload: {
+          provider: result.providerName,
+        },
+      });
 
       await this.markCampaignTarget(message.id, "sent");
       await this.finalizeCampaignIfReady(message.campaignId);
@@ -174,6 +200,16 @@ export class ProcessSmsMessageJobUseCase {
           providerSelected: result.providerName,
         },
       });
+      await MessageEventService.recordStatusTransition(prisma, {
+        organizationId: job.organization_id,
+        messageId: message.id,
+        status: "queued",
+        payload: {
+          deliveryCycle: job.delivery_cycle + 1,
+          provider: result.providerName,
+          reason: "retry",
+        },
+      });
 
       await ActivityLogger.log({
         organizationId: job.organization_id,
@@ -207,6 +243,15 @@ export class ProcessSmsMessageJobUseCase {
         from: result.senderUsed,
         status: "failed",
         providerSelected: result.providerName,
+      },
+    });
+    await MessageEventService.recordStatusTransition(prisma, {
+      organizationId: job.organization_id,
+      messageId: message.id,
+      status: "failed",
+      payload: {
+        deliveryCycle: job.delivery_cycle,
+        provider: result.providerName,
       },
     });
 

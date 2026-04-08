@@ -136,8 +136,8 @@ export class StripePaymentProvider implements PaymentProviderPort {
     return signatures.some((signature) => {
       try {
         return timingSafeEqual(
-          Buffer.from(signature, "utf8"),
-          Buffer.from(expected, "utf8")
+          textEncoder.encode(signature),
+          textEncoder.encode(expected)
         );
       } catch {
         return false;
@@ -212,3 +212,4 @@ export class StripePaymentProvider implements PaymentProviderPort {
     };
   }
 }
+const textEncoder = new TextEncoder();

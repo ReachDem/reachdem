@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@reachdem/database";
-import { BillingCatalogService } from "./billing-catalog.service";
+import { BillingRecordService } from "./billing-record.service";
 import { PlanEntitlementsService } from "./plan-entitlements.service";
+import { BillingInsufficientCreditsError } from "../errors/billing.errors";
 import {
   MessageInsufficientCreditsError,
   MessageSendValidationError,
@@ -30,14 +31,24 @@ export class MessagingEntitlementsService {
     db: DbClient,
     organizationId: string,
     channel: MessagingChannel,
-    units = 1
+    units = 1,
+    options: {
+      apiKeyId?: string | null;
+      messageId?: string | null;
+      campaignId?: string | null;
+      source?: "dashboard" | "publicApi" | "worker" | "system";
+    } = {}
   ): Promise<{ senderId: string | null }> {
+    // This service is called from write transactions. The row lock keeps
+    // quota calculation, wallet debit, and quota usage update consistent.
+    await db.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "organization" WHERE "id" = ${organizationId} FOR UPDATE`
+    );
+
     const organization = await db.organization.findUnique({
       where: { id: organizationId },
       select: {
         planCode: true,
-        creditBalance: true,
-        creditCurrency: true,
         smsQuotaUsed: true,
         smsQuotaPeriodStartedAt: true,
         emailQuotaUsed: true,
@@ -55,15 +66,20 @@ export class MessagingEntitlementsService {
     const entitlements = PlanEntitlementsService.get(organization.planCode);
     const smsPeriodStart = startOfUtcMonth(now);
     const emailPeriodStart = startOfUtcDay(now);
+    const isCurrentSmsPeriod = isSameInstant(
+      organization.smsQuotaPeriodStartedAt,
+      smsPeriodStart
+    );
+    const isCurrentEmailPeriod = isSameInstant(
+      organization.emailQuotaPeriodStartedAt,
+      emailPeriodStart
+    );
     const currentUsage =
       channel === "sms"
-        ? isSameInstant(organization.smsQuotaPeriodStartedAt, smsPeriodStart)
+        ? isCurrentSmsPeriod
           ? organization.smsQuotaUsed
           : 0
-        : isSameInstant(
-              organization.emailQuotaPeriodStartedAt,
-              emailPeriodStart
-            )
+        : isCurrentEmailPeriod
           ? organization.emailQuotaUsed
           : 0;
     const includedLimit =
@@ -74,38 +90,40 @@ export class MessagingEntitlementsService {
       includedLimit == null ? 0 : Math.max(0, includedLimit - currentUsage);
     const billableUnits = Math.max(0, units - includedRemaining);
 
-    const chargeAmountMinor = BillingCatalogService.calculateMessageChargeMinor(
-      {
-        channel,
-        units: billableUnits,
-        currency: organization.creditCurrency,
+    if (billableUnits > 0) {
+      try {
+        await BillingRecordService.billMessageUsage(db, {
+          organizationId,
+          apiKeyId: options.apiKeyId ?? null,
+          channel,
+          units: billableUnits,
+          messageId: options.messageId ?? null,
+          campaignId: options.campaignId ?? null,
+          source: options.source ?? "dashboard",
+        });
+      } catch (error) {
+        if (error instanceof BillingInsufficientCreditsError) {
+          throw new MessageInsufficientCreditsError(
+            `Insufficient credit balance to send ${units} ${channel} message(s).`
+          );
+        }
+        throw error;
       }
-    );
-
-    if (chargeAmountMinor > organization.creditBalance) {
-      throw new MessageInsufficientCreditsError(
-        `Insufficient credit balance to send ${units} ${channel} message(s).`
-      );
     }
 
     await db.organization.update({
       where: { id: organizationId },
       data: {
-        ...(chargeAmountMinor > 0
-          ? {
-              creditBalance: {
-                decrement: chargeAmountMinor,
-              },
-            }
-          : {}),
         ...(channel === "sms"
           ? {
               smsQuotaPeriodStartedAt: smsPeriodStart,
-              smsQuotaUsed: currentUsage + units,
+              smsQuotaUsed: isCurrentSmsPeriod ? { increment: units } : units,
             }
           : {
               emailQuotaPeriodStartedAt: emailPeriodStart,
-              emailQuotaUsed: currentUsage + units,
+              emailQuotaUsed: isCurrentEmailPeriod
+                ? { increment: units }
+                : units,
             }),
       },
     });

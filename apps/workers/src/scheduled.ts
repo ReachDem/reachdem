@@ -1,4 +1,9 @@
-import { CampaignService, MessageService } from "@reachdem/core";
+import {
+  CampaignService,
+  MessageService,
+  ProcessWebhookDeliveriesUseCase,
+} from "@reachdem/core";
+import { createHmac } from "crypto";
 import type { CampaignLaunchJob, MessageExecutionJob } from "@reachdem/shared";
 import {
   emailWorkerConfig,
@@ -28,6 +33,7 @@ export async function handleScheduled(
     case scheduledWorkerConfig.cron:
       await handleScheduledCampaigns(env, scheduledTime);
       await handleScheduledMessages(env, scheduledTime);
+      await handleWebhookDeliveries(env, scheduledTime);
       break;
     default:
       console.warn("[Cron] Unknown cron pattern", {
@@ -146,5 +152,48 @@ async function handleScheduledMessages(
 
   console.log("[Cron] Queued scheduled messages", {
     count: payload.items.length,
+  });
+}
+
+async function handleWebhookDeliveries(
+  env: Env,
+  scheduledTime: Date
+): Promise<void> {
+  const summary = await ProcessWebhookDeliveriesUseCase.execute({
+    limit: scheduledWorkerConfig.webhookDeliveryBatchSize,
+    now: scheduledTime,
+    send: async (delivery) => {
+      const payloadJson = JSON.stringify(delivery.payload);
+      const signature = delivery.signingSecret
+        ? createHmac("sha256", delivery.signingSecret)
+            .update(payloadJson)
+            .digest("hex")
+        : null;
+      const response = await fetch(delivery.targetUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-reachdem-event-type": delivery.eventType,
+          "x-reachdem-organization-id": delivery.organizationId,
+          "x-reachdem-attempt": String(delivery.attemptCount),
+          ...(delivery.apiKeyId
+            ? { "x-reachdem-api-key-id": delivery.apiKeyId }
+            : {}),
+          ...(signature ? { "x-reachdem-signature": signature } : {}),
+        },
+        body: payloadJson,
+      });
+
+      return {
+        statusCode: response.status,
+        error: response.ok ? null : await response.text(),
+      };
+    },
+  });
+
+  console.log("[Cron] Processed webhook deliveries", {
+    claimed: summary.claimed,
+    delivered: summary.delivered,
+    failed: summary.failed,
   });
 }

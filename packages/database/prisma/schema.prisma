@@ -114,25 +114,29 @@ model Organization {
   businessDocumentKey         String?
   createdAt                   DateTime                    @default(now())
 
-  members               Member[]
-  invitations           Invitation[]
-  sessions              Session[]
-  contacts              Contact[]
-  contactFields         ContactFieldDefinition[]
-  groups                Group[]
-  segments              Segment[]
-  activityEvents        ActivityEvent[]
-  smsConfig             WorkspaceSmsConfig?
-  messages              Message[]
-  campaigns             Campaign[]
-  trackedLinks          TrackedLink[]
-  emailDeliveryEvents   EmailDeliveryEvent[]
-  paymentSessions       PaymentSession[]
-  paymentTransactions   PaymentTransaction[]
-  feedbacks             Feedback[]
-  onboardingStates      OnboardingState[]
-  apiKeys               ApiKey[]
-  apiIdempotencyRecords ApiIdempotencyRecord[]
+  members                 Member[]
+  invitations             Invitation[]
+  sessions                Session[]
+  contacts                Contact[]
+  contactFields           ContactFieldDefinition[]
+  groups                  Group[]
+  segments                Segment[]
+  activityEvents          ActivityEvent[]
+  smsConfig               WorkspaceSmsConfig?
+  messages                Message[]
+  campaigns               Campaign[]
+  trackedLinks            TrackedLink[]
+  emailDeliveryEvents     EmailDeliveryEvent[]
+  paymentSessions         PaymentSession[]
+  paymentTransactions     PaymentTransaction[]
+  feedbacks               Feedback[]
+  onboardingStates        OnboardingState[]
+  apiKeys                 ApiKey[]
+  apiIdempotencyRecords   ApiIdempotencyRecord[]
+  apiWebhookSubscriptions ApiWebhookSubscription[]
+  billingRecords          BillingRecord[]
+  messageEvents           MessageEvent[]
+  webhookDeliveries       WebhookDelivery[]
 
   @@map("organization")
 }
@@ -497,6 +501,7 @@ model WorkspaceSmsConfig {
 model Message {
   id               String         @id @default(cuid())
   organizationId   String
+  apiKeyId         String?
   campaignId       String?
   channel          MessageChannel @default(sms)
   toEmail          String?
@@ -516,12 +521,16 @@ model Message {
   updatedAt        DateTime       @updatedAt
 
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   attempts       MessageAttempt[]
   trackedLinks   TrackedLink[]
   deliveryEvents EmailDeliveryEvent[]
+  billingRecords BillingRecord[]
+  events         MessageEvent[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
+  @@index([apiKeyId, createdAt])
   @@index([organizationId, campaignId])
   @@index([organizationId, status])
   @@index([organizationId, channel, status, scheduledAt])
@@ -684,6 +693,7 @@ enum FeedbackStatus {
 model Campaign {
   id             String          @id @default(uuid())
   organizationId String
+  apiKeyId       String?
   name           String
   description    String?
   channel        CampaignChannel @default(sms)
@@ -696,13 +706,16 @@ model Campaign {
   updatedAt DateTime @updatedAt
 
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   audiences      CampaignAudience[]
   targets        CampaignTarget[]
   trackedLinks   TrackedLink[]
   deliveryEvents EmailDeliveryEvent[]
+  billingRecords BillingRecord[]
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+  @@index([apiKeyId, createdAt])
   @@map("campaign")
 }
 
@@ -905,12 +918,19 @@ model ApiKey {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  idempotencyRecords ApiIdempotencyRecord[]
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pricingProfile       ApiPricingProfile?       @relation(fields: [pricingProfileId], references: [id], onDelete: SetNull)
+  idempotencyRecords   ApiIdempotencyRecord[]
+  webhookSubscriptions ApiWebhookSubscription[]
+  billingRecords       BillingRecord[]
+  campaigns            Campaign[]
+  messages             Message[]
+  webhookDeliveries    WebhookDelivery[]
 
   @@index([organizationId])
   @@index([organizationId, environment])
   @@index([organizationId, revokedAt])
+  @@index([pricingProfileId])
   @@map("api_key")
 }
 
@@ -936,4 +956,131 @@ model ApiIdempotencyRecord {
   @@index([organizationId, expiresAt])
   @@index([apiKeyId, createdAt])
   @@map("api_idempotency_record")
+}
+
+model ApiWebhookSubscription {
+  id             String   @id @default(uuid())
+  organizationId String
+  apiKeyId       String
+  targetUrl      String
+  eventTypes     String[]
+  active         Boolean  @default(true)
+  signingSecret  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey       @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, targetUrl])
+  @@index([organizationId, active])
+  @@index([apiKeyId, active])
+  @@map("api_webhook_subscription")
+}
+
+enum BillingRecordSource {
+  dashboard
+  publicApi
+  worker
+  system
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  delivering
+  delivered
+  failed
+}
+
+model ApiPricingProfile {
+  id         String   @id @default(uuid())
+  name       String
+  currency   String   @default("XAF")
+  isDefault  Boolean  @default(false)
+  active     Boolean  @default(true)
+  smsTiers   Json
+  emailTiers Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  apiKeys        ApiKey[]
+  billingRecords BillingRecord[]
+
+  @@index([active, isDefault])
+  @@map("api_pricing_profile")
+}
+
+model BillingRecord {
+  id               String              @id @default(uuid())
+  organizationId   String
+  apiKeyId         String?
+  pricingProfileId String?
+  channel          MessageChannel
+  units            Int
+  unitPriceMinor   Int
+  totalPriceMinor  Int
+  currency         String
+  walletCurrency   String
+  fxRate           Float?
+  messageId        String?
+  campaignId       String?
+  source           BillingRecordSource
+  metadata         Json?
+  createdAt        DateTime            @default(now())
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?            @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  pricingProfile ApiPricingProfile? @relation(fields: [pricingProfileId], references: [id], onDelete: SetNull)
+  message        Message?           @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  campaign       Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, channel, createdAt])
+  @@index([apiKeyId, createdAt])
+  @@index([messageId])
+  @@index([campaignId])
+  @@map("billing_record")
+}
+
+model MessageEvent {
+  id             String         @id @default(uuid())
+  organizationId String
+  messageId      String
+  type           String
+  status         MessageStatus?
+  payload        Json?
+  createdAt      DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, messageId, createdAt])
+  @@index([organizationId, type, createdAt])
+  @@map("message_event")
+}
+
+model WebhookDelivery {
+  id             String                @id @default(uuid())
+  organizationId String
+  apiKeyId       String?
+  eventType      String
+  payload        Json
+  targetUrl      String
+  signingSecret  String?
+  status         WebhookDeliveryStatus @default(pending)
+  attemptCount   Int                   @default(0)
+  nextAttemptAt  DateTime?
+  lastAttemptAt  DateTime?
+  lastStatusCode Int?
+  lastError      String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, nextAttemptAt])
+  @@index([organizationId, eventType, createdAt])
+  @@index([apiKeyId, createdAt])
+  @@map("webhook_delivery")
 }

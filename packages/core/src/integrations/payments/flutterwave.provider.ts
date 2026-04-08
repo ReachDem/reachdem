@@ -195,8 +195,8 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
 
     try {
       return timingSafeEqual(
-        Buffer.from(provided, "utf8"),
-        Buffer.from(expected, "utf8")
+        textEncoder.encode(provided),
+        textEncoder.encode(expected)
       );
     } catch {
       return false;
@@ -335,3 +335,4 @@ export class FlutterwavePaymentProvider implements PaymentProviderPort {
     };
   }
 }
+const textEncoder = new TextEncoder();

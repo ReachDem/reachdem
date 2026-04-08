@@ -5,6 +5,7 @@ import { PublicApiError } from "../errors/public-api.errors";
 
 const API_KEY_PATTERN =
   /^rd_(live|test)_([A-Za-z0-9]{8})_([A-Za-z0-9_-]{32,})$/;
+const textEncoder = new TextEncoder();
 
 function getHashSecret(): string {
   const secret = process.env.API_KEY_HASH_SECRET;
@@ -19,8 +20,8 @@ function getHashSecret(): string {
 }
 
 function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a, "utf8");
-  const right = Buffer.from(b, "utf8");
+  const left = textEncoder.encode(a);
+  const right = textEncoder.encode(b);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }

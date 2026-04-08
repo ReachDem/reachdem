@@ -30,6 +30,12 @@ export const creditPricingTierSchema = z.object({
 });
 export type CreditPricingTier = z.infer<typeof creditPricingTierSchema>;
 
+export const apiPricingTierSchema = z.object({
+  minimumQuantity: z.number().int().positive(),
+  unitAmountMinor: z.number().int().positive(),
+});
+export type ApiPricingTier = z.infer<typeof apiPricingTierSchema>;
+
 export const creditPricingSchema = z.object({
   currency: z.string(),
   minimumQuantity: z.number().int().positive(),

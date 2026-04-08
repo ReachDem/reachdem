@@ -3,8 +3,7 @@ import type { CampaignLaunchJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignService } from "./campaign.service";
 import { SegmentService } from "./segment.service";
-import { BillingCatalogService } from "./billing-catalog.service";
-import { PlanEntitlementsService } from "./plan-entitlements.service";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
 import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
   CampaignInsufficientCreditsError,
@@ -12,24 +11,11 @@ import {
   CampaignLaunchValidationError,
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
+import { MessageInsufficientCreditsError } from "../errors/messaging.errors";
 
 // URL regex for detecting URLs in content
 const URL_REGEX =
   /((?:https?:\/\/|www\.|[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,})(?:[^\s<>"']*))/g;
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
-  );
-}
-
-function startOfUtcMonth(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-function isSameInstant(left: Date | null, right: Date): boolean {
-  return left?.getTime() === right.getTime();
-}
 
 function isUnsubscribedFromChannel(
   hasUnsubscribed: unknown,
@@ -43,8 +29,6 @@ function isUnsubscribedFromChannel(
 }
 
 export class RequestCampaignLaunchUseCase {
-  private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
-
   static async execute(
     organizationId: string,
     campaignId: string,
@@ -64,67 +48,11 @@ export class RequestCampaignLaunchUseCase {
       );
     }
 
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: {
-        planCode: true,
-        creditBalance: true,
-        creditCurrency: true,
-        smsQuotaUsed: true,
-        smsQuotaPeriodStartedAt: true,
-        emailQuotaUsed: true,
-        emailQuotaPeriodStartedAt: true,
-        senderId: true,
-        workspaceVerificationStatus: true,
-      },
-    });
-
-    if (!organization) {
-      throw new CampaignNotFoundError("Organization not found");
-    }
-
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
       campaignId,
       campaign.channel
     );
-
-    const now = new Date();
-    const entitlements = PlanEntitlementsService.get(organization.planCode);
-    const smsPeriodStart = startOfUtcMonth(now);
-    const emailPeriodStart = startOfUtcDay(now);
-    const currentUsage =
-      campaign.channel === "sms"
-        ? isSameInstant(organization.smsQuotaPeriodStartedAt, smsPeriodStart)
-          ? organization.smsQuotaUsed
-          : 0
-        : isSameInstant(
-              organization.emailQuotaPeriodStartedAt,
-              emailPeriodStart
-            )
-          ? organization.emailQuotaUsed
-          : 0;
-    const includedLimit =
-      campaign.channel === "sms"
-        ? entitlements.smsIncludedLimit
-        : entitlements.emailIncludedLimit;
-    const includedRemaining =
-      includedLimit == null ? 0 : Math.max(0, includedLimit - currentUsage);
-    const billableUnits = Math.max(0, eligibleTargetCount - includedRemaining);
-
-    const chargeAmountMinor = BillingCatalogService.calculateMessageChargeMinor(
-      {
-        channel: campaign.channel,
-        units: billableUnits,
-        currency: organization.creditCurrency,
-      }
-    );
-
-    if (chargeAmountMinor > organization.creditBalance) {
-      throw new CampaignInsufficientCreditsError(
-        `Insufficient credit balance.`
-      );
-    }
 
     // Pre-process links before launching
     await CampaignLinkTrackingService.preprocessCampaignLinks(
@@ -132,54 +60,52 @@ export class RequestCampaignLaunchUseCase {
       campaign as any
     );
 
-    await prisma.$transaction(async (tx) => {
-      const updateContent =
-        campaign.channel === "sms"
-          ? {
-              ...(campaign.content as any),
-              from:
-                organization.workspaceVerificationStatus === "verified" &&
-                organization.senderId
-                  ? organization.senderId
-                  : this.DEFAULT_SMS_SENDER_ID,
-              senderId:
-                organization.workspaceVerificationStatus === "verified" &&
-                organization.senderId
-                  ? organization.senderId
-                  : this.DEFAULT_SMS_SENDER_ID,
+    await prisma.$transaction(
+      async (tx) => {
+        let reservation: { senderId: string | null };
+        try {
+          reservation = await MessagingEntitlementsService.reserveMessageSend(
+            tx,
+            organizationId,
+            campaign.channel,
+            eligibleTargetCount,
+            {
+              apiKeyId: campaign.apiKeyId ?? null,
+              campaignId,
+              source: campaign.apiKeyId ? "publicApi" : "dashboard",
             }
-          : undefined;
+          );
+        } catch (error) {
+          if (error instanceof MessageInsufficientCreditsError) {
+            throw new CampaignInsufficientCreditsError(
+              "Insufficient credit balance."
+            );
+          }
+          throw error;
+        }
 
-      await tx.organization.update({
-        where: { id: organizationId },
-        data: {
-          ...(chargeAmountMinor > 0
+        const updateContent =
+          campaign.channel === "sms"
             ? {
-                creditBalance: {
-                  decrement: chargeAmountMinor,
-                },
+                ...(campaign.content as any),
+                from: reservation.senderId,
+                senderId: reservation.senderId,
               }
-            : {}),
-          ...(campaign.channel === "sms"
-            ? {
-                smsQuotaPeriodStartedAt: smsPeriodStart,
-                smsQuotaUsed: currentUsage + eligibleTargetCount,
-              }
-            : {
-                emailQuotaPeriodStartedAt: emailPeriodStart,
-                emailQuotaUsed: currentUsage + eligibleTargetCount,
-              }),
-        },
-      });
+            : undefined;
 
-      await tx.campaign.update({
-        where: { id: campaignId },
-        data: {
-          status: "running",
-          ...(updateContent ? { content: updateContent } : {}),
-        },
-      });
-    });
+        await tx.campaign.update({
+          where: { id: campaignId },
+          data: {
+            status: "running",
+            ...(updateContent ? { content: updateContent } : {}),
+          },
+        });
+      },
+      {
+        maxWait: 10_000,
+        timeout: 20_000,
+      }
+    );
 
     await publishCampaignLaunchJob({
       campaign_id: campaignId,

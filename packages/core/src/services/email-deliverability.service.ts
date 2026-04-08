@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@reachdem/database";
 import { RedisCacheClient } from "../integrations/redis-cache.client";
+import { MessageEventService } from "./message-event.service";
 
 type AlibabaEventType =
   | "dm:Deliver:Succeed"
@@ -240,6 +241,18 @@ export class EmailDeliverabilityService {
                 status: "failed",
               },
             });
+
+            await MessageEventService.recordWithWebhookDelivery(tx, {
+              organizationId: matchingAttempt.message.organizationId,
+              messageId: matchingAttempt.message.id,
+              type: "message.failed",
+              status: "failed",
+              payload: {
+                providerEventType: rawType,
+                eventType: mappedType,
+                providerMessageId,
+              },
+            });
           }
 
           if (mappedType === "delivered") {
@@ -259,6 +272,18 @@ export class EmailDeliverabilityService {
               },
               data: {
                 status: "sent",
+              },
+            });
+
+            await MessageEventService.recordWithWebhookDelivery(tx, {
+              organizationId: matchingAttempt.message.organizationId,
+              messageId: matchingAttempt.message.id,
+              type: "message.delivered",
+              status: "sent",
+              payload: {
+                providerEventType: rawType,
+                eventType: mappedType,
+                providerMessageId,
               },
             });
           }

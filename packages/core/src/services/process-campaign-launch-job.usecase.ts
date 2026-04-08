@@ -134,7 +134,13 @@ export class ProcessCampaignLaunchJobUseCase {
                   campaignId: job.campaign_id,
                   scheduledAt,
                 },
-                publishSmsJob
+                publishSmsJob,
+                {
+                  apiKeyId: refreshedCampaign.apiKeyId ?? null,
+                  source: refreshedCampaign.apiKeyId
+                    ? "publicApi"
+                    : "dashboard",
+                }
               )
             : EnqueueEmailUseCase.execute(
                 job.organization_id,
@@ -151,7 +157,13 @@ export class ProcessCampaignLaunchJobUseCase {
                   campaignId: job.campaign_id,
                   scheduledAt,
                 },
-                publishEmailJob
+                publishEmailJob,
+                {
+                  apiKeyId: refreshedCampaign.apiKeyId ?? null,
+                  source: refreshedCampaign.apiKeyId
+                    ? "publicApi"
+                    : "dashboard",
+                }
               ));
 
           await prisma.campaignTarget.update({

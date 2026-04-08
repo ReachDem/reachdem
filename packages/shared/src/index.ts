@@ -9,6 +9,7 @@ export * from "./validations/links";
 export * from "./validations/billing-catalog";
 export * from "./validations/payments";
 export * from "./validations/workspace-billing";
+export * from "./validations/webhook-subscriptions";
 export * from "./utils/contact-channel-validation";
 
 // Re-export type definitions for the frontend and backend

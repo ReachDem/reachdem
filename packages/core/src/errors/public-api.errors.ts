@@ -1,6 +1,7 @@
 export type PublicApiErrorCode =
   | "unauthorized"
   | "forbidden"
+  | "not_found"
   | "invalid_api_key"
   | "api_key_revoked"
   | "insufficient_scope"

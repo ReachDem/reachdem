@@ -215,11 +215,13 @@ export class CampaignService {
   static async createCampaign(
     organizationId: string,
     data: CreateCampaignDto,
-    userId?: string
+    userId?: string,
+    options: { apiKeyId?: string | null } = {}
   ): Promise<CampaignResponse> {
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
+        apiKeyId: options.apiKeyId ?? null,
         name: data.name,
         description: data.description || null,
         channel: data.channel as any,

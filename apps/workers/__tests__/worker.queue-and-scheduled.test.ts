@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHmac } from "crypto";
 import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
 import type {
   Env,
@@ -11,6 +12,7 @@ const mockedFns = vi.hoisted(() => ({
   processCampaignLaunchExecuteMock: vi.fn(),
   processSmsExecuteMock: vi.fn(),
   processEmailExecuteMock: vi.fn(),
+  processWebhookDeliveriesExecuteMock: vi.fn(),
   sendMailMock: vi.fn(),
 }));
 
@@ -23,6 +25,23 @@ vi.mock("@reachdem/core", () => ({
   },
   ProcessEmailMessageJobUseCase: {
     execute: mockedFns.processEmailExecuteMock,
+  },
+  ProcessWebhookDeliveriesUseCase: {
+    execute: mockedFns.processWebhookDeliveriesExecuteMock,
+  },
+  CampaignService: {
+    claimScheduledCampaigns: vi.fn().mockResolvedValue({
+      updated: 0,
+      items: [],
+    }),
+    revertScheduledCampaignClaim: vi.fn().mockResolvedValue(undefined),
+  },
+  MessageService: {
+    claimScheduledMessages: vi.fn().mockResolvedValue({
+      updated: 0,
+      items: [],
+    }),
+    revertScheduledMessageClaim: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -55,6 +74,11 @@ function createEnv(): Env {
     ENVIRONMENT: "test",
     API_BASE_URL: "http://localhost:3000",
     INTERNAL_API_SECRET: "secret",
+    AVLYTEXT_API_KEY: "avlytext-test-key",
+    MBOA_SMS_USERID: "mboa-user",
+    MBOA_SMS_API_PASSWORD: "mboa-password",
+    ALIBABA_ACCESS_KEY_ID: "alibaba-key-id",
+    ALIBABA_ACCESS_KEY_SECRET: "alibaba-secret",
     SMTP_HOST: "smtp.example.com",
     SMTP_PORT: "465",
     SMTP_USER: "user@example.com",
@@ -79,6 +103,11 @@ function createEnvelope<T>(body: T): QueueMessageEnvelope<T> & {
 describe("Worker queue and scheduled flows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedFns.processWebhookDeliveriesExecuteMock.mockResolvedValue({
+      claimed: 0,
+      delivered: 0,
+      failed: 0,
+    });
     mockedFns.sendMailMock.mockResolvedValue({
       messageId: "smtp-message-id",
       accepted: ["dest@example.com"],
@@ -267,46 +296,59 @@ describe("Worker queue and scheduled flows", () => {
       scheduledTime: Date.parse("2026-03-14T10:00:00.000Z"),
     };
 
-    const fetchMock = vi.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          updated: 2,
-          items: [
-            {
-              id: "msg_scheduled_sms",
-              organizationId: "org_1",
-              channel: "sms",
-            },
-            {
-              id: "msg_scheduled_email",
-              organizationId: "org_1",
-              channel: "email",
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      )
+    await handleScheduled(controller, env);
+    expect(mockedFns.processWebhookDeliveriesExecuteMock).toHaveBeenCalledTimes(
+      1
     );
+  });
 
+  it("scheduled handler delivers due webhooks over HTTP", async () => {
+    const env = createEnv();
+    const controller: ScheduledController = {
+      cron: "* * * * *",
+      scheduledTime: Date.parse("2026-03-14T10:00:00.000Z"),
+    };
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
+
+    mockedFns.processWebhookDeliveriesExecuteMock.mockImplementationOnce(
+      async ({ send }) =>
+        send({
+          id: "wd_1",
+          eventType: "message.sent",
+          targetUrl: "https://example.test/webhooks/reachdem",
+          payload: { messageId: "msg_1" },
+          apiKeyId: "api_key_1",
+          signingSecret: "webhook-signing-secret",
+          attemptCount: 1,
+          organizationId: "org_1",
+        }).then(() => ({
+          claimed: 1,
+          delivered: 1,
+          failed: 0,
+        }))
+    );
 
     await handleScheduled(controller, env);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(env.SMS_QUEUE.send).toHaveBeenCalledWith({
-      message_id: "msg_scheduled_sms",
-      organization_id: "org_1",
-      channel: "sms",
-      delivery_cycle: 1,
-    });
-    expect(env.EMAIL_QUEUE.send).toHaveBeenCalledWith({
-      message_id: "msg_scheduled_email",
-      organization_id: "org_1",
-      channel: "email",
-      delivery_cycle: 1,
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/webhooks/reachdem",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "content-type": "application/json",
+          "x-reachdem-event-type": "message.sent",
+          "x-reachdem-organization-id": "org_1",
+          "x-reachdem-api-key-id": "api_key_1",
+          "x-reachdem-attempt": "1",
+          "x-reachdem-signature": createHmac("sha256", "webhook-signing-secret")
+            .update(JSON.stringify({ messageId: "msg_1" }))
+            .digest("hex"),
+        }),
+      })
+    );
   });
 });

@@ -979,14 +979,891 @@ paths:
         "404":
           description: Message not found
 
+  # ─── Public API ───────────────────────────────────────────────────────────
+
+  /public/v1/messages/sms:
+    post:
+      summary: Public API - Send SMS
+      description: Creates a workspace-scoped SMS message authenticated with an API key. Billing, idempotency, and webhook delivery are tied to the originating API key.
+      tags: [Public API, Public Messages]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicSendSmsRequest"
+      responses:
+        "201":
+          description: SMS accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "400":
+          description: Validation or idempotency error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `messages:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/messages/email:
+    post:
+      summary: Public API - Send Email
+      description: Creates a workspace-scoped email message authenticated with an API key. Billing, idempotency, and webhook delivery are tied to the originating API key.
+      tags: [Public API, Public Messages]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicSendEmailRequest"
+      responses:
+        "201":
+          description: Email accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "400":
+          description: Validation or idempotency error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `messages:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/messages:
+    get:
+      summary: Public API - List Messages
+      description: Returns a paginated list of messages visible to the API key organization.
+      tags: [Public API, Public Messages]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [scheduled, queued, sending, sent, failed]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated message list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageSummary"
+                  nextCursor:
+                    type: string
+                    nullable: true
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `messages:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/messages/{id}:
+    get:
+      summary: Public API - Get Message
+      description: Returns a single message with all provider attempts.
+      tags: [Public API, Public Messages]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageDetail"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `messages:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/campaigns:
+    get:
+      summary: Public API - List Campaigns
+      description: Returns a paginated list of campaigns visible to the API key organization.
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated campaign list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignListResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+    post:
+      summary: Public API - Create Campaign
+      description: Creates a draft campaign attached to the API key. Launch-time billing and message webhooks remain tied to that same API key.
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignDto"
+      responses:
+        "201":
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "400":
+          description: Validation or idempotency error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/campaigns/{id}:
+    get:
+      summary: Public API - Get Campaign
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+    patch:
+      summary: Public API - Update Campaign
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCampaignDto"
+      responses:
+        "200":
+          description: Campaign updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignResponse"
+        "400":
+          description: Validation error or campaign not editable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/campaigns/{id}/audience:
+    get:
+      summary: Public API - Get Campaign Audience
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audience list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudienceResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+    post:
+      summary: Public API - Set Campaign Audience
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCampaignAudienceDto"
+      responses:
+        "201":
+          description: Audience updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudienceResponse"
+        "400":
+          description: Validation error or campaign not editable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/campaigns/{id}/launch:
+    post:
+      summary: Public API - Launch Campaign
+      description: Reserves billing against the API key-backed organization wallet, marks the campaign as running, and enqueues asynchronous campaign processing.
+      tags: [Public API, Public Campaigns]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        "200":
+          description: Campaign launch queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: Campaign not launchable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `campaigns:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/webhook-subscriptions:
+    get:
+      summary: Public API - List Webhook Subscriptions
+      tags: [Public API, Public Webhooks]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      responses:
+        "200":
+          description: Webhook subscriptions for the authenticated API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `webhooks:read` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+    post:
+      summary: Public API - Create Webhook Subscription
+      description: Creates a webhook subscription for the authenticated API key and returns the signing secret once.
+      tags: [Public API, Public Webhooks]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWebhookSubscriptionRequest"
+      responses:
+        "201":
+          description: Webhook subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionSecretResponse"
+        "400":
+          description: Validation error or duplicate target URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `webhooks:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
+  /public/v1/webhook-subscriptions/{id}:
+    patch:
+      summary: Public API - Update Webhook Subscription
+      description: Updates a webhook subscription. If `rotateSigningSecret` is true, a new secret is returned once in the response.
+      tags: [Public API, Public Webhooks]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWebhookSubscriptionRequest"
+      responses:
+        "200":
+          description: Webhook subscription updated
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/WebhookSubscriptionResponse"
+                  - $ref: "#/components/schemas/WebhookSubscriptionSecretResponse"
+        "400":
+          description: Validation error or duplicate target URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `webhooks:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Webhook subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+    delete:
+      summary: Public API - Delete Webhook Subscription
+      tags: [Public API, Public Webhooks]
+      servers:
+        - url: http://localhost:3000/api
+          description: Local Public API Server
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Webhook subscription deleted
+        "401":
+          description: Missing, invalid, or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "403":
+          description: Missing `webhooks:write` scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+        "404":
+          description: Webhook subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicApiErrorResponse"
+
 components:
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
       name: better-auth.session_token
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
   schemas:
+    PublicApiErrorResponse:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              enum:
+                [
+                  unauthorized,
+                  forbidden,
+                  not_found,
+                  invalid_api_key,
+                  api_key_revoked,
+                  insufficient_scope,
+                  missing_idempotency_key,
+                  idempotency_conflict,
+                  idempotency_processing,
+                  validation_error,
+                  internal_error,
+                ]
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        request_id:
+          type: string
+
     # ─── SMS Schemas ──────────────────────────────────────────────────────────
+    PublicSendSmsRequest:
+      type: object
+      required: [to, text, from]
+      properties:
+        to:
+          type: string
+          description: Destination phone in E.164 format
+          example: "+2376XXXXXXXX"
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+        from:
+          type: string
+          description: Sender ID requested by the client. The effective sender may be normalized by ReachDem business rules.
+          example: "ReachDem"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PublicSendEmailRequest:
+      type: object
+      required: [to, subject, html]
+      properties:
+        to:
+          type: string
+          format: email
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+        from:
+          type: string
+          maxLength: 200
+          nullable: true
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    WebhookEventType:
+      type: string
+      enum:
+        [message.accepted, message.sent, message.delivered, message.failed, "*"]
+
+    CreateWebhookSubscriptionRequest:
+      type: object
+      required: [targetUrl]
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+        eventTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+          default: ["*"]
+        active:
+          type: boolean
+          default: true
+
+    UpdateWebhookSubscriptionRequest:
+      type: object
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+        eventTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        active:
+          type: boolean
+        rotateSigningSecret:
+          type: boolean
+
+    WebhookSubscriptionResponse:
+      type: object
+      required:
+        [id, organizationId, apiKeyId, targetUrl, eventTypes, active, hasSigningSecret, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        apiKeyId:
+          type: string
+          format: uuid
+        targetUrl:
+          type: string
+          format: uri
+        eventTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        active:
+          type: boolean
+        hasSigningSecret:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WebhookSubscriptionSecretResponse:
+      allOf:
+        - $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        - type: object
+          required: [signingSecret]
+          properties:
+            signingSecret:
+              type: string
+              description: Returned only on creation or secret rotation. Store it securely.
+
     SendSmsRequest:
       type: object
       required: [to, text, from, idempotency_key]
