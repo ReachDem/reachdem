@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useDeferredValue } from "react";
 import type { FocusPosition } from "@tiptap/core";
 import { Code2, FileCode2, Loader2, Send, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,17 @@ import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
 import { FontSelector } from "./font-selector";
+import { EmailSpamScoreCard } from "./email-spam-score-card";
 import { toast } from "sonner";
+import {
+  fetchEmailSpamAnalysis,
+  getEmailSpamWarningReasons,
+  shouldWarnBeforeSendingEmail,
+} from "@/lib/email-send-guard";
+import {
+  analyzeEmailSpam,
+  type EmailSpamAnalysis,
+} from "@/lib/email-spam-score";
 
 // Import editor and default commands
 import {
@@ -53,6 +63,16 @@ export function EmailComposer({
   const [editor, setEditor] = useState<MailyEditor | null>(null);
   const [isEditorLoading, setIsEditorLoading] = useState(true);
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [enhancedSpamAnalysis, setEnhancedSpamAnalysis] =
+    useState<EmailSpamAnalysis | null>(null);
+  const [isAiToneLoading, setIsAiToneLoading] = useState(false);
+  const deferredSubject = useDeferredValue(value.subject);
+  const deferredBody = useDeferredValue(value.body);
+  const heuristicSpamAnalysis = analyzeEmailSpam({
+    subject: deferredSubject,
+    htmlContent: deferredBody,
+  });
+  const spamAnalysis = enhancedSpamAnalysis ?? heuristicSpamAnalysis;
 
   // Apply font to editor when font changes
   const applyFontToEditor = (fontFamily: string) => {
@@ -105,6 +125,51 @@ export function EmailComposer({
     }
   }, [value.fontFamily]);
 
+  useEffect(() => {
+    setEnhancedSpamAnalysis(null);
+
+    const trimmedSubject = deferredSubject.trim();
+    const plainTextBody = deferredBody
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!trimmedSubject && plainTextBody.length < 40) {
+      setIsAiToneLoading(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setIsAiToneLoading(true);
+
+      try {
+        const analysis = await fetchEmailSpamAnalysis({
+          subject: deferredSubject,
+          htmlContent: deferredBody,
+        });
+
+        if (!abortController.signal.aborted) {
+          setEnhancedSpamAnalysis(analysis);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Failed to enrich spam analysis:", error);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsAiToneLoading(false);
+        }
+      }
+    }, 900);
+
+    return () => {
+      abortController.abort();
+      window.clearTimeout(timeoutId);
+      setIsAiToneLoading(false);
+    };
+  }, [deferredBody, deferredSubject]);
+
   const handleSubjectChange = (subject: string) => {
     onChange({ ...value, subject });
   };
@@ -126,6 +191,7 @@ export function EmailComposer({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              subject: value.subject,
               htmlContent: value.body, // Pass HTML directly
               fontFamily: value.fontFamily || "Inter",
               fontWeights: value.fontWeights || [400, 600, 700],
@@ -162,12 +228,7 @@ export function EmailComposer({
     });
   };
 
-  const handleSendTest = async () => {
-    if (!value.subject || !value.body) {
-      toast.error("Veuillez remplir le sujet et le contenu de l'email.");
-      return;
-    }
-
+  const sendTestEmail = async () => {
     setIsSendingTest(true);
 
     const payload = {
@@ -206,6 +267,40 @@ export function EmailComposer({
     } finally {
       setIsSendingTest(false);
     }
+  };
+
+  const handleSendTest = async (skipSpamWarning = false) => {
+    if (!value.subject || !value.body) {
+      toast.error("Veuillez remplir le sujet et le contenu de l'email.");
+      return;
+    }
+
+    if (!skipSpamWarning) {
+      const analysis =
+        enhancedSpamAnalysis ??
+        (await fetchEmailSpamAnalysis({
+          subject: value.subject,
+          htmlContent: value.body,
+        }));
+
+      if (shouldWarnBeforeSendingEmail(analysis)) {
+        const reasons = getEmailSpamWarningReasons(analysis);
+        toast.warning("Ce message risque d'être classé comme spam.", {
+          description: reasons.join(" "),
+          duration: 20000,
+          action: {
+            label: "Envoyer quand même",
+            onClick: () => {
+              void handleSendTest(true);
+            },
+          },
+          cancel: { label: "Revoir", onClick: () => {} },
+        });
+        return;
+      }
+    }
+
+    await sendTestEmail();
   };
 
   return (
@@ -287,7 +382,7 @@ export function EmailComposer({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleSendTest}
+            onClick={() => handleSendTest()}
             disabled={
               disabled || !value.subject || !value.body || isSendingTest
             }
@@ -315,6 +410,11 @@ export function EmailComposer({
           />
         </div>
       </div>
+
+      <EmailSpamScoreCard
+        analysis={spamAnalysis}
+        isAiToneLoading={isAiToneLoading}
+      />
 
       {/* Editor Content */}
       <div className="mt-2">

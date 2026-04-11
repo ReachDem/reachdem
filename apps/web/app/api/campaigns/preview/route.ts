@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { analyzeEmailSpamWithAI } from "@/lib/email-spam-score.server";
 import { wrapContentInEmailStructure } from "@/lib/render-email";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { content, previewText, fontFamily, fontWeights, htmlContent } = body;
+    const {
+      content,
+      previewText,
+      fontFamily,
+      fontWeights,
+      htmlContent,
+      subject,
+    } = body;
 
     // If HTML content is provided, wrap it in email structure
     if (htmlContent) {
@@ -13,7 +21,11 @@ export async function POST(request: NextRequest) {
         fontFamily || "Inter",
         fontWeights || [400, 600, 700]
       );
-      return NextResponse.json({ html });
+      const spamAnalysis = await analyzeEmailSpamWithAI({
+        subject,
+        htmlContent,
+      });
+      return NextResponse.json({ html, spamAnalysis });
     }
 
     // If JSON content is provided, we can't render it without the full Maily setup

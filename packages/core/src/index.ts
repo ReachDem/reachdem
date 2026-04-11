@@ -64,3 +64,5 @@ export * from "./adapters/payments/stripe-payment.adapter";
 export * from "./integrations/payments/flutterwave.provider";
 export * from "./integrations/payments/flutterwave-v4.provider";
 export * from "./integrations/payments/stripe.provider";
+export * from "./services/contact-unsubscribe.service";
+export * from "./services/unsubscribe-link.service";

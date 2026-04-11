@@ -215,7 +215,8 @@ export class CampaignService {
   static async createCampaign(
     organizationId: string,
     data: CreateCampaignDto,
-    userId?: string
+    userId?: string,
+    options?: { apiKeyId?: string }
   ): Promise<CampaignResponse> {
     const campaign = await prisma.campaign.create({
       data: {
@@ -227,6 +228,7 @@ export class CampaignService {
         content: data.content as any,
         scheduledAt: data.scheduledAt || null,
         createdBy: userId || null,
+        apiKeyId: options?.apiKeyId || null,
       } as any,
     });
 

@@ -19,7 +19,11 @@ export class EnqueueEmailUseCase {
   static async execute(
     organizationId: string,
     input: SendEmailInput,
-    publish: (job: EmailExecutionJob) => Promise<void>
+    publish: (job: EmailExecutionJob) => Promise<void>,
+    options: {
+      apiKeyId?: string | null;
+      source?: "dashboard" | "publicApi" | "worker" | "system";
+    } = {}
   ): Promise<SendSmsResult> {
     const existing = await prisma.message.findUnique({
       where: {

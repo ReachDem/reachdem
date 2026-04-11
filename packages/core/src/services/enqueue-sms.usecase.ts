@@ -19,7 +19,11 @@ export class EnqueueSmsUseCase {
   static async execute(
     organizationId: string,
     input: SendSmsInput,
-    publish: (job: SmsExecutionJob) => Promise<void>
+    publish: (job: SmsExecutionJob) => Promise<void>,
+    options: {
+      apiKeyId?: string | null;
+      source?: "dashboard" | "publicApi" | "worker" | "system";
+    } = {}
   ): Promise<SendSmsResult> {
     const existing = await prisma.message.findUnique({
       where: {

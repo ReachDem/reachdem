@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import {
+  fetchEmailSpamAnalysis,
+  getEmailSpamWarningReasons,
+  shouldWarnBeforeSendingEmail,
+} from "@/lib/email-send-guard";
 import { cn } from "@/lib/utils";
 
 interface EditCampaignPageProps {
@@ -356,7 +361,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
     }
   };
 
-  const handleSchedule = async () => {
+  const handleSchedule = async (skipSpamWarning = false) => {
     console.log("[Edit Campaign] Starting schedule...");
 
     if (!scheduledDate) {
@@ -394,29 +399,51 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       return;
     }
 
+    // Combine date and time
+    const scheduledDateTime = buildScheduledDateTime(
+      scheduledDate,
+      scheduledTime
+    );
+
+    // Prepare content
+    const content =
+      type === "email"
+        ? buildEmailCampaignContent(
+            {
+              ...emailContent,
+            },
+            campaignTitle
+          )
+        : buildSmsCampaignContent({
+            ...smsContent,
+            text: smsContent.text.trim(),
+          });
+
+    if (!skipSpamWarning && type === "email") {
+      const analysis = await fetchEmailSpamAnalysis({
+        subject: (content as any).subject,
+        htmlContent: (content as any).html,
+      });
+
+      if (shouldWarnBeforeSendingEmail(analysis)) {
+        toast.warning("Ce message risque d'etre classe comme spam.", {
+          description: getEmailSpamWarningReasons(analysis).join(" "),
+          duration: 20000,
+          action: {
+            label: "Programmer quand meme",
+            onClick: () => {
+              void handleSchedule(true);
+            },
+          },
+          cancel: { label: "Revoir", onClick: () => {} },
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
-      // Combine date and time
-      const scheduledDateTime = buildScheduledDateTime(
-        scheduledDate,
-        scheduledTime
-      );
-
-      // Prepare content
-      const content =
-        type === "email"
-          ? buildEmailCampaignContent(
-              {
-                ...emailContent,
-              },
-              campaignTitle
-            )
-          : buildSmsCampaignContent({
-              ...smsContent,
-              text: smsContent.text.trim(),
-            });
-
       // If failed campaign, create new one
       if (isFailedCampaign) {
         const campaignPayload = {
@@ -515,7 +542,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
     }
   };
 
-  const handleLaunch = async () => {
+  const handleLaunch = async (skipSpamWarning = false) => {
     console.log("[Edit Campaign] Starting launch...");
 
     // Validate content
@@ -541,23 +568,45 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       return;
     }
 
+    // Prepare content
+    const content =
+      type === "email"
+        ? buildEmailCampaignContent(
+            {
+              ...emailContent,
+            },
+            campaignTitle
+          )
+        : buildSmsCampaignContent({
+            ...smsContent,
+            text: smsContent.text.trim(),
+          });
+
+    if (!skipSpamWarning && type === "email") {
+      const analysis = await fetchEmailSpamAnalysis({
+        subject: (content as any).subject,
+        htmlContent: (content as any).html,
+      });
+
+      if (shouldWarnBeforeSendingEmail(analysis)) {
+        toast.warning("Ce message risque d'etre classe comme spam.", {
+          description: getEmailSpamWarningReasons(analysis).join(" "),
+          duration: 20000,
+          action: {
+            label: "Lancer quand meme",
+            onClick: () => {
+              void handleLaunch(true);
+            },
+          },
+          cancel: { label: "Revoir", onClick: () => {} },
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
-      // Prepare content
-      const content =
-        type === "email"
-          ? buildEmailCampaignContent(
-              {
-                ...emailContent,
-              },
-              campaignTitle
-            )
-          : buildSmsCampaignContent({
-              ...smsContent,
-              text: smsContent.text.trim(),
-            });
-
       let campaignIdToLaunch = campaignId;
 
       // If failed campaign, create new one
@@ -799,7 +848,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
                     <Button
                       className="w-full"
-                      onClick={handleSchedule}
+                      onClick={() => handleSchedule()}
                       disabled={isLoading}
                     >
                       {isLoading ? "SCHEDULING..." : "Schedule Campaign"}
@@ -810,7 +859,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
               <Button
                 className="h-11 rounded-none px-6"
-                onClick={handleLaunch}
+                onClick={() => handleLaunch()}
                 disabled={isLoading}
               >
                 {isLoading ? "LAUNCHING..." : "Launch"}

@@ -92,11 +92,11 @@ export const auth = betterAuth({
     organization({
       ac,
       roles: { owner, admin, member },
-      allowUserToCreateOrganization: async (user) => {
+      allowUserToCreateOrganization: async (user: any) => {
         return user.emailVerified === true;
       },
       creatorRole: "owner",
-      async sendInvitationEmail(data) {
+      async sendInvitationEmail(data: any) {
         // TODO: Wire to your email provider (Resend / Alibaba DM)
         // For now, log the invitation link to console
         const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invitation/${data.id}`;

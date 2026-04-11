@@ -63,3 +63,7 @@ export class ContactFieldError extends Error {
     this.name = "ContactFieldError";
   }
 }
+export interface ContactUnsubscribePreferences {
+  SMS: boolean;
+  Email: boolean;
+}

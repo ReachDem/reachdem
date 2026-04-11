@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import {
+  fetchEmailSpamAnalysis,
+  getEmailSpamWarningReasons,
+  shouldWarnBeforeSendingEmail,
+} from "@/lib/email-send-guard";
 import { cn } from "@/lib/utils";
 
 interface NewCampaignTypePageProps {
@@ -290,7 +295,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     }
   };
 
-  const handleSchedule = async () => {
+  const handleSchedule = async (skipSpamWarning = false) => {
     console.log("[Campaign] Starting schedule...");
     console.log("[Campaign] Scheduled Date:", scheduledDate);
     console.log("[Campaign] Scheduled Time:", scheduledTime);
@@ -340,33 +345,55 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       return;
     }
 
+    // Combine date and time
+    const scheduledDateTime = buildScheduledDateTime(
+      scheduledDate,
+      scheduledTime
+    );
+
+    console.log(
+      "[Campaign] Scheduled DateTime:",
+      scheduledDateTime.toISOString()
+    );
+
+    const content =
+      type === "email"
+        ? buildEmailCampaignContent(
+            {
+              ...emailContent,
+            },
+            campaignTitle
+          )
+        : buildSmsCampaignContent({
+            ...smsContent,
+            text: smsContent.text.trim(),
+          });
+
+    if (!skipSpamWarning && type === "email") {
+      const analysis = await fetchEmailSpamAnalysis({
+        subject: (content as any).subject,
+        htmlContent: (content as any).html,
+      });
+
+      if (shouldWarnBeforeSendingEmail(analysis)) {
+        toast.warning("Ce message risque d'être classé comme spam.", {
+          description: getEmailSpamWarningReasons(analysis).join(" "),
+          duration: 20000,
+          action: {
+            label: "Programmer quand même",
+            onClick: () => {
+              void handleSchedule(true);
+            },
+          },
+          cancel: { label: "Revoir", onClick: () => {} },
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
-      // Combine date and time
-      const scheduledDateTime = buildScheduledDateTime(
-        scheduledDate,
-        scheduledTime
-      );
-
-      console.log(
-        "[Campaign] Scheduled DateTime:",
-        scheduledDateTime.toISOString()
-      );
-
-      const content =
-        type === "email"
-          ? buildEmailCampaignContent(
-              {
-                ...emailContent,
-              },
-              campaignTitle
-            )
-          : buildSmsCampaignContent({
-              ...smsContent,
-              text: smsContent.text.trim(),
-            });
-
       const campaignPayload = {
         name: campaignTitle.trim(),
         description: optionalTrimmedString(campaignDescription),
@@ -440,7 +467,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     }
   };
 
-  const handleLaunch = async () => {
+  const handleLaunch = async (skipSpamWarning = false) => {
     console.log("[Campaign] Starting launch...");
     console.log("[Campaign] Type:", type);
     console.log("[Campaign] Title:", campaignTitle);
@@ -484,22 +511,45 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       return;
     }
 
+    const content =
+      type === "email"
+        ? buildEmailCampaignContent(
+            {
+              ...emailContent,
+            },
+            campaignTitle
+          )
+        : buildSmsCampaignContent({
+            ...smsContent,
+            text: smsContent.text.trim(),
+          });
+
+    if (!skipSpamWarning && type === "email") {
+      const analysis = await fetchEmailSpamAnalysis({
+        subject: (content as any).subject,
+        htmlContent: (content as any).html,
+      });
+
+      if (shouldWarnBeforeSendingEmail(analysis)) {
+        toast.warning("Ce message risque d'être classé comme spam.", {
+          description: getEmailSpamWarningReasons(analysis).join(" "),
+          duration: 20000,
+          action: {
+            label: "Lancer quand même",
+            onClick: () => {
+              void handleLaunch(true);
+            },
+          },
+          cancel: { label: "Revoir", onClick: () => {} },
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
       // Step 1: Create campaign
-      const content =
-        type === "email"
-          ? buildEmailCampaignContent(
-              {
-                ...emailContent,
-              },
-              campaignTitle
-            )
-          : buildSmsCampaignContent({
-              ...smsContent,
-              text: smsContent.text.trim(),
-            });
 
       const campaignPayload = {
         name: campaignTitle.trim(),
@@ -746,7 +796,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
                     <Button
                       className="w-full"
-                      onClick={handleSchedule}
+                      onClick={() => handleSchedule()}
                       disabled={isLoading}
                     >
                       {isLoading ? "SCHEDULING..." : "Schedule Campaign"}
@@ -757,7 +807,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
               <Button
                 className="h-11 rounded-none px-6"
-                onClick={handleLaunch}
+                onClick={() => handleLaunch()}
                 disabled={isLoading}
               >
                 {isLoading ? "LAUNCHING..." : "Launch"}

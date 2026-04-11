@@ -268,6 +268,7 @@ model Contact {
   work                String?
   enterprise          String?
   customFields        Json? // Map of key to value
+    unsubscribe         Json? // Map of channel to unsubscription status
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime? // Soft delete
