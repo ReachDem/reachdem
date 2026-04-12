@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createContactSchema } from "@reachdem/shared";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { ContactService } from "@reachdem/core";
 
-export const GET = withWorkspace(async ({ req, organizationId }) => {
+export const GET = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q");
@@ -29,7 +29,7 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
   }
 });
 
-export const POST = withWorkspace(async ({ req, organizationId }) => {
+export const POST = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const body = await req.json();
     const validatedData = createContactSchema.parse(body);

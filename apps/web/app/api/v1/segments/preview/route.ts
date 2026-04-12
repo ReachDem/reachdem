@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { SegmentService } from "@reachdem/core";
 import { SegmentNodeSchema } from "@reachdem/shared";
 
 // Evaluate a segment definition without saving it (Dry-Run Preview)
-export const POST = withWorkspace(async ({ req, organizationId }) => {
+export const POST = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const body = await req.json();
 

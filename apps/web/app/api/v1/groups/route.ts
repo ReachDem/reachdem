@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { groupSchema } from "@reachdem/shared";
 import { z } from "zod";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { GroupService } from "@reachdem/core";
 
-export const GET = withWorkspace(async ({ req, organizationId }) => {
+export const GET = withPublicWorkspace(async ({ req, organizationId }) => {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
   const cursor = searchParams.get("cursor");
@@ -24,7 +24,7 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
   }
 });
 
-export const POST = withWorkspace(async ({ req, organizationId }) => {
+export const POST = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const body = await req.json();
     const validatedData = groupSchema.parse(body);

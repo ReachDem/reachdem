@@ -56,6 +56,7 @@ export class EnqueueEmailUseCase {
       return tx.message.create({
         data: {
           organizationId,
+          apiKeyId: options.apiKeyId ?? null,
           campaignId: input.campaignId ?? null,
           channel: "email",
           toEmail: input.to,
