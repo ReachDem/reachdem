@@ -819,6 +819,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: API Key
+      description: |
+        Provide the full workspace API key as a Bearer token.
+        Example: `Authorization: Bearer rdm_abc123def4_xxxxxxxxxxxxxxxxxxxxxxxx`
 
   parameters:
     IdempotencyKey:
@@ -1000,6 +1003,15 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+        type: transactional
+        channel: sms
+        status: queued
+        correlationId: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+        scheduledAt: null
+        createdAt: "2026-04-13T08:42:15.000Z"
+        updatedAt: "2026-04-13T08:42:15.000Z"
 
     MessageListResponse:
       type: object
@@ -1012,6 +1024,25 @@ components:
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+            type: transactional
+            channel: sms
+            status: sent
+            correlationId: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+            scheduledAt: null
+            createdAt: "2026-04-13T08:42:15.000Z"
+            updatedAt: "2026-04-13T08:42:18.000Z"
+          - id: msg_01hr8ma5r9n4k2p6d8y3t1zcv
+            type: transactional
+            channel: email
+            status: queued
+            correlationId: 8d8d52cf-a598-4f7c-b6dd-cf919d28f6f5
+            scheduledAt: null
+            createdAt: "2026-04-13T08:44:02.000Z"
+            updatedAt: "2026-04-13T08:44:02.000Z"
+        nextCursor: msg_01hr8ma5r9n4k2p6d8y3t1zcv
 
     SendSmsMessageRequest:
       type: object
@@ -1037,6 +1068,12 @@ components:
         scheduledAt:
           type: string
           format: date-time
+      example:
+        type: transactional
+        channel: sms
+        to: "+237670112233"
+        text: "Bonjour Amina, votre commande RD-2048 est prete pour retrait a Akwa."
+        from: ReachDem
 
     SendEmailMessageRequest:
       type: object
@@ -1066,6 +1103,13 @@ components:
         scheduledAt:
           type: string
           format: date-time
+      example:
+        type: transactional
+        channel: email
+        to: "amina.ngono@novatech.cm"
+        subject: "Votre facture ReachDem d'avril est disponible"
+        html: "<p>Bonjour Amina,</p><p>Votre facture du mois d'avril est maintenant disponible dans votre espace client.</p>"
+        from: "ReachDem Billing <billing@reachdem.cc>"
 
     SendMessageRequest:
       oneOf:
@@ -1086,6 +1130,11 @@ components:
           format: uuid
         idempotent:
           type: boolean
+      example:
+        message_id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+        status: queued
+        correlation_id: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+        idempotent: false
 
     Contact:
       type: object
@@ -1131,6 +1180,22 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        id: ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+        name: "Amina Ngono"
+        phoneE164: "+237670112233"
+        email: "amina.ngono@novatech.cm"
+        gender: FEMALE
+        birthdate: "1994-08-15T00:00:00.000Z"
+        address: "Akwa, Douala"
+        work: "Head of Growth"
+        enterprise: "NovaTech Cameroun"
+        customFields:
+          city: Douala
+          loyalty_tier: gold
+          last_order_amount: 28500
+        createdAt: "2026-04-10T09:15:00.000Z"
+        updatedAt: "2026-04-12T16:10:00.000Z"
 
     CreateContactRequest:
       type: object
@@ -1168,6 +1233,17 @@ components:
           nullable: true
           additionalProperties: true
       description: At least one of `phoneE164` or `email` must be provided.
+      example:
+        name: "Amina Ngono"
+        phoneE164: "+237670112233"
+        email: "amina.ngono@novatech.cm"
+        gender: FEMALE
+        address: "Akwa, Douala"
+        work: "Head of Growth"
+        enterprise: "NovaTech Cameroun"
+        customFields:
+          city: Douala
+          loyalty_tier: gold
 
     UpdateContactRequest:
       type: object
@@ -1203,6 +1279,11 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+      example:
+        work: "Regional Growth Lead"
+        customFields:
+          loyalty_tier: platinum
+          preferred_channel: sms
 
     ContactListResponse:
       type: object
@@ -1215,6 +1296,37 @@ components:
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+            name: "Amina Ngono"
+            phoneE164: "+237670112233"
+            email: "amina.ngono@novatech.cm"
+            gender: FEMALE
+            birthdate: "1994-08-15T00:00:00.000Z"
+            address: "Akwa, Douala"
+            work: "Head of Growth"
+            enterprise: "NovaTech Cameroun"
+            customFields:
+              city: Douala
+              loyalty_tier: gold
+            createdAt: "2026-04-10T09:15:00.000Z"
+            updatedAt: "2026-04-12T16:10:00.000Z"
+          - id: ct_01hr8m4jk6cgp7s6y0d3f4r2qa
+            name: "Junior Tchana"
+            phoneE164: "+237699001122"
+            email: null
+            gender: MALE
+            birthdate: null
+            address: "Bastos, Yaounde"
+            work: "Store Manager"
+            enterprise: "NovaTech Cameroun"
+            customFields:
+              city: Yaounde
+              preferred_channel: sms
+            createdAt: "2026-04-10T10:05:00.000Z"
+            updatedAt: "2026-04-12T11:22:00.000Z"
+        nextCursor: ct_01hr8m4jk6cgp7s6y0d3f4r2qa
 
     Group:
       type: object
@@ -1235,6 +1347,12 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        id: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+        name: "Clients VIP Douala"
+        description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
+        createdAt: "2026-04-11T08:00:00.000Z"
+        updatedAt: "2026-04-12T09:20:00.000Z"
 
     GroupWriteRequest:
       type: object
@@ -1247,6 +1365,9 @@ components:
         description:
           type: string
           maxLength: 500
+      example:
+        name: "Clients VIP Douala"
+        description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
 
     GroupListResponse:
       type: object
@@ -1259,6 +1380,19 @@ components:
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+            name: "Clients VIP Douala"
+            description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
+            createdAt: "2026-04-11T08:00:00.000Z"
+            updatedAt: "2026-04-12T09:20:00.000Z"
+          - id: grp_01hr8mc8vq1j54m8h3v6w1sspa
+            name: "Revendeurs Yaounde"
+            description: "Reseau de revendeurs actifs dans la zone Centre."
+            createdAt: "2026-04-11T11:30:00.000Z"
+            updatedAt: "2026-04-11T11:30:00.000Z"
+        nextCursor: grp_01hr8mc8vq1j54m8h3v6w1sspa
 
     GroupContactsWriteRequest:
       type: object
@@ -1270,6 +1404,10 @@ components:
           maxItems: 10000
           items:
             type: string
+      example:
+        contactIds:
+          - ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+          - ct_01hr8m4jk6cgp7s6y0d3f4r2qa
 
     GroupContactsWriteResponse:
       type: object
@@ -1281,6 +1419,11 @@ components:
           type: array
           items:
             type: string
+      example:
+        groupId: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+        contactIds:
+          - ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+          - ct_01hr8m4jk6cgp7s6y0d3f4r2qa
 
     SegmentCondition:
       type: object
@@ -1296,6 +1439,11 @@ components:
           enum: [string, number, date, boolean]
         value:
           nullable: true
+      example:
+        field: city
+        operator: eq
+        type: string
+        value: Douala
 
     SegmentNode:
       oneOf:
@@ -1333,6 +1481,23 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        id: seg_01hr8mf3w7v2t54m31kav4mecx
+        name: "Clients inactifs depuis 30 jours"
+        description: "Contacts sans achat recent a relancer avec une offre de retour."
+        definition:
+          op: AND
+          children:
+            - field: city
+              operator: eq
+              type: string
+              value: Douala
+            - field: last_order_days_ago
+              operator: gte
+              type: number
+              value: 30
+        createdAt: "2026-04-12T07:45:00.000Z"
+        updatedAt: "2026-04-12T07:45:00.000Z"
 
     SegmentWriteRequest:
       type: object
@@ -1346,6 +1511,20 @@ components:
           type: string
         definition:
           $ref: "#/components/schemas/SegmentNode"
+      example:
+        name: "Clients inactifs depuis 30 jours"
+        description: "Contacts sans achat recent a relancer avec une offre de retour."
+        definition:
+          op: AND
+          children:
+            - field: city
+              operator: eq
+              type: string
+              value: Douala
+            - field: last_order_days_ago
+              operator: gte
+              type: number
+              value: 30
 
     SegmentPreviewRequest:
       type: object
@@ -1353,6 +1532,20 @@ components:
       properties:
         definition:
           $ref: "#/components/schemas/SegmentNode"
+      example:
+        definition:
+          op: OR
+          children:
+            - field: loyalty_tier
+              operator: in
+              type: string
+              value:
+                - gold
+                - platinum
+            - field: city
+              operator: eq
+              type: string
+              value: Yaounde
 
     SegmentListResponse:
       type: object
@@ -1365,6 +1558,25 @@ components:
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: seg_01hr8mf3w7v2t54m31kav4mecx
+            name: "Clients inactifs depuis 30 jours"
+            description: "Contacts sans achat recent a relancer avec une offre de retour."
+            definition:
+              op: AND
+              children:
+                - field: city
+                  operator: eq
+                  type: string
+                  value: Douala
+                - field: last_order_days_ago
+                  operator: gte
+                  type: number
+                  value: 30
+            createdAt: "2026-04-12T07:45:00.000Z"
+            updatedAt: "2026-04-12T07:45:00.000Z"
+        nextCursor: null
 
     SmsCampaignContent:
       type: object
@@ -1378,6 +1590,9 @@ components:
           type: string
           minLength: 1
           maxLength: 20
+      example:
+        text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+        from: ReachDem
 
     EmailCampaignContent:
       type: object
@@ -1394,6 +1609,10 @@ components:
         from:
           type: string
           minLength: 1
+      example:
+        subject: "Offre retour: -15% jusqu'a dimanche"
+        html: "<p>Bonjour {{first_name}},</p><p>Nous avons reserve une offre de retour de 15% valable jusqu'a dimanche.</p>"
+        from: "ReachDem Marketing <hello@reachdem.cc>"
 
     CampaignContent:
       oneOf:
@@ -1431,6 +1650,18 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        id: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        name: "Relance clients inactifs Douala"
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+        channel: sms
+        status: draft
+        content:
+          text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+          from: ReachDem
+        scheduledAt: "2026-04-15T09:00:00.000Z"
+        createdAt: "2026-04-13T06:30:00.000Z"
+        updatedAt: "2026-04-13T06:30:00.000Z"
 
     CreateCampaignRequest:
       type: object
@@ -1452,6 +1683,14 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        name: "Relance clients inactifs Douala"
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+        channel: sms
+        content:
+          text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+          from: ReachDem
+        scheduledAt: "2026-04-15T09:00:00.000Z"
 
     UpdateCampaignRequest:
       type: object
@@ -1473,6 +1712,9 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours a Douala."
+        scheduledAt: "2026-04-15T10:30:00.000Z"
 
     CampaignListResponse:
       type: object
@@ -1485,6 +1727,20 @@ components:
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+            name: "Relance clients inactifs Douala"
+            description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+            channel: sms
+            status: draft
+            content:
+              text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+              from: ReachDem
+            scheduledAt: "2026-04-15T09:00:00.000Z"
+            createdAt: "2026-04-13T06:30:00.000Z"
+            updatedAt: "2026-04-13T06:30:00.000Z"
+        nextCursor: null
 
     CampaignAudience:
       type: object
@@ -1502,6 +1758,12 @@ components:
         createdAt:
           type: string
           format: date-time
+      example:
+        id: aud_01hr8mnsn6z5yt5k9vf1r0a4xc
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        sourceType: segment
+        sourceId: seg_01hr8mf3w7v2t54m31kav4mecx
+        createdAt: "2026-04-13T06:35:00.000Z"
 
     SetCampaignAudienceRequest:
       type: object
@@ -1518,6 +1780,12 @@ components:
                 enum: [group, segment]
               sourceId:
                 type: string
+      example:
+        audiences:
+          - sourceType: segment
+            sourceId: seg_01hr8mf3w7v2t54m31kav4mecx
+          - sourceType: group
+            sourceId: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
 
     CampaignLaunchResponse:
       type: object
@@ -1528,6 +1796,9 @@ components:
         status:
           type: string
           enum: [running]
+      example:
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        status: running
 
     CampaignStats:
       type: object
@@ -1561,6 +1832,16 @@ components:
         resolvedStatus:
           type: string
           enum: [draft, running, partial, completed, failed, expired]
+      example:
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        audienceSize: 1240
+        pendingCount: 0
+        sentCount: 1187
+        failedCount: 38
+        skippedCount: 15
+        clickCount: 214
+        uniqueClickCount: 176
+        resolvedStatus: completed
 
     BillingSummary:
       type: object
@@ -1602,3 +1883,14 @@ components:
               type: string
               enum: [not_submitted, pending, verified, rejected]
               nullable: true
+      example:
+        workspace:
+          balance:
+            amountMinor: 125000
+            currency: XAF
+          creditBalance: 842
+          smsQuotaUsed: 3158
+          emailQuotaUsed: 942
+          usesSharedCredits: true
+          senderId: NovaTech
+          workspaceVerificationStatus: verified

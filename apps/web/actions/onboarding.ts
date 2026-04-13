@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@reachdem/auth";
+import { ensureDefaultApiKeyForOrganization } from "@reachdem/auth/api-key";
 import { prisma } from "@reachdem/database";
 import { generateUniqueOrganizationSlug } from "../lib/slugify";
 import { headers } from "next/headers";
@@ -198,6 +199,18 @@ export async function createWorkspace(
         },
       });
     });
+
+    try {
+      await ensureDefaultApiKeyForOrganization({
+        organizationId: organization.id,
+        createdBy: session.user.id,
+      });
+    } catch (apiKeyError) {
+      console.error(
+        "[createWorkspace] Failed to provision default API key",
+        apiKeyError
+      );
+    }
 
     return { success: true, organizationId: organization.id };
   } catch (error) {

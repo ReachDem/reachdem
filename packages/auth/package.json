@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/auth-client.ts",
+    "./api-key": "./src/api-key.ts",
     "./permissions": "./src/permissions.ts",
     "./guards": "./src/guards.ts"
   },

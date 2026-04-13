@@ -173,6 +173,7 @@ model ApiKey {
   organizationId String
   token          String
   salt           String
+  encryptedSecret String?
   redacted       String
   title          String
   type           String
