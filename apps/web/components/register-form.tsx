@@ -131,54 +131,32 @@ export function RegisterForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex flex-col items-center justify-center text-center">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-            {/* Same Logo as in app/layout or typical ReachDem logo */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-5"
-            >
-              <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-            </svg>
-          </div>
-          <span className="text-xl font-bold tracking-tight">ReachDem</span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">
+      <div className="mb-4 flex flex-col items-center justify-center text-center">
+        {/* <span className="text-xl font-bold tracking-tight">ReachDem</span> */}
+        <h2 className="text-2xl font-semibold tracking-tight">
           Create your account
-        </h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Start for free, no credit card required.
-        </p>
+        </h2>
       </div>
-
       <div className="bg-background w-full rounded-2xl border p-8 shadow-xl">
-        {/* 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full mb-6 relative hover:bg-muted/50"
-        onClick={handleGoogleSignup}
-      >
-        <img
-          src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/google-icon.svg"
-          alt="Google"
-          className="mr-2 size-4"
-        />
-        Continue with Google
-      </Button> */}
+        <Button
+          type="button"
+          variant="outline"
+          className="hover:bg-muted/50 relative mb-6 w-full"
+          onClick={handleGoogleSignup}
+        >
+          <img
+            src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/google-icon.svg"
+            alt="Google"
+            className="mr-2 size-4"
+          />
+          Continue with Google
+        </Button>
 
-        {/* <div className="relative mb-6 text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-        <span className="bg-background text-muted-foreground relative z-10 px-2">
-          or 
-        </span>
-      </div> */}
+        <div className="after:border-border relative mb-6 text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+          <span className="bg-background text-muted-foreground relative z-10 px-2">
+            or
+          </span>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -289,18 +267,23 @@ export function RegisterForm() {
               >
                 I accept the{" "}
                 <a
-                  href="#"
+                  href="https://reachdem.cc/terms"
                   className="text-foreground font-medium hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  Terms of Service
+                  terms of service
                 </a>{" "}
                 and the{" "}
                 <a
-                  href="#"
+                  href="https://reachdem.cc/privacy"
                   className="text-foreground font-medium hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  Privacy Policy
+                  privacy policy
                 </a>
+                .
               </label>
               {errors.acceptTerms && (
                 <p className="text-destructive mt-1 text-xs">
