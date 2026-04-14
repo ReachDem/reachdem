@@ -35,8 +35,8 @@ export const WelcomeEmail = ({ name }: WelcomeEmailProps) => {
                 this email. I read EVERY ONE.
                 <br />
                 <br />
-                If you&apos;d like to see how other teams are using Kodo or want
-                a quick walkthrough, feel free to book a time here:{" "}
+                If you&apos;d like to see how other teams are using ReachDem or
+                want a quick walkthrough, feel free to book a time here:{" "}
                 <Link
                   href="https://cal.com/belrick/reachdem-onboarding"
                   target="_blank"
