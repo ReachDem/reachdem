@@ -2,9 +2,9 @@ import nodemailer from "nodemailer";
 
 function getConfiguredSenderEmail() {
   const senderEmail =
+    process.env.SMTP_USER ||
     process.env.SENDER_EMAIL ||
-    process.env.ALIBABA_SENDER_EMAIL ||
-    process.env.SMTP_USER;
+    process.env.ALIBABA_SENDER_EMAIL;
 
   return senderEmail?.trim() || "";
 }

@@ -13,6 +13,8 @@
   "dependencies": {
     "@better-auth/core": "1.4.3",
     "@reachdem/database": "workspace:*",
+    "@reachdem/shared": "workspace:*",
+    "@reachdem/core": "workspace:*",
     "@reachdem/transactional": "workspace:*",
     "@react-email/components": "^1.0.8",
     "@react-email/render": "^2.0.4",
