@@ -109,18 +109,20 @@ const data = {
       url: "#",
       icon: IconTemplate,
       disabled: true,
+      badge: "Coming soon",
     },
     {
       name: "Links",
       url: "#",
       icon: IconLink,
       disabled: true,
+      badge: "Coming soon",
     },
     {
       name: "API & Developers",
-      url: "#",
+      url: "/api-config",
       icon: IconApi,
-      disabled: true,
+      disabled: false,
     },
   ],
   navSecondary: [
@@ -260,11 +262,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments
-          items={data.tools}
-          label="Tools"
-          sectionBadge="Coming soon"
-        />
+        <NavDocuments items={data.tools} label="Tools" />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

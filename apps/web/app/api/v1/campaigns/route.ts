@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CampaignService } from "@reachdem/core";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { createCampaignSchema } from "@reachdem/shared";
 
 // List Campaigns
-export const GET = withWorkspace(async ({ req, organizationId }) => {
+export const GET = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const url = new URL(req.url);
     const limitParam = url.searchParams.get("limit");
@@ -30,44 +30,47 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
 });
 
 // Create Campaign
-export const POST = withWorkspace(async ({ req, organizationId, userId }) => {
-  try {
-    const body = await req.json();
-    const validation = createCampaignSchema.safeParse(body);
+export const POST = withPublicWorkspace(
+  async ({ req, organizationId, userId, apiKeyId }) => {
+    try {
+      const body = await req.json();
+      const validation = createCampaignSchema.safeParse(body);
 
-    if (!validation.success) {
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Validation Error",
+            details: validation.error.flatten(),
+            issues: validation.error.issues,
+          },
+          { status: 400 }
+        );
+      }
+
+      const campaign = await CampaignService.createCampaign(
+        organizationId,
+        validation.data,
+        userId,
+        { apiKeyId: apiKeyId ?? undefined }
+      );
+
+      // Associate existing tracked links with this campaign
+      await associateLinksWithCampaign(
+        organizationId,
+        campaign.id,
+        validation.data.content
+      );
+
+      return NextResponse.json(campaign, { status: 201 });
+    } catch (error: any) {
+      console.error("[Campaign API - POST] Error creating campaign:", error);
       return NextResponse.json(
-        {
-          error: "Validation Error",
-          details: validation.error.flatten(),
-          issues: validation.error.issues,
-        },
-        { status: 400 }
+        { error: "Internal Server Error", details: error.message },
+        { status: 500 }
       );
     }
-
-    const campaign = await CampaignService.createCampaign(
-      organizationId,
-      validation.data,
-      userId
-    );
-
-    // Associate existing tracked links with this campaign
-    await associateLinksWithCampaign(
-      organizationId,
-      campaign.id,
-      validation.data.content
-    );
-
-    return NextResponse.json(campaign, { status: 201 });
-  } catch (error: any) {
-    console.error("[Campaign API - POST] Error creating campaign:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
-      { status: 500 }
-    );
   }
-});
+);
 
 // Helper function to associate existing rcdm.ink links with campaign
 async function associateLinksWithCampaign(

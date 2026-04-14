@@ -15,6 +15,7 @@
     "db:push": "pnpm --filter @reachdem/database db:push",
     "db:migrate": "pnpm --filter @reachdem/database db:migrate",
     "db:studio": "pnpm --filter @reachdem/database db:studio",
+    "backfill:api-keys": "dotenv -e .env -- tsx scripts/backfill-default-api-keys.ts",
     "link-campaign-stats": "tsx scripts/link-campaign-stats.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
@@ -36,11 +37,12 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@prisma/config": "^7.4.2"
+    "@prisma/config": "^7.4.2",
+    "@react-email/components": "^1.0.8"
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,jsx,md,json,css}": [
-      "prettier --write"
+      "node ./node_modules/prettier/bin/prettier.cjs --write"
     ]
   }
 }

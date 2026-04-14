@@ -34,6 +34,8 @@ model User {
   paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
   feedbacks           Feedback[]
   onboardingState     OnboardingState?
+  createdApiKeys      ApiKey[]             @relation("ApiKeyCreator")
+  revokedApiKeys      ApiKey[]             @relation("ApiKeyRevoker")
 
   @@map("user")
 }
@@ -128,6 +130,7 @@ model Organization {
   paymentTransactions PaymentTransaction[]
   feedbacks           Feedback[]
   onboardingStates    OnboardingState[]
+  apiKeys             ApiKey[]
 
   @@map("organization")
 }
@@ -163,6 +166,34 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  token          String
+  salt           String
+  encryptedSecret String?
+  redacted       String
+  title          String
+  type           String
+  lastUsedAt     DateTime?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  revokedBy      String?
+  revokedAt      DateTime?
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User         @relation("ApiKeyCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  revoker      User?        @relation("ApiKeyRevoker", fields: [revokedBy], references: [id], onDelete: SetNull)
+  messages     Message[]
+  campaigns    Campaign[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, revokedAt, deletedAt])
+  @@map("api_key")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -493,6 +524,7 @@ model Message {
   id               String         @id @default(cuid())
   organizationId   String
   campaignId       String?
+  apiKeyId         String?
   channel          MessageChannel @default(sms)
   toEmail          String?
   toE164           String?
@@ -511,6 +543,7 @@ model Message {
   updatedAt        DateTime       @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   attempts     MessageAttempt[]
   trackedLinks TrackedLink[]
   deliveryEvents EmailDeliveryEvent[]
@@ -518,6 +551,7 @@ model Message {
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
   @@index([organizationId, campaignId])
+  @@index([organizationId, apiKeyId])
   @@index([organizationId, status])
   @@index([organizationId, channel, status, scheduledAt])
   @@map("message")
@@ -668,6 +702,7 @@ enum FeedbackStatus {
 model Campaign {
   id             String          @id @default(uuid())
   organizationId String
+  apiKeyId       String?
   name           String
   description    String?
   channel        CampaignChannel @default(sms)
@@ -680,6 +715,7 @@ model Campaign {
   updatedAt DateTime @updatedAt
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey?            @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   audiences    CampaignAudience[]
   targets      CampaignTarget[]
   trackedLinks TrackedLink[]
@@ -687,6 +723,7 @@ model Campaign {
 
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+  @@index([organizationId, apiKeyId])
   @@map("campaign")
 }
 

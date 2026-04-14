@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { SegmentService } from "@reachdem/core";
 import { createSegmentSchema } from "@reachdem/shared";
 
 // List all segments
-export const GET = withWorkspace(async ({ req, organizationId }) => {
+export const GET = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const url = new URL(req.url);
     const limitParam = url.searchParams.get("limit");
@@ -29,7 +29,7 @@ export const GET = withWorkspace(async ({ req, organizationId }) => {
 });
 
 // Create segment
-export const POST = withWorkspace(async ({ req, organizationId }) => {
+export const POST = withPublicWorkspace(async ({ req, organizationId }) => {
   try {
     const body = await req.json();
 

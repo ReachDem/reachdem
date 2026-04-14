@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { WorkspaceBillingService } from "@reachdem/core";
 import { workspaceBillingSummarySchema } from "@reachdem/shared";
 
-export const GET = withWorkspace(async ({ organizationId }) => {
+export const GET = withPublicWorkspace(async ({ organizationId }) => {
   try {
     const summary = await WorkspaceBillingService.getSummary(organizationId);
 

@@ -13,6 +13,10 @@ export default function ApiDocs() {
       SwaggerUIBundle({
         url: "/openapi.yaml",
         domNode: swaggerRef.current,
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+        displayRequestDuration: true,
+        defaultModelsExpandDepth: 0,
         presets: [
           SwaggerUIBundle.presets.apis,
           SwaggerUIBundle.SwaggerUIStandalonePreset,

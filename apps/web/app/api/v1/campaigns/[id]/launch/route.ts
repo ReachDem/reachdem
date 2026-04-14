@@ -7,50 +7,52 @@ import {
   CampaignStatsService,
   RequestCampaignLaunchUseCase,
 } from "@reachdem/core";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { publishCampaignLaunchJob } from "../../../../../../lib/publish-campaign-launch-job";
 
 // Launch Campaign
-export const POST = withWorkspace(async ({ req, organizationId, params }) => {
-  try {
-    const id = params.id as string;
+export const POST = withPublicWorkspace(
+  async ({ req, organizationId, params }) => {
+    try {
+      const id = params.id as string;
 
-    await RequestCampaignLaunchUseCase.execute(
-      organizationId,
-      id,
-      publishCampaignLaunchJob
-    );
-    await CampaignStatsService.invalidate(id);
+      await RequestCampaignLaunchUseCase.execute(
+        organizationId,
+        id,
+        publishCampaignLaunchJob
+      );
+      await CampaignStatsService.invalidate(id);
 
-    return NextResponse.json(
-      { message: "Campaign launch queued successfully" },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("[Campaign API - POST launch] Error:", error);
-
-    if (error instanceof CampaignNotFoundError) {
-      return NextResponse.json({ error: "Not Found" }, { status: 404 });
-    }
-    if (error instanceof CampaignInvalidStatusError) {
       return NextResponse.json(
-        { error: "Bad Request", details: error.message },
-        { status: 400 }
+        { message: "Campaign launch queued successfully" },
+        { status: 200 }
+      );
+    } catch (error: any) {
+      console.error("[Campaign API - POST launch] Error:", error);
+
+      if (error instanceof CampaignNotFoundError) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      if (error instanceof CampaignInvalidStatusError) {
+        return NextResponse.json(
+          { error: "Bad Request", details: error.message },
+          { status: 400 }
+        );
+      }
+      if (
+        error instanceof CampaignLaunchValidationError ||
+        error instanceof CampaignInsufficientCreditsError
+      ) {
+        return NextResponse.json(
+          { error: "Bad Request", details: error.message },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: "Internal Server Error", details: error.message },
+        { status: 500 }
       );
     }
-    if (
-      error instanceof CampaignLaunchValidationError ||
-      error instanceof CampaignInsufficientCreditsError
-    ) {
-      return NextResponse.json(
-        { error: "Bad Request", details: error.message },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
-      { status: 500 }
-    );
   }
-});
+);

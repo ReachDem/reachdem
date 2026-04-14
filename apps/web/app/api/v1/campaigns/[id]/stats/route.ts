@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { CampaignNotFoundError, CampaignStatsService } from "@reachdem/core";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 
-export const GET = withWorkspace(async ({ organizationId, params }) => {
+export const GET = withPublicWorkspace(async ({ organizationId, params }) => {
   try {
     const id = params.id as string;
     const stats = await CampaignStatsService.getCampaignStats(

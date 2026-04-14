@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { IconChevronDown, IconLifebuoy, IconSearch } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,10 @@ const initialVisibleCount = 8;
 export function HelpCenterClient() {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredFaqs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -150,6 +155,53 @@ export function HelpCenterClient() {
 
   const visibleFaqs = filteredFaqs.slice(0, visibleCount);
   const hasMore = visibleCount < filteredFaqs.length;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedEmail = email.trim();
+    const normalizedSubject = subject.trim();
+    const normalizedMessage = message.trim();
+
+    if (!normalizedEmail || !normalizedSubject || !normalizedMessage) {
+      toast.error("Please fill in your email, subject, and message.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/support/request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          subject: normalizedSubject,
+          message: normalizedMessage,
+        }),
+      });
+
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to submit request");
+      }
+
+      toast.success("Your request has been sent successfully.");
+      setSubject("");
+      setMessage("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send your request."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -237,38 +289,65 @@ export function HelpCenterClient() {
                 </p>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="help-email">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      id="help-email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
+                      className="bg-background h-12"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor="help-subject"
+                    >
+                      Subject <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      id="help-subject"
+                      value={subject}
+                      onChange={(event) => setSubject(event.target.value)}
+                      placeholder="Brief summary"
+                      className="bg-background h-12"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Email <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium" htmlFor="help-message">
+                    Message <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    placeholder="you@example.com"
-                    className="bg-background h-12"
+                  <Textarea
+                    id="help-message"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    placeholder="Describe your issue or question in detail..."
+                    className="bg-background min-h-32 resize-none"
+                    required
+                    disabled={isSubmitting}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Subject <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    placeholder="Brief summary"
-                    className="bg-background h-12"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Message <span className="text-red-500">*</span>
-                </label>
-                <Textarea
-                  placeholder="Describe your issue or question in detail..."
-                  className="bg-background min-h-32 resize-none"
-                />
-              </div>
-
-              <Button className="h-12 w-full text-base">Submit Request</Button>
+                <Button
+                  className="h-12 w-full text-base"
+                  type="submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Sending..." : "Submit Request"}
+                </Button>
+              </form>
 
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-2 text-sm">
                 <IconLifebuoy className="size-4" />
@@ -283,7 +362,7 @@ export function HelpCenterClient() {
                 >
                   Visit support
                 </Link>
-                <span>•</span>
+                <span>&bull;</span>
                 <Link
                   href="https://reachdem.cc/docs/getting-started"
                   target="_blank"

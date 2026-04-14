@@ -1,1706 +1,944 @@
 openapi: 3.1.0
 info:
-  title: ReachDem API
-  description: Monorepo Backend API Operations for Contacts, Groups, and Segments management.
+  title: ReachDem Public API
   version: 1.0.0
+  description: |
+    Public V1 contract for ReachDem client integrations.
+
+    This specification intentionally documents only the external client-facing
+    API surface. Internal dashboard routes, provider orchestration internals,
+    and infrastructure-only webhook endpoints are excluded.
+
 servers:
-  - url: http://localhost:3000/api/v1
-    description: Local Development Server
+  - url: http://localhost:3000/api
+    description: Local development
+
+tags:
+  - name: Messages
+  - name: Contacts
+  - name: Groups
+  - name: Segments
+  - name: Campaigns
+  - name: Billing
 
 security:
-  - cookieAuth: []
+  - bearerAuth: []
 
 paths:
-  /contacts:
-    get:
-      summary: List all Contacts
-      description: Returns a paginated list of contacts for the active workspace.
+  /v1/messages/send:
+    post:
+      tags: [Messages]
+      summary: Send a transactional message
+      description: >
+        Unified transactional messaging endpoint for SMS and email.
+        This operation is idempotent and requires the `Idempotency-Key` header.
       parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-        - in: query
-          name: q
-          description: Search term (name, phone, email)
-          schema:
-            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
       responses:
         "200":
-          description: Successful response
+          description: Idempotent replay
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedContacts"
-
-  /contacts/{id}:
-    get:
-      summary: Get Contact by ID
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Contact Details
-    patch:
-      summary: Update a Contact
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Any sub-field from CreateContactDto
-      responses:
-        "200":
-          description: Updated Contact
-    delete:
-      summary: Soft Delete Contact
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "204":
-          description: Successfully deleted
-
-    post:
-      summary: Create a Contact
-      description: Creates a new contact in the active workspace. Requires at least an email or phone number.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateContactDto"
-      responses:
+                $ref: "#/components/schemas/SendMessageResponse"
         "201":
-          description: Contact Created
-
-  /groups:
-    get:
-      summary: List all Groups
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-      responses:
-        "200":
-          description: OK
-    post:
-      summary: Create a Group
-      description: Create a stationary static group
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateGroupDto"
-      responses:
-        "201":
-          description: Group Created
-
-  /groups/{id}:
-    get:
-      summary: Get Group Details
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Group Entity
-    patch:
-      summary: Update Group
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateGroupDto"
-      responses:
-        "200":
-          description: Group Updated
-    delete:
-      summary: Delete Group
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "204":
-          description: Group Removed
-
-  /groups/{id}/members:
-    post:
-      summary: Add members to group
-      description: Bulk add up to 500 contacts at a time to a specified group
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                contact_ids:
-                  type: array
-                  items:
-                    type: string
-                    format: uuid
-      responses:
-        "201":
-          description: Members correctly added
-    delete:
-      summary: Remove members from group
-      description: Bulk remove up to 500 contacts from a group
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                contact_ids:
-                  type: array
-                  items:
-                    type: string
-                    format: uuid
-      responses:
-        "204":
-          description: Members properly stripped
-
-  /groups/{id}/contacts:
-    get:
-      summary: Get Paginated Members
-      description: List paginated contacts that reside exclusively inside this group definition.
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-      responses:
-        "200":
-          description: Members Listed Here
-
-  /segments:
-    post:
-      summary: Create a Segment (Dynamic Audience)
-      description: Creates a Segment evaluating a recursive JSON logic tree securely.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateSegmentDto"
-      responses:
-        "201":
-          description: Segment Created
-
-  /segments/{id}:
-    get:
-      summary: Get Segment Details
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Segment Information
-    delete:
-      summary: Delete Segment permanently
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "204":
-          description: Gone
-
-  /segments/{id}/contacts:
-    get:
-      summary: Evaluate Dynamic Audience
-      description: Evaluates the segments JSONAST locally against the Database and fetches a mapped list of compliant Contact identifiers.
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: cursor
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Evaluated Segments List Response
-
-  /activity:
-    get:
-      summary: List Activity Events
-      description: Returns a paginated list of activity events for the workspace. Default window is 7 days, max 30 days.
-      parameters:
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: category
-          schema:
-            type: string
-            enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
-        - in: query
-          name: severity
-          schema:
-            type: string
-            enum: [debug, info, warn, error]
-        - in: query
-          name: status
-          schema:
-            type: string
-            enum: [success, failed, pending]
-        - in: query
-          name: provider
-          schema:
-            type: string
-            example: twilio
-        - in: query
-          name: resource_id
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Paginated list of activity events
+          description: Message accepted for processing
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ActivityEvent"
-                  nextCursor:
-                    type: string
-                    nullable: true
+                $ref: "#/components/schemas/SendMessageResponse"
         "400":
-          description: Invalid filters or time window exceeds 30 days
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
-  /activity/{id}:
+  /v1/messages:
     get:
-      summary: Get Activity Event by ID
+      tags: [Messages]
+      summary: List messages
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/FromDateTime"
+        - $ref: "#/components/parameters/ToDateTime"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
       responses:
         "200":
-          description: Activity event with provider calls
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/messages/{id}:
+    get:
+      tags: [Messages]
+      summary: Get message by ID
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Message summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Event not found
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
-  /activity/providers/summary:
+  /v1/contacts:
     get:
-      summary: Provider Usage Summary
-      description: Aggregated stats per provider (total calls, errors, avg latency, fallbacks). Both `from` and `to` are required, max window 30 days.
+      tags: [Contacts]
+      summary: List contacts
       parameters:
-        - in: query
-          name: from
-          required: true
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: q
+          in: query
           schema:
             type: string
-            format: date-time
-        - in: query
-          name: to
-          required: true
-          schema:
-            type: string
-            format: date-time
+          description: Search by name, phone, or email
       responses:
         "200":
-          description: Provider aggregates
+          description: Contacts list
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ProviderSummary"
+                $ref: "#/components/schemas/ContactListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Contacts]
+      summary: Create contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactRequest"
+      responses:
+        "201":
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
         "400":
-          description: Invalid or missing date range
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
-  # ─── Campaigns ─────────────────────────────────────────────────────────────
-
-  /campaigns:
+  /v1/contacts/{id}:
     get:
-      summary: List Campaigns
-      description: Returns a paginated, workspace-scoped list of campaigns.
-      tags: [Campaigns]
+      tags: [Contacts]
+      summary: Get contact
       parameters:
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ResourceId"
       responses:
         "200":
-          description: Paginated campaign list
+          description: Contact details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Contacts]
+      summary: Update contact
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContactRequest"
+      responses:
+        "200":
+          description: Contact updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Contacts]
+      summary: Delete contact
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Contact deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/groups:
+    get:
+      tags: [Groups]
+      summary: List groups
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Groups list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Groups]
+      summary: Create group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupWriteRequest"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/groups/{id}:
+    get:
+      tags: [Groups]
+      summary: Get group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Groups]
+      summary: Update group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupWriteRequest"
+      responses:
+        "200":
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Groups]
+      summary: Delete group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Group deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/groups/{id}/contacts:
+    get:
+      tags: [Groups]
+      summary: List contacts in a group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Group members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Groups]
+      summary: Add contacts to a group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupContactsWriteRequest"
+      responses:
+        "200":
+          description: Contacts added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupContactsWriteResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Groups]
+      summary: Remove contacts from a group
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupContactsWriteRequest"
+      responses:
+        "200":
+          description: Contacts removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupContactsWriteResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/segments:
+    get:
+      tags: [Segments]
+      summary: List segments
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Segments list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Segments]
+      summary: Create segment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentWriteRequest"
+      responses:
+        "201":
+          description: Segment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/segments/preview:
+    post:
+      tags: [Segments]
+      summary: Preview segment definition
+      description: Preview matching contacts before creating or updating a segment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentPreviewRequest"
+      responses:
+        "200":
+          description: Preview results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/segments/{id}:
+    get:
+      tags: [Segments]
+      summary: Get segment
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Segment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Segments]
+      summary: Update segment
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentWriteRequest"
+      responses:
+        "200":
+          description: Segment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Segments]
+      summary: Delete segment
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Segment deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/segments/{id}/contacts:
+    get:
+      tags: [Segments]
+      summary: List contacts matching a segment
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Segment contacts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/campaigns:
+    get:
+      tags: [Campaigns]
+      summary: List campaigns
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Campaigns list
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CampaignListResponse"
-    post:
-      summary: Create Campaign
-      description: Creates a new draft SMS or email campaign with structured content and optional scheduling.
-      tags: [Campaigns]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateCampaignDto"
-      responses:
-        "201":
-          description: Campaign created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CampaignResponse"
-        "400":
-          description: Validation error
-
-  /campaigns/{id}:
-    get:
-      summary: Get Campaign Detail
-      description: Returns a single campaign.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Campaign detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CampaignResponse"
-        "404":
-          description: Campaign not found
-    patch:
-      summary: Update Campaign
-      description: Updates a draft campaign. Once launched, the campaign can no longer be edited.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateCampaignDto"
-      responses:
-        "200":
-          description: Campaign updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CampaignResponse"
-        "400":
-          description: Validation error or campaign not in draft status
-        "404":
-          description: Campaign not found
-    delete:
-      summary: Delete Campaign
-      description: Deletes a draft campaign.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Campaign deleted successfully
-        "400":
-          description: Campaign not in draft status
-        "404":
-          description: Campaign not found
-
-  /campaigns/{id}/audience:
-    get:
-      summary: Get Campaign Audiences
-      description: Returns the groups and segments attached to the campaign.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: List of campaign audiences
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CampaignAudienceResponse"
-        "404":
-          description: Campaign not found
-    post:
-      summary: Set Campaign Audiences
-      description: Replaces the existing audiences with a new list (only works in draft).
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SetCampaignAudienceDto"
-      responses:
-        "201":
-          description: Audiences updated successfully
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CampaignAudienceResponse"
-        "400":
-          description: Validation error or campaign not in draft status
-        "404":
-          description: Campaign not found
-
-  /campaigns/{id}/launch:
-    post:
-      summary: Launch Campaign
-      description: Resolves the audience, deduplicates contacts, creates one message per target, and hands execution to the async worker pipeline. If `scheduledAt` is in the future, messages are created in `scheduled`; otherwise they are created in `queued`.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Campaign launch accepted successfully
-        "400":
-          description: Campaign not in draft status
-        "404":
-          description: Campaign not found
-
-  /campaigns/{id}/stats:
-    get:
-      summary: Get Campaign Stats
-      description: Returns minimal delivery and click stats for a campaign. Delivery stats come from campaign targets, click stats come from tracked links.
-      tags: [Campaigns]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Campaign stats
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CampaignStatsResponse"
-        "404":
-          description: Campaign not found
-
-  /links:
-    get:
-      summary: List Tracked Links
-      description: Returns a paginated, workspace-scoped list of tracked links with optional campaign, message, or contact filters.
-      tags: [Links]
-      parameters:
-        - in: query
-          name: campaignId
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: messageId
-          schema:
-            type: string
-        - in: query
-          name: contactId
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Paginated tracked link list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TrackedLinkListResponse"
-    post:
-      summary: Create Tracked Link
-      description: Creates a short link in Sink, then stores the business mapping in ReachDem.
-      tags: [Links]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateTrackedLinkDto"
-      responses:
-        "201":
-          description: Tracked link created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TrackedLinkResponse"
-        "400":
-          description: Validation error
-
-  /links/{id}:
-    get:
-      summary: Get Tracked Link
-      description: Returns a single tracked link scoped to the active workspace.
-      tags: [Links]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Tracked link detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TrackedLinkResponse"
-        "404":
-          description: Tracked link not found
-    patch:
-      summary: Update Tracked Link
-      description: Updates a tracked link in ReachDem and, when supported, propagates the target change to Sink.
-      tags: [Links]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateTrackedLinkDto"
-      responses:
-        "200":
-          description: Tracked link updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TrackedLinkResponse"
-        "400":
-          description: Validation error
-        "404":
-          description: Tracked link not found
-
-  /links/{id}/stats:
-    get:
-      summary: Refresh Tracked Link Stats
-      description: Refreshes total and unique click counters from Sink using the tracked link slug.
-      tags: [Links]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Tracked link stats refreshed successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TrackedLinkStatsResponse"
-        "404":
-          description: Tracked link not found
-
-  /payments/session:
-    post:
-      summary: Create Payment Session
-      description: Creates a workspace-scoped payment session using Flutterwave checkout.
-      tags: [Payments]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreatePaymentSessionDto"
-      responses:
-        "201":
-          description: Payment session created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreatePaymentSessionResult"
-        "400":
-          description: Validation error
-        "500":
-          description: Payment provider or internal server error
-
-  /payments/session/{id}:
-    get:
-      summary: Get Payment Session
-      description: Returns a workspace-scoped payment session and all recorded provider transactions.
-      tags: [Payments]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Payment session detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaymentSessionDetailsResponse"
-        "404":
-          description: Payment session not found
-        "500":
-          description: Internal server error
-    post:
-      summary: Reconcile Payment Session
-      description: Confirms or refreshes the current payment session after a provider redirect using the provider transaction identifiers.
-      tags: [Payments]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReconcilePaymentSessionDto"
-      responses:
-        "200":
-          description: Payment session detail after reconciliation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaymentSessionDetailsResponse"
-        "400":
-          description: Validation error
-        "404":
-          description: Payment session not found
-        "500":
-          description: Internal server error
-
-  /payments/webhooks/flutterwave:
-    post:
-      summary: Flutterwave Webhook
-      description: Receives and validates Flutterwave payment webhooks. This endpoint is unauthenticated and secured by provider signature validation.
-      tags: [Payments]
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        "200":
-          description: Webhook accepted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaymentWebhookAck"
         "401":
-          description: Invalid webhook signature
+          $ref: "#/components/responses/Unauthorized"
         "500":
-          description: Internal server error
-
-  # ─── SMS Messaging ─────────────────────────────────────────────────────────
-
-  /sms/send:
+          $ref: "#/components/responses/InternalError"
     post:
-      summary: Send an SMS
-      description: |
-        Sends an SMS via the workspace's configured primary provider,
-        with automatic fallback to secondary providers on retryable errors.
-        Idempotency is guaranteed per workspace using the `idempotency_key` field.
-      tags: [SMS]
+      tags: [Campaigns]
+      summary: Create draft campaign
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendSmsRequest"
+              $ref: "#/components/schemas/CreateCampaignRequest"
       responses:
         "201":
-          description: SMS sent successfully (new request)
+          description: Campaign created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendSmsResponse"
-        "200":
-          description: Idempotent response — message already exists for this key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SendSmsResponse"
+                $ref: "#/components/schemas/Campaign"
         "400":
-          description: Validation error (invalid E.164, empty text, etc.)
-        "422":
-          description: No SMS provider configured for this workspace
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
-  /email/send:
-    post:
-      summary: Send an Email
-      description: |
-        Queues an email for asynchronous delivery through the worker pipeline.
-        Idempotency is guaranteed per workspace using the `idempotency_key` field.
-      tags: [Email]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SendEmailRequest"
-      responses:
-        "201":
-          description: Email accepted successfully (new request)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SendEmailResponse"
-        "200":
-          description: Idempotent response — message already exists for this key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SendEmailResponse"
-        "400":
-          description: Validation error (invalid email, empty HTML, etc.)
-
-  /sms/messages:
+  /v1/campaigns/{id}:
     get:
-      summary: List Messages
-      description: Returns a paginated, workspace-scoped list of sent messages.
-      tags: [SMS]
+      tags: [Campaigns]
+      summary: Get campaign
       parameters:
-        - in: query
-          name: status
-          schema:
-            type: string
-            enum: [scheduled, queued, sending, sent, failed]
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ResourceId"
       responses:
         "200":
-          description: Paginated message list
+          description: Campaign details
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/MessageSummary"
-                  nextCursor:
-                    type: string
-                    nullable: true
-
-  /sms/messages/{id}:
-    get:
-      summary: Get Message Detail
-      description: Returns a single message with all its provider attempts.
-      tags: [SMS]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Message detail with attempts
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageDetail"
+                $ref: "#/components/schemas/Campaign"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Message not found
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Campaigns]
+      summary: Update draft campaign
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCampaignRequest"
+      responses:
+        "200":
+          description: Campaign updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/CampaignInvalidStatus"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Campaigns]
+      summary: Delete draft campaign
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Campaign deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/CampaignInvalidStatus"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/campaigns/{id}/audience:
+    get:
+      tags: [Campaigns]
+      summary: List campaign audience sources
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Audience sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudience"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Campaigns]
+      summary: Replace campaign audience
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCampaignAudienceRequest"
+      responses:
+        "201":
+          description: Audience replaced
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignAudience"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/CampaignInvalidStatus"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/campaigns/{id}/launch:
+    post:
+      tags: [Campaigns]
+      summary: Launch draft campaign
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Campaign launch queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignLaunchResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/CampaignInvalidStatus"
+        "422":
+          $ref: "#/components/responses/InsufficientBalance"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/campaigns/{id}/stats:
+    get:
+      tags: [Campaigns]
+      summary: Get campaign stats
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Campaign statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/workspace/billing:
+    get:
+      tags: [Billing]
+      summary: Get workspace billing summary
+      description: >
+        Public read-only billing summary related to messaging usage and
+        available balance for the authenticated workspace.
+      responses:
+        "200":
+          description: Billing summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: better-auth.session_token
-  schemas:
-    # ─── SMS Schemas ──────────────────────────────────────────────────────────
-    SendSmsRequest:
-      type: object
-      required: [to, text, from, idempotency_key]
-      properties:
-        to:
-          type: string
-          description: Destination phone in E.164 format
-          example: "+2376XXXXXXXX"
-        text:
-          type: string
-          minLength: 1
-          maxLength: 1600
-        from:
-          type: string
-          description: Sender ID
-          example: "ReachDem"
-        idempotency_key:
-          type: string
-          maxLength: 128
-          example: "campaign_123:contact_456"
-        scheduledAt:
-          type: string
-          format: date-time
-          nullable: true
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: |
+        Provide the full workspace API key as a Bearer token.
+        Example: `Authorization: Bearer rdm_abc123def4_xxxxxxxxxxxxxxxxxxxxxxxx`
 
-    SendSmsResponse:
-      type: object
-      properties:
-        message_id:
-          type: string
-        status:
-          type: string
-          enum: [scheduled, queued, sending, sent, failed]
-          description: Immediate API responses normally return `queued` or `scheduled`. `sent` is reached asynchronously after worker execution.
-        correlation_id:
-          type: string
-          format: uuid
-        idempotent:
-          type: boolean
-          description: true if this was a duplicate idempotent request
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: Client-generated key used to make write operations idempotent.
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Resource identifier.
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    Status:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [scheduled, queued, sending, sent, failed]
+    FromDateTime:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    ToDateTime:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date-time
 
-    SendEmailRequest:
-      type: object
-      required: [to, subject, html, idempotency_key]
-      properties:
-        to:
-          type: string
-          format: email
-          example: "user@example.com"
-        subject:
-          type: string
-          minLength: 1
-          maxLength: 200
-        html:
-          type: string
-          minLength: 1
-          maxLength: 200000
-        from:
-          type: string
-          maxLength: 200
-          nullable: true
-          example: "ReachDem Notifications"
-        idempotency_key:
-          type: string
-          maxLength: 128
-          example: "email_123:contact_456"
-        scheduledAt:
-          type: string
-          format: date-time
-          nullable: true
-
-    SendEmailResponse:
-      type: object
-      properties:
-        message_id:
-          type: string
-        status:
-          type: string
-          enum: [scheduled, queued, sending, sent, failed]
-          description: Immediate API responses normally return `queued` or `scheduled`. `sent` is reached asynchronously after worker execution.
-        correlation_id:
-          type: string
-          format: uuid
-        idempotent:
-          type: boolean
-          description: true if this was a duplicate idempotent request
-
-    MessageSummary:
-      type: object
-      properties:
-        id:
-          type: string
-        channel:
-          type: string
-          enum: [sms, email]
-        toLast4:
-          type: string
-          example: "5678"
-        from:
-          type: string
-        status:
-          type: string
-          enum: [scheduled, queued, sending, sent, failed]
-        providerSelected:
-          type: string
-          nullable: true
-        correlationId:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-
-    MessageAttemptSchema:
-      type: object
-      properties:
-        id:
-          type: string
-        provider:
-          type: string
-        attemptNo:
-          type: integer
-        status:
-          type: string
-          enum: [queued, sent, failed]
-        providerMessageId:
-          type: string
-          nullable: true
-        errorCode:
-          type: string
-          nullable: true
-        errorMessage:
-          type: string
-          nullable: true
-        durationMs:
-          type: integer
-        createdAt:
-          type: string
-          format: date-time
-
-    MessageDetail:
-      allOf:
-        - $ref: "#/components/schemas/MessageSummary"
-        - type: object
-          properties:
-            attempts:
-              type: array
-              items:
-                $ref: "#/components/schemas/MessageAttemptSchema"
-
-    PaymentKind:
-      type: string
-      enum: [subscription, creditPurchase]
-
-    PaymentProvider:
-      type: string
-      enum: [flutterwave, stripe]
-      description: `flutterwave` is the active checkout provider. `stripe` is retained for legacy compatibility with historical payment records.
-
-    PaymentSessionStatus:
-      type: string
-      enum:
-        [pending, providerRedirected, processing, succeeded, failed, cancelled, expired]
-
-    PaymentTransactionStatus:
-      type: string
-      enum: [initiated, pending, processing, succeeded, failed, cancelled, refunded]
-
-    CreatePaymentSessionDto:
-      type: object
-      required: [kind, currency]
-      properties:
-        kind:
-          $ref: "#/components/schemas/PaymentKind"
-        currency:
-          type: string
-          minLength: 3
-          maxLength: 3
-          example: XAF
-        planCode:
-          type: string
-          enum: [free, basic, growth, pro, custom]
-          nullable: true
-          example: growth
-        creditsQuantity:
-          type: integer
-          nullable: true
-          minimum: 1
-        metadata:
-          type: object
-          nullable: true
-          additionalProperties: true
-      description: For `subscription`, `planCode` is required. For `creditPurchase`, `creditsQuantity` is required. `free` and `custom` are not purchasable via checkout.
-
-    CreatePaymentSessionResult:
-      type: object
-      required: [paymentSessionId, provider, status]
-      properties:
-        paymentSessionId:
-          type: string
-          format: uuid
-        provider:
-          type: string
-          enum: [flutterwave]
-        status:
-          $ref: "#/components/schemas/PaymentSessionStatus"
-        checkoutUrl:
-          type: string
-          format: uri
-          nullable: true
-
-    ReconcilePaymentSessionDto:
-      type: object
-      properties:
-        provider:
-          $ref: "#/components/schemas/PaymentProvider"
-        providerReference:
-          type: string
-          nullable: true
-        providerTransactionId:
-          type: string
-          nullable: true
-        status:
-          type: string
-          nullable: true
-        cancelled:
-          type: boolean
-          nullable: true
-
-    PaymentSessionResponse:
-      type: object
-      required:
-        [
-          id,
-          organizationId,
-          initiatedByUserId,
-          kind,
-          providerPrimary,
-          status,
-          currency,
-          amountMinor,
-          createdAt,
-          updatedAt,
-        ]
-      properties:
-        id:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-          format: uuid
-        initiatedByUserId:
-          type: string
-          format: uuid
-        kind:
-          $ref: "#/components/schemas/PaymentKind"
-        providerPrimary:
-          $ref: "#/components/schemas/PaymentProvider"
-        providerSelected:
-          allOf:
-            - $ref: "#/components/schemas/PaymentProvider"
-          nullable: true
-        status:
-          $ref: "#/components/schemas/PaymentSessionStatus"
-        currency:
-          type: string
-        amountMinor:
-          type: integer
-        planCode:
-          type: string
-          nullable: true
-        creditsQuantity:
-          type: integer
-          nullable: true
-        providerCheckoutUrl:
-          type: string
-          format: uri
-          nullable: true
-        providerSessionId:
-          type: string
-          nullable: true
-        providerReference:
-          type: string
-          nullable: true
-        metadata:
-          type: object
-          nullable: true
-          additionalProperties: true
-        activatedAt:
-          type: string
-          format: date-time
-          nullable: true
-        failedAt:
-          type: string
-          format: date-time
-          nullable: true
-        cancelledAt:
-          type: string
-          format: date-time
-          nullable: true
-        expiredAt:
-          type: string
-          format: date-time
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    PaymentTransactionResponse:
-      type: object
-      required:
-        [
-          id,
-          paymentSessionId,
-          organizationId,
-          provider,
-          status,
-          amountMinor,
-          currency,
-          createdAt,
-          updatedAt,
-        ]
-      properties:
-        id:
-          type: string
-          format: uuid
-        paymentSessionId:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-          format: uuid
-        initiatedByUserId:
-          type: string
-          format: uuid
-          nullable: true
-        provider:
-          $ref: "#/components/schemas/PaymentProvider"
-        status:
-          $ref: "#/components/schemas/PaymentTransactionStatus"
-        amountMinor:
-          type: integer
-        currency:
-          type: string
-        providerTransactionId:
-          type: string
-          nullable: true
-        providerSessionId:
-          type: string
-          nullable: true
-        providerReference:
-          type: string
-          nullable: true
-        providerEventId:
-          type: string
-          nullable: true
-        rawStatus:
-          type: string
-          nullable: true
-        rawPayload:
-          type: object
-          nullable: true
-          additionalProperties: true
-        confirmedAt:
-          type: string
-          format: date-time
-          nullable: true
-        failedAt:
-          type: string
-          format: date-time
-          nullable: true
-        cancelledAt:
-          type: string
-          format: date-time
-          nullable: true
-        refundedAt:
-          type: string
-          format: date-time
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    PaymentSessionDetailsResponse:
-      type: object
-      required: [session, transactions]
-      properties:
-        session:
-          $ref: "#/components/schemas/PaymentSessionResponse"
-        transactions:
-          type: array
-          items:
-            $ref: "#/components/schemas/PaymentTransactionResponse"
-
-    PaymentWebhookAck:
-      type: object
-      required: [ok]
-      properties:
-        ok:
-          type: boolean
-
-    # ─── Existing Schemas ─────────────────────────────────────────────────────
-    PaginatedContacts:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/Contact"
-        metadata:
-          type: object
-          properties:
-            total:
-              type: integer
-            page:
-              type: integer
-            limit:
-              type: integer
-            totalPages:
-              type: integer
-
-    Contact:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        email:
-          type: string
-          nullable: true
-        phoneE164:
-          type: string
-          nullable: true
-        hasValidEmail:
-          type: boolean
-          nullable: true
-        hasEmailableAddress:
-          type: boolean
-          nullable: true
-        hasValidNumber:
-          type: boolean
-          nullable: true
-        customFields:
-          type: object
-          additionalProperties: true
-
-    CreateContactDto:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          example: "John Doe"
-        email:
-          type: string
-          example: "john@example.com"
-        phoneE164:
-          type: string
-          example: "+1234567890"
-        customFields:
-          type: object
-          description: Valid JSON Hashmap corresponding to Organization Definitions
-          example: { vip_rank: "Gold" }
-
-    CreateGroupDto:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          example: "All Stars"
-        description:
-          type: string
-          example: "The premium member tier limit."
-
-    CreateSegmentDto:
-      type: object
-      required:
-        - name
-        - definition
-      properties:
-        name:
-          type: string
-          example: "Gold Members living in Paris"
-        definition:
-          type: object
-          description: "A recursive Logical Tree representing Prisma clauses"
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
           example:
-            op: "AND"
-            children:
-              - field: "city"
-                operator: "eq"
-                value: "Paris"
-                type: "string"
-              - field: "custom.vip_rank"
-                operator: "eq"
-                value: "Gold"
-                type: "string"
+            error:
+              code: unauthorized
+              message: Unauthorized
+              details: {}
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: not_found
+              message: Resource not found
+              details: {}
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: validation_error
+              message: Request validation failed
+              details: {}
+    IdempotencyConflict:
+      description: Idempotency key reused with a different semantic payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: idempotency_conflict
+              message: Idempotency key conflict
+              details: {}
+    CampaignInvalidStatus:
+      description: Campaign is not in a mutable or launchable state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: campaign_invalid_status
+              message: Campaign is not in a valid status for this operation
+              details: {}
+    InsufficientBalance:
+      description: Insufficient workspace balance or quota
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: insufficient_balance
+              message: Insufficient balance
+              details: {}
+    UnprocessableEntity:
+      description: Request is well-formed but cannot be processed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: internal_error
+              message: Internal server error
+              details: {}
 
-    ActivityEvent:
+  schemas:
+    ErrorResponse:
       type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+    Message:
+      type: object
+      required: [id, type, channel, status, correlationId, createdAt]
       properties:
         id:
           type: string
-          format: uuid
-        actorType:
+        type:
           type: string
-          enum: [user, system, api_key]
-        category:
+          enum: [transactional]
+        channel:
           type: string
-          enum: [sms, email, whatsapp, contacts, links, auth, billing, system]
-        action:
+          enum: [sms, email]
+        status:
           type: string
-          enum:
-            [
-              send_attempt,
-              send_success,
-              send_failed,
-              fallback,
-              provider_error,
-              rate_limit,
-              created,
-              updated,
-              deleted,
-            ]
-        resourceType:
-          type: string
-          nullable: true
-        resourceId:
-          type: string
-          nullable: true
-        provider:
-          type: string
-          nullable: true
-          example: twilio
+          enum: [scheduled, queued, sending, sent, failed]
         correlationId:
           type: string
-          description: Stable across a full chain. Auto-generated if absent.
-        severity:
-          type: string
-          enum: [debug, info, warn, error]
-        status:
-          type: string
-          enum: [success, failed, pending]
-        durationMs:
-          type: integer
-          nullable: true
-        meta:
-          type: object
-          description: JSONB — redacted payload metadata, error codes, fallback info
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-
-    ProviderSummary:
-      type: object
-      properties:
-        provider:
-          type: string
-          example: twilio
-        totalCalls:
-          type: integer
-        avgDurationMs:
-          type: number
-          nullable: true
-        errorCount:
-          type: integer
-        fallbackCount:
-          type: integer
-
-    # ─── Campaigns ───────────────────────────────────────────────────────────
-
-    CampaignSmsContent:
-      type: object
-      required:
-        - text
-      properties:
-        text:
-          type: string
-          minLength: 1
-          maxLength: 1600
-          example: "Hello from ReachDem"
-        from:
-          type: string
-          maxLength: 20
-          nullable: true
-          example: "ReachDem Orange"
-
-    CampaignEmailContent:
-      type: object
-      required:
-        - subject
-        - html
-      properties:
-        subject:
-          type: string
-          minLength: 1
-          maxLength: 200
-          example: "Welcome to ReachDem"
-        html:
-          type: string
-          minLength: 1
-          maxLength: 200000
-          example: "<p>Hello from ReachDem</p>"
-        from:
-          type: string
-          maxLength: 200
-          nullable: true
-          example: "ReachDem Notifications"
-
-    CampaignContent:
-      oneOf:
-        - $ref: "#/components/schemas/CampaignSmsContent"
-        - $ref: "#/components/schemas/CampaignEmailContent"
-
-    CreateCampaignDto:
-      type: object
-      required:
-        - name
-        - channel
-        - content
-      properties:
-        name:
-          type: string
-          maxLength: 100
-        description:
-          type: string
-          maxLength: 500
-          nullable: true
-        channel:
-          type: string
-          enum: [sms, email]
-          default: sms
-        content:
-          $ref: "#/components/schemas/CampaignContent"
-        scheduledAt:
-          type: string
-          format: date-time
-          nullable: true
-      examples:
-        sms:
-          value:
-            name: "March promo SMS"
-            channel: "sms"
-            content:
-              text: "Promo flash cette semaine"
-              from: "ReachDem Orange"
-        email:
-          value:
-            name: "March newsletter"
-            channel: "email"
-            content:
-              subject: "March updates"
-              html: "<h1>News</h1><p>Latest updates</p>"
-              from: "ReachDem Notifications"
-
-    UpdateCampaignDto:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 100
-        description:
-          type: string
-          maxLength: 500
-          nullable: true
-        channel:
-          type: string
-          enum: [sms, email]
-        content:
-          $ref: "#/components/schemas/CampaignContent"
-        scheduledAt:
-          type: string
-          format: date-time
-          nullable: true
-
-    CampaignResponse:
-      type: object
-      properties:
-        id:
-          type: string
           format: uuid
-        organizationId:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-          nullable: true
-        channel:
-          type: string
-          enum: [sms, email]
-        status:
-          type: string
-          enum: [draft, running, partial, completed, failed]
-        content:
-          $ref: "#/components/schemas/CampaignContent"
         scheduledAt:
           type: string
           format: date-time
-          nullable: true
-        createdBy:
-          type: string
           nullable: true
         createdAt:
           type: string
@@ -1708,49 +946,754 @@ components:
         updatedAt:
           type: string
           format: date-time
+          nullable: true
+      example:
+        id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+        type: transactional
+        channel: sms
+        status: queued
+        correlationId: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+        scheduledAt: null
+        createdAt: "2026-04-13T08:42:15.000Z"
+        updatedAt: "2026-04-13T08:42:15.000Z"
 
-    CampaignListResponse:
+    MessageListResponse:
       type: object
+      required: [items]
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/CampaignResponse"
+            $ref: "#/components/schemas/Message"
         nextCursor:
           type: string
           nullable: true
+      example:
+        items:
+          - id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+            type: transactional
+            channel: sms
+            status: sent
+            correlationId: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+            scheduledAt: null
+            createdAt: "2026-04-13T08:42:15.000Z"
+            updatedAt: "2026-04-13T08:42:18.000Z"
+          - id: msg_01hr8ma5r9n4k2p6d8y3t1zcv
+            type: transactional
+            channel: email
+            status: queued
+            correlationId: 8d8d52cf-a598-4f7c-b6dd-cf919d28f6f5
+            scheduledAt: null
+            createdAt: "2026-04-13T08:44:02.000Z"
+            updatedAt: "2026-04-13T08:44:02.000Z"
+        nextCursor: msg_01hr8ma5r9n4k2p6d8y3t1zcv
 
-    CampaignAudienceInput:
+    SendSmsMessageRequest:
       type: object
-      required:
-        - sourceType
-        - sourceId
+      required: [type, channel, to, text]
       properties:
-        sourceType:
+        type:
           type: string
-          enum: [group, segment]
-        sourceId:
+          const: transactional
+        channel:
           type: string
+          const: sms
+        to:
+          type: string
+          pattern: ^\+[1-9]\d{7,14}$
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+        from:
+          type: string
+          minLength: 1
+          maxLength: 20
+        scheduledAt:
+          type: string
+          format: date-time
+      example:
+        type: transactional
+        channel: sms
+        to: "+237670112233"
+        text: "Bonjour Amina, votre commande RD-2048 est prete pour retrait a Akwa."
+        from: ReachDem
 
-    SetCampaignAudienceDto:
+    SendEmailMessageRequest:
       type: object
-      required:
-        - audiences
+      required: [type, channel, to, subject, html]
       properties:
-        audiences:
-          type: array
-          items:
-            $ref: "#/components/schemas/CampaignAudienceInput"
+        type:
+          type: string
+          const: transactional
+        channel:
+          type: string
+          const: email
+        to:
+          type: string
+          format: email
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+        from:
+          type: string
+          minLength: 1
+          maxLength: 200
+        scheduledAt:
+          type: string
+          format: date-time
+      example:
+        type: transactional
+        channel: email
+        to: "amina.ngono@novatech.cm"
+        subject: "Votre facture ReachDem d'avril est disponible"
+        html: "<p>Bonjour Amina,</p><p>Votre facture du mois d'avril est maintenant disponible dans votre espace client.</p>"
+        from: "ReachDem Billing <billing@reachdem.cc>"
 
-    CampaignAudienceResponse:
+    SendMessageRequest:
+      oneOf:
+        - $ref: "#/components/schemas/SendSmsMessageRequest"
+        - $ref: "#/components/schemas/SendEmailMessageRequest"
+
+    SendMessageResponse:
       type: object
+      required: [message_id, status, correlation_id, idempotent]
+      properties:
+        message_id:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, queued, sending, sent, failed]
+        correlation_id:
+          type: string
+          format: uuid
+        idempotent:
+          type: boolean
+      example:
+        message_id: msg_01hr8m9j3v6w2r4x7k1p8n5tq
+        status: queued
+        correlation_id: 5c84e9de-79ec-4f52-a4bb-39be7b0dbd43
+        idempotent: false
+
+    Contact:
+      type: object
+      required: [id, name]
       properties:
         id:
           type: string
-          format: uuid
+        name:
+          type: string
+        phoneE164:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        gender:
+          type: string
+          enum: [UNKNOWN, MALE, FEMALE, OTHER]
+          nullable: true
+        birthdate:
+          type: string
+          format: date-time
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        enterprise:
+          type: string
+          nullable: true
+        customFields:
+          type: object
+          nullable: true
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+        name: "Amina Ngono"
+        phoneE164: "+237670112233"
+        email: "amina.ngono@novatech.cm"
+        gender: FEMALE
+        birthdate: "1994-08-15T00:00:00.000Z"
+        address: "Akwa, Douala"
+        work: "Head of Growth"
+        enterprise: "NovaTech Cameroun"
+        customFields:
+          city: Douala
+          loyalty_tier: gold
+          last_order_amount: 28500
+        createdAt: "2026-04-10T09:15:00.000Z"
+        updatedAt: "2026-04-12T16:10:00.000Z"
+
+    CreateContactRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+        phoneE164:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        gender:
+          type: string
+          enum: [UNKNOWN, MALE, FEMALE, OTHER]
+          nullable: true
+        birthdate:
+          type: string
+          format: date-time
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        enterprise:
+          type: string
+          nullable: true
+        customFields:
+          type: object
+          nullable: true
+          additionalProperties: true
+      description: At least one of `phoneE164` or `email` must be provided.
+      example:
+        name: "Amina Ngono"
+        phoneE164: "+237670112233"
+        email: "amina.ngono@novatech.cm"
+        gender: FEMALE
+        address: "Akwa, Douala"
+        work: "Head of Growth"
+        enterprise: "NovaTech Cameroun"
+        customFields:
+          city: Douala
+          loyalty_tier: gold
+
+    UpdateContactRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+        phoneE164:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        gender:
+          type: string
+          enum: [UNKNOWN, MALE, FEMALE, OTHER]
+          nullable: true
+        birthdate:
+          type: string
+          format: date-time
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        work:
+          type: string
+          nullable: true
+        enterprise:
+          type: string
+          nullable: true
+        customFields:
+          type: object
+          nullable: true
+          additionalProperties: true
+      example:
+        work: "Regional Growth Lead"
+        customFields:
+          loyalty_tier: platinum
+          preferred_channel: sms
+
+    ContactListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        nextCursor:
+          type: string
+          nullable: true
+      example:
+        items:
+          - id: ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+            name: "Amina Ngono"
+            phoneE164: "+237670112233"
+            email: "amina.ngono@novatech.cm"
+            gender: FEMALE
+            birthdate: "1994-08-15T00:00:00.000Z"
+            address: "Akwa, Douala"
+            work: "Head of Growth"
+            enterprise: "NovaTech Cameroun"
+            customFields:
+              city: Douala
+              loyalty_tier: gold
+            createdAt: "2026-04-10T09:15:00.000Z"
+            updatedAt: "2026-04-12T16:10:00.000Z"
+          - id: ct_01hr8m4jk6cgp7s6y0d3f4r2qa
+            name: "Junior Tchana"
+            phoneE164: "+237699001122"
+            email: null
+            gender: MALE
+            birthdate: null
+            address: "Bastos, Yaounde"
+            work: "Store Manager"
+            enterprise: "NovaTech Cameroun"
+            customFields:
+              city: Yaounde
+              preferred_channel: sms
+            createdAt: "2026-04-10T10:05:00.000Z"
+            updatedAt: "2026-04-12T11:22:00.000Z"
+        nextCursor: ct_01hr8m4jk6cgp7s6y0d3f4r2qa
+
+    Group:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+        name: "Clients VIP Douala"
+        description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
+        createdAt: "2026-04-11T08:00:00.000Z"
+        updatedAt: "2026-04-12T09:20:00.000Z"
+
+    GroupWriteRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 500
+      example:
+        name: "Clients VIP Douala"
+        description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
+
+    GroupListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+        nextCursor:
+          type: string
+          nullable: true
+      example:
+        items:
+          - id: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+            name: "Clients VIP Douala"
+            description: "Clients a forte valeur situes a Douala et deja actifs sur les 90 derniers jours."
+            createdAt: "2026-04-11T08:00:00.000Z"
+            updatedAt: "2026-04-12T09:20:00.000Z"
+          - id: grp_01hr8mc8vq1j54m8h3v6w1sspa
+            name: "Revendeurs Yaounde"
+            description: "Reseau de revendeurs actifs dans la zone Centre."
+            createdAt: "2026-04-11T11:30:00.000Z"
+            updatedAt: "2026-04-11T11:30:00.000Z"
+        nextCursor: grp_01hr8mc8vq1j54m8h3v6w1sspa
+
+    GroupContactsWriteRequest:
+      type: object
+      required: [contactIds]
+      properties:
+        contactIds:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            type: string
+      example:
+        contactIds:
+          - ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+          - ct_01hr8m4jk6cgp7s6y0d3f4r2qa
+
+    GroupContactsWriteResponse:
+      type: object
+      required: [groupId, contactIds]
+      properties:
+        groupId:
+          type: string
+        contactIds:
+          type: array
+          items:
+            type: string
+      example:
+        groupId: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+        contactIds:
+          - ct_01hr8m3t4s0m8f2vvf5b3c4n7d
+          - ct_01hr8m4jk6cgp7s6y0d3f4r2qa
+
+    SegmentCondition:
+      type: object
+      required: [field, operator, type]
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+          enum: [eq, contains, in, gt, gte, lt, lte, between, is_null, is_not_null]
+        type:
+          type: string
+          enum: [string, number, date, boolean]
+        value:
+          nullable: true
+      example:
+        field: city
+        operator: eq
+        type: string
+        value: Douala
+
+    SegmentNode:
+      oneOf:
+        - $ref: "#/components/schemas/SegmentCondition"
+        - type: object
+          required: [op, children]
+          properties:
+            op:
+              type: string
+              enum: [AND, OR]
+            children:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/SegmentNode"
+
+    Segment:
+      type: object
+      required: [id, name, definition]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        definition:
+          $ref: "#/components/schemas/SegmentNode"
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: seg_01hr8mf3w7v2t54m31kav4mecx
+        name: "Clients inactifs depuis 30 jours"
+        description: "Contacts sans achat recent a relancer avec une offre de retour."
+        definition:
+          op: AND
+          children:
+            - field: city
+              operator: eq
+              type: string
+              value: Douala
+            - field: last_order_days_ago
+              operator: gte
+              type: number
+              value: 30
+        createdAt: "2026-04-12T07:45:00.000Z"
+        updatedAt: "2026-04-12T07:45:00.000Z"
+
+    SegmentWriteRequest:
+      type: object
+      required: [name, definition]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+        definition:
+          $ref: "#/components/schemas/SegmentNode"
+      example:
+        name: "Clients inactifs depuis 30 jours"
+        description: "Contacts sans achat recent a relancer avec une offre de retour."
+        definition:
+          op: AND
+          children:
+            - field: city
+              operator: eq
+              type: string
+              value: Douala
+            - field: last_order_days_ago
+              operator: gte
+              type: number
+              value: 30
+
+    SegmentPreviewRequest:
+      type: object
+      required: [definition]
+      properties:
+        definition:
+          $ref: "#/components/schemas/SegmentNode"
+      example:
+        definition:
+          op: OR
+          children:
+            - field: loyalty_tier
+              operator: in
+              type: string
+              value:
+                - gold
+                - platinum
+            - field: city
+              operator: eq
+              type: string
+              value: Yaounde
+
+    SegmentListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Segment"
+        nextCursor:
+          type: string
+          nullable: true
+      example:
+        items:
+          - id: seg_01hr8mf3w7v2t54m31kav4mecx
+            name: "Clients inactifs depuis 30 jours"
+            description: "Contacts sans achat recent a relancer avec une offre de retour."
+            definition:
+              op: AND
+              children:
+                - field: city
+                  operator: eq
+                  type: string
+                  value: Douala
+                - field: last_order_days_ago
+                  operator: gte
+                  type: number
+                  value: 30
+            createdAt: "2026-04-12T07:45:00.000Z"
+            updatedAt: "2026-04-12T07:45:00.000Z"
+        nextCursor: null
+
+    SmsCampaignContent:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+        from:
+          type: string
+          minLength: 1
+          maxLength: 20
+      example:
+        text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+        from: ReachDem
+
+    EmailCampaignContent:
+      type: object
+      required: [subject, html]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 200000
+        from:
+          type: string
+          minLength: 1
+      example:
+        subject: "Offre retour: -15% jusqu'a dimanche"
+        html: "<p>Bonjour {{first_name}},</p><p>Nous avons reserve une offre de retour de 15% valable jusqu'a dimanche.</p>"
+        from: "ReachDem Marketing <hello@reachdem.cc>"
+
+    CampaignContent:
+      oneOf:
+        - $ref: "#/components/schemas/SmsCampaignContent"
+        - $ref: "#/components/schemas/EmailCampaignContent"
+
+    Campaign:
+      type: object
+      required: [id, name, channel, status, content]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        channel:
+          type: string
+          enum: [sms, email]
+        status:
+          type: string
+          enum: [draft, running, partial, completed, failed, expired]
+        content:
+          $ref: "#/components/schemas/CampaignContent"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        name: "Relance clients inactifs Douala"
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+        channel: sms
+        status: draft
+        content:
+          text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+          from: ReachDem
+        scheduledAt: "2026-04-15T09:00:00.000Z"
+        createdAt: "2026-04-13T06:30:00.000Z"
+        updatedAt: "2026-04-13T06:30:00.000Z"
+
+    CreateCampaignRequest:
+      type: object
+      required: [name, channel, content]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        channel:
+          type: string
+          enum: [sms, email]
+        content:
+          $ref: "#/components/schemas/CampaignContent"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        name: "Relance clients inactifs Douala"
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+        channel: sms
+        content:
+          text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+          from: ReachDem
+        scheduledAt: "2026-04-15T09:00:00.000Z"
+
+    UpdateCampaignRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        channel:
+          type: string
+          enum: [sms, email]
+        content:
+          $ref: "#/components/schemas/CampaignContent"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours a Douala."
+        scheduledAt: "2026-04-15T10:30:00.000Z"
+
+    CampaignListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+        nextCursor:
+          type: string
+          nullable: true
+      example:
+        items:
+          - id: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+            name: "Relance clients inactifs Douala"
+            description: "Campagne SMS pour reengager les clients inactifs depuis 30 jours."
+            channel: sms
+            status: draft
+            content:
+              text: "Bonjour {{first_name}}, profitez de 15% de reduction en boutique jusqu'a dimanche avec le code RETOUR15."
+              from: ReachDem
+            scheduledAt: "2026-04-15T09:00:00.000Z"
+            createdAt: "2026-04-13T06:30:00.000Z"
+            updatedAt: "2026-04-13T06:30:00.000Z"
+        nextCursor: null
+
+    CampaignAudience:
+      type: object
+      required: [id, campaignId, sourceType, sourceId, createdAt]
+      properties:
+        id:
+          type: string
         campaignId:
           type: string
-          format: uuid
         sourceType:
           type: string
           enum: [group, segment]
@@ -1759,148 +1702,139 @@ components:
         createdAt:
           type: string
           format: date-time
+      example:
+        id: aud_01hr8mnsn6z5yt5k9vf1r0a4xc
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        sourceType: segment
+        sourceId: seg_01hr8mf3w7v2t54m31kav4mecx
+        createdAt: "2026-04-13T06:35:00.000Z"
 
-    CampaignStatsResponse:
+    SetCampaignAudienceRequest:
       type: object
+      required: [audiences]
+      properties:
+        audiences:
+          type: array
+          items:
+            type: object
+            required: [sourceType, sourceId]
+            properties:
+              sourceType:
+                type: string
+                enum: [group, segment]
+              sourceId:
+                type: string
+      example:
+        audiences:
+          - sourceType: segment
+            sourceId: seg_01hr8mf3w7v2t54m31kav4mecx
+          - sourceType: group
+            sourceId: grp_01hr8mb2rjz7dwm9f4t4d9fpyw
+
+    CampaignLaunchResponse:
+      type: object
+      required: [campaignId, status]
       properties:
         campaignId:
           type: string
-          format: uuid
+        status:
+          type: string
+          enum: [running]
+      example:
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        status: running
+
+    CampaignStats:
+      type: object
+      required:
+        - campaignId
+        - audienceSize
+        - pendingCount
+        - sentCount
+        - failedCount
+        - skippedCount
+        - clickCount
+        - uniqueClickCount
+        - resolvedStatus
+      properties:
+        campaignId:
+          type: string
         audienceSize:
+          type: integer
+        pendingCount:
           type: integer
         sentCount:
           type: integer
         failedCount:
           type: integer
+        skippedCount:
+          type: integer
         clickCount:
           type: integer
         uniqueClickCount:
           type: integer
+        resolvedStatus:
+          type: string
+          enum: [draft, running, partial, completed, failed, expired]
+      example:
+        campaignId: cmp_01hr8mk8e2q37h4a6xv1z0r9pm
+        audienceSize: 1240
+        pendingCount: 0
+        sentCount: 1187
+        failedCount: 38
+        skippedCount: 15
+        clickCount: 214
+        uniqueClickCount: 176
+        resolvedStatus: completed
 
-    CreateTrackedLinkDto:
+    BillingSummary:
       type: object
-      required:
-        - targetUrl
+      required: [workspace]
       properties:
-        targetUrl:
-          type: string
-          format: uri
-          example: "https://example.com/landing"
-        slug:
-          type: string
-          nullable: true
-          example: "reachdem-campaign"
-        campaignId:
-          type: string
-          format: uuid
-          nullable: true
-        messageId:
-          type: string
-          nullable: true
-        contactId:
-          type: string
-          format: uuid
-          nullable: true
-        channel:
-          type: string
-          enum: [sms, email]
-          nullable: true
-        comment:
-          type: string
-          nullable: true
-
-    UpdateTrackedLinkDto:
-      type: object
-      minProperties: 1
-      properties:
-        targetUrl:
-          type: string
-          format: uri
-          nullable: true
-        status:
-          type: string
-          enum: [active, disabled]
-          nullable: true
-
-    TrackedLinkResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-        sinkLinkId:
-          type: string
-        slug:
-          type: string
-        shortUrl:
-          type: string
-          format: uri
-        targetUrl:
-          type: string
-          format: uri
-        campaignId:
-          type: string
-          format: uuid
-          nullable: true
-        messageId:
-          type: string
-          nullable: true
-        contactId:
-          type: string
-          format: uuid
-          nullable: true
-        channel:
-          type: string
-          enum: [sms, email]
-          nullable: true
-        status:
-          type: string
-          enum: [active, disabled]
-        totalClicks:
-          type: integer
-          nullable: true
-        uniqueClicks:
-          type: integer
-          nullable: true
-        lastStatsSyncAt:
-          type: string
-          format: date-time
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    TrackedLinkStatsResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-        totalClicks:
-          type: integer
-          nullable: true
-        uniqueClicks:
-          type: integer
-          nullable: true
-        lastStatsSyncAt:
-          type: string
-          format: date-time
-          nullable: true
-
-    TrackedLinkListResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/TrackedLinkResponse"
-        nextCursor:
-          type: string
-          nullable: true
+        workspace:
+          type: object
+          required:
+            - balance
+            - creditBalance
+            - smsQuotaUsed
+            - emailQuotaUsed
+            - usesSharedCredits
+          properties:
+            balance:
+              type: object
+              required: [amountMinor, currency]
+              properties:
+                amountMinor:
+                  type: integer
+                  minimum: 0
+                currency:
+                  type: string
+            creditBalance:
+              type: integer
+              minimum: 0
+            smsQuotaUsed:
+              type: integer
+              minimum: 0
+            emailQuotaUsed:
+              type: integer
+              minimum: 0
+            usesSharedCredits:
+              type: boolean
+            senderId:
+              type: string
+              nullable: true
+            workspaceVerificationStatus:
+              type: string
+              enum: [not_submitted, pending, verified, rejected]
+              nullable: true
+      example:
+        workspace:
+          balance:
+            amountMinor: 125000
+            currency: XAF
+          creditBalance: 842
+          smsQuotaUsed: 3158
+          emailQuotaUsed: 942
+          usesSharedCredits: true
+          senderId: NovaTech
+          workspaceVerificationStatus: verified

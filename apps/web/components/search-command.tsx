@@ -7,12 +7,12 @@ import {
   Mail,
   Users,
   BarChart3,
-  Link2,
   Code,
   Send,
   FileText,
   Settings,
   CreditCard,
+  LifeBuoy,
 } from "lucide-react";
 
 import {
@@ -30,30 +30,29 @@ const navigationItems = [
   {
     heading: "Messaging",
     items: [
-      { icon: MessageSquare, label: "Send SMS", href: "/dashboard/sms" },
-      { icon: Mail, label: "Send Email", href: "/dashboard/email" },
-      { icon: Send, label: "WhatsApp (Beta)", href: "/dashboard/whatsapp" },
+      { icon: MessageSquare, label: "Send SMS", href: "/campaigns/new/sms" },
+      { icon: Mail, label: "Send Email", href: "/campaigns/new/email" },
+      { icon: Send, label: "New Campaign", href: "/campaigns/new" },
     ],
   },
   {
     heading: "Contacts",
     items: [
       { icon: Users, label: "All Contacts", href: "/contacts" },
-      { icon: Users, label: "Groups", href: "/dashboard/contacts/groups" },
-      { icon: Users, label: "Segments", href: "/dashboard/contacts/segments" },
+      { icon: Users, label: "Groups", href: "/contacts/groups" },
+      { icon: Users, label: "Segments", href: "/contacts/segments" },
     ],
   },
   {
     heading: "Tools",
     items: [
-      { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
-      { icon: Link2, label: "URL Shortener", href: "/dashboard/url-shortener" },
       {
-        icon: FileText,
-        label: "Email Templates",
-        href: "/dashboard/templates",
+        icon: BarChart3,
+        label: "Dashboard",
+        href: "/dashboard",
       },
-      { icon: Code, label: "API Documentation", href: "/dashboard/api" },
+      { icon: FileText, label: "API Reference", href: "/api-reference" },
+      { icon: Code, label: "API & Developers", href: "/api-config" },
     ],
   },
   {
@@ -61,10 +60,11 @@ const navigationItems = [
     items: [
       {
         icon: CreditCard,
-        label: "Buy SMS Credits",
-        href: "/dashboard/credits",
+        label: "Plans & Credits",
+        href: "/billing",
       },
-      { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+      { icon: Settings, label: "Settings", href: "/settings/workspace" },
+      { icon: LifeBuoy, label: "Help Center", href: "/help" },
     ],
   },
 ];

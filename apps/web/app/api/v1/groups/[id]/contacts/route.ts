@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { GroupMemberService } from "@reachdem/core";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { bulkGroupMembersSchema } from "@reachdem/shared";
 import { z } from "zod";
 
-export const GET = withWorkspace<{ id: string }>(
+export const GET = withPublicWorkspace<{ id: string }>(
   async ({ req, params, organizationId }) => {
     try {
       const { id: groupId } = params;
@@ -32,7 +32,7 @@ export const GET = withWorkspace<{ id: string }>(
   }
 );
 
-export const POST = withWorkspace<{ id: string }>(
+export const POST = withPublicWorkspace<{ id: string }>(
   async ({ req, params, organizationId }) => {
     try {
       const { id: groupId } = params;
@@ -92,7 +92,7 @@ export const POST = withWorkspace<{ id: string }>(
   }
 );
 
-export const DELETE = withWorkspace<{ id: string }>(
+export const DELETE = withPublicWorkspace<{ id: string }>(
   async ({ req, params, organizationId }) => {
     try {
       const { id: groupId } = params;

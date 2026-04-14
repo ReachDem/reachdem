@@ -56,6 +56,7 @@ export class EnqueueSmsUseCase {
       return tx.message.create({
         data: {
           organizationId,
+          apiKeyId: options.apiKeyId ?? null,
           campaignId: input.campaignId ?? null,
           toE164: input.to,
           toHashed: hashPhone(input.to),
