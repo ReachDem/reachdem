@@ -132,8 +132,6 @@ paths:
     post:
       tags: [Contacts]
       summary: Create contact
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -141,12 +139,6 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateContactRequest"
       responses:
-        "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Contact"
         "201":
           description: Contact created
           content:
@@ -157,8 +149,6 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "409":
-          $ref: "#/components/responses/IdempotencyConflict"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -243,8 +233,6 @@ paths:
     post:
       tags: [Groups]
       summary: Create group
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -252,12 +240,6 @@ paths:
             schema:
               $ref: "#/components/schemas/GroupWriteRequest"
       responses:
-        "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Group"
         "201":
           description: Group created
           content:
@@ -268,8 +250,6 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "409":
-          $ref: "#/components/responses/IdempotencyConflict"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -428,8 +408,6 @@ paths:
     post:
       tags: [Segments]
       summary: Create segment
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -437,12 +415,6 @@ paths:
             schema:
               $ref: "#/components/schemas/SegmentWriteRequest"
       responses:
-        "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Segment"
         "201":
           description: Segment created
           content:
@@ -453,8 +425,6 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "409":
-          $ref: "#/components/responses/IdempotencyConflict"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -586,8 +556,6 @@ paths:
     post:
       tags: [Campaigns]
       summary: Create draft campaign
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -595,12 +563,6 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateCampaignRequest"
       responses:
-        "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Campaign"
         "201":
           description: Campaign created
           content:
@@ -611,8 +573,6 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "409":
-          $ref: "#/components/responses/IdempotencyConflict"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -706,7 +666,6 @@ paths:
       summary: Replace campaign audience
       parameters:
         - $ref: "#/components/parameters/ResourceId"
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -714,14 +673,6 @@ paths:
             schema:
               $ref: "#/components/schemas/SetCampaignAudienceRequest"
       responses:
-        "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CampaignAudience"
         "201":
           description: Audience replaced
           content:
@@ -747,16 +698,9 @@ paths:
       summary: Launch draft campaign
       parameters:
         - $ref: "#/components/parameters/ResourceId"
-        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "200":
-          description: Idempotent replay
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CampaignLaunchResponse"
-        "201":
-          description: Campaign launch accepted
+          description: Campaign launch queued
           content:
             application/json:
               schema:

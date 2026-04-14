@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import nodemailer from "nodemailer";
 import { z } from "zod";
+import { createSmtpTransport, getSmtpSenderEmail } from "@/lib/smtp";
 
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET;
 
@@ -24,19 +24,6 @@ function isAuthorized(req: NextRequest): boolean {
   );
 }
 
-function createTransport() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "465", 10),
-    secure: process.env.SMTP_SECURE !== "false",
-    authMethod: "LOGIN",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-}
-
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,23 +40,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (
-      !process.env.SMTP_HOST ||
-      !process.env.SMTP_USER ||
-      !process.env.SMTP_PASSWORD ||
-      !process.env.SENDER_EMAIL
-    ) {
-      return NextResponse.json(
-        { error: "SMTP environment is not configured" },
-        { status: 500 }
-      );
-    }
-
-    const transporter = createTransport();
+    const transporter = createSmtpTransport();
+    const senderEmail = getSmtpSenderEmail();
 
     try {
       const info = await transporter.sendMail({
-        from: `"${parsed.data.fromName}" <${process.env.SENDER_EMAIL}>`,
+        from: `"${parsed.data.fromName}" <${senderEmail}>`,
         to: parsed.data.to,
         subject: parsed.data.subject,
         html: parsed.data.html,

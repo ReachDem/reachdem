@@ -164,14 +164,14 @@ function parseBearerApiKey(rawToken: string): ParsedApiKey | null {
 
   const parts = token.split("_");
 
-  if (parts.length >= 4 && parts[0] === "rdm") {
+  if (parts.length >= 4 && parts[0] === API_KEY_PREFIX) {
     return {
       id: parts[2],
       secret: parts.slice(3).join("_"),
     };
   }
 
-  if (parts.length >= 3 && parts[0] === "rdm") {
+  if (parts.length >= 3 && parts[0] === API_KEY_PREFIX) {
     return {
       id: parts[1],
       secret: parts.slice(2).join("_"),

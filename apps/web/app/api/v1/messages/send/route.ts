@@ -121,11 +121,12 @@ export const POST = withPublicWorkspace(
         status: result.idempotent ? 200 : 201,
       });
     } catch (error: any) {
-      if (
-        error instanceof MessageSendValidationError ||
-        error instanceof MessageInsufficientCreditsError
-      ) {
+      if (error instanceof MessageSendValidationError) {
         return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      if (error instanceof MessageInsufficientCreditsError) {
+        return NextResponse.json({ error: error.message }, { status: 422 });
       }
 
       if (error.message?.startsWith("No SMS provider configured")) {

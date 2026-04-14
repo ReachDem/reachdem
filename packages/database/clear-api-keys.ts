@@ -3,10 +3,12 @@ const prisma = new PrismaClient();
 
 async function run() {
   try {
-    await prisma.$executeRawUnsafe('DELETE FROM "api_key"');
-    console.log("Deleted old rows from api_key");
+    const result = await prisma.apiKey.deleteMany();
+    console.log(`Deleted ${result.count} rows from api_key`);
   } catch (e) {
     console.error(e);
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
