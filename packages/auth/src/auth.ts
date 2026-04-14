@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { organization, emailOTP } from "better-auth/plugins";
-import { prisma } from "@reachdem/database";
+import { prisma, Prisma } from "@reachdem/database";
 import { ac, owner, admin, member } from "./permissions";
 import { render } from "@react-email/render";
 import { VerificationEmail } from "@reachdem/transactional/emails/verification";
@@ -35,6 +35,9 @@ const smtpOptions: SMTPTransport.Options = {
 };
 const transporter = nodemailer.createTransport(smtpOptions);
 
+const DEFERRED_WELCOME_EMAIL_KIND = "welcome-follow-up";
+const DEFERRED_WELCOME_EMAIL_DELAY_MS = 10 * 60 * 1000;
+
 function getWelcomeDisplayName(user: { name?: string | null; email: string }) {
   const trimmedName = user.name?.trim();
 
@@ -45,6 +48,134 @@ function getWelcomeDisplayName(user: { name?: string | null; email: string }) {
   const emailLocalPart = user.email.split("@")[0]?.trim();
 
   return emailLocalPart || "there";
+}
+
+function getFirstNameForGreeting(input: {
+  firstName?: string | null;
+  name?: string | null;
+  email: string;
+}) {
+  const trimmedFirstName = input.firstName?.trim();
+
+  if (trimmedFirstName) {
+    return trimmedFirstName;
+  }
+
+  const trimmedName = input.name?.trim();
+  if (trimmedName) {
+    return trimmedName.split(/\s+/)[0] || trimmedName;
+  }
+
+  const emailLocalPart = input.email.split("@")[0]?.trim();
+
+  return emailLocalPart || "there";
+}
+
+async function getRecipientProfileFromContext(context?: {
+  body?: unknown;
+  request?: Request;
+}) {
+  const body = context?.body;
+
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>;
+
+    return {
+      firstName:
+        typeof record.firstName === "string" ? record.firstName : undefined,
+      name: typeof record.name === "string" ? record.name : undefined,
+    };
+  }
+
+  const request = context?.request;
+
+  if (!request) {
+    return null;
+  }
+
+  const contentType = request.headers.get("content-type") || "";
+
+  try {
+    if (contentType.includes("application/json")) {
+      const body = (await request.clone().json()) as Record<string, unknown>;
+
+      return {
+        firstName:
+          typeof body.firstName === "string" ? body.firstName : undefined,
+        name: typeof body.name === "string" ? body.name : undefined,
+      };
+    }
+
+    if (
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("multipart/form-data")
+    ) {
+      const formData = await request.clone().formData();
+      const firstName = formData.get("firstName");
+      const name = formData.get("name");
+
+      return {
+        firstName: typeof firstName === "string" ? firstName : undefined,
+        name: typeof name === "string" ? name : undefined,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function scheduleWelcomeEmail(user: {
+  id: string;
+  name?: string | null;
+  email: string;
+}) {
+  const existing = await prisma.authDeferredEmail.findUnique({
+    where: {
+      userId_kind: {
+        userId: user.id,
+        kind: DEFERRED_WELCOME_EMAIL_KIND,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existing) {
+    return false;
+  }
+
+  const html = await render(
+    WelcomeEmail({ name: getWelcomeDisplayName(user) })
+  );
+
+  try {
+    await prisma.authDeferredEmail.create({
+      data: {
+        userId: user.id,
+        kind: DEFERRED_WELCOME_EMAIL_KIND,
+        toEmail: user.email,
+        subject: "Welcome to ReachDem",
+        html,
+        fromName: "Belrick from ReachDem",
+        replyTo: "contact@reachdem.cc",
+        scheduledAt: new Date(Date.now() + DEFERRED_WELCOME_EMAIL_DELAY_MS),
+      },
+    });
+
+    return true;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -144,7 +275,34 @@ export const auth = betterAuth({
           meta: { email, type, action: "sending_otp" },
         }).catch(() => {});
 
-        const html = await render(VerificationEmail({ otp, name: "User" }));
+        const recipient = await prisma.user.findUnique({
+          where: { email },
+          select: {
+            email: true,
+            firstName: true,
+            name: true,
+          },
+        });
+        const requestProfile = await getRecipientProfileFromContext(request);
+
+        const html = await render(
+          VerificationEmail({
+            otp,
+            name: getFirstNameForGreeting(
+              recipient
+                ? {
+                    email: recipient.email,
+                    firstName: recipient.firstName ?? requestProfile?.firstName,
+                    name: recipient.name ?? requestProfile?.name,
+                  }
+                : {
+                    email,
+                    firstName: requestProfile?.firstName,
+                    name: requestProfile?.name,
+                  }
+            ),
+          })
+        );
 
         try {
           await transporter.sendMail({
@@ -217,28 +375,24 @@ export const auth = betterAuth({
             category: "auth",
             action: "send_attempt",
             status: "pending",
-            meta: { email: user.email, action: "welcome_email_sending" },
+            meta: { email: user.email, action: "welcome_email_scheduling" },
           }).catch(() => {});
 
           try {
-            const html = await render(
-              WelcomeEmail({ name: getWelcomeDisplayName(user) })
-            );
-            await transporter.sendMail({
-              from: `"Belrick from ReachDem" <${process.env.SMTP_USER}>`,
-              replyTo: "contact@reachdem.cc",
-              to: user.email,
-              subject: "Welcome to ReachDem",
-              html,
-            });
+            const scheduled = await scheduleWelcomeEmail(user);
             await ActivityLogger.log({
               organizationId: fallbackOrgId,
               actorType: "system",
               actorId: user.id,
               category: "auth",
-              action: "send_success",
+              action: "updated",
               status: "success",
-              meta: { email: user.email, action: "welcome_email_sent" },
+              meta: {
+                email: user.email,
+                action: scheduled
+                  ? "welcome_email_scheduled"
+                  : "welcome_email_already_scheduled",
+              },
             }).catch(() => {});
           } catch (err) {
             await ActivityLogger.log({
@@ -246,12 +400,12 @@ export const auth = betterAuth({
               actorType: "system",
               actorId: user.id,
               category: "auth",
-              action: "send_failed",
+              action: "updated",
               status: "failed",
               meta: {
                 email: user.email,
                 error: err instanceof Error ? err.message : "Unknown error",
-                action: "welcome_email_failed",
+                action: "welcome_email_schedule_failed",
               },
             }).catch(() => {});
           }

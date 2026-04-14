@@ -28,6 +28,7 @@ export async function handleScheduled(
     case scheduledWorkerConfig.cron:
       await handleScheduledCampaigns(env, scheduledTime);
       await handleScheduledMessages(env, scheduledTime);
+      await handleDeferredAuthEmails(env, scheduledTime);
       break;
     default:
       console.warn("[Cron] Unknown cron pattern", {
@@ -147,4 +148,48 @@ async function handleScheduledMessages(
   console.log("[Cron] Queued scheduled messages", {
     count: payload.items.length,
   });
+}
+
+async function handleDeferredAuthEmails(
+  env: Env,
+  scheduledTime: Date
+): Promise<void> {
+  const endpoint = new URL(
+    "/api/internal/auth/deferred-emails/process",
+    env.API_BASE_URL
+  );
+
+  console.log("[Cron] Processing deferred auth emails", {
+    endpoint: endpoint.toString(),
+    scheduledTime: scheduledTime.toISOString(),
+    limit: scheduledWorkerConfig.authDeferredEmailBatchSize,
+  });
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-internal-secret": env.INTERNAL_API_SECRET,
+    },
+    body: JSON.stringify({
+      until: scheduledTime.toISOString(),
+      limit: scheduledWorkerConfig.authDeferredEmailBatchSize,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `Deferred auth email processing failed (${response.status}): ${responseText}`
+    );
+  }
+
+  const result = (await response.json()) as {
+    processed: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+  };
+
+  console.log("[Cron] Deferred auth emails processed", result);
 }
