@@ -13,16 +13,44 @@ const globalForPrisma = globalThis as unknown as {
         driver?: "pg" | "neon";
       }
     | undefined;
+  prismaAccelerateWarningShown: boolean | undefined;
 };
+
+function normalizeAccelerateUrl(value?: string) {
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  try {
+    const protocol = new URL(trimmedValue).protocol;
+    if (protocol === "prisma:" || protocol === "prisma+postgres:") {
+      return trimmedValue;
+    }
+  } catch {
+    // Ignore invalid URLs and fall back to DATABASE_URL below.
+  }
+
+  if (!globalForPrisma.prismaAccelerateWarningShown) {
+    console.warn(
+      "Ignoring PRISMA_ACCELERATE_URL because it is not a valid Prisma Accelerate URL. Falling back to DATABASE_URL."
+    );
+    globalForPrisma.prismaAccelerateWarningShown = true;
+  }
+
+  return undefined;
+}
 
 function readRuntimeConfig() {
   return {
     databaseUrl:
       globalForPrisma.prismaRuntimeConfig?.databaseUrl ??
       process.env.DATABASE_URL,
-    prismaAccelerateUrl:
+    prismaAccelerateUrl: normalizeAccelerateUrl(
       globalForPrisma.prismaRuntimeConfig?.prismaAccelerateUrl ??
-      process.env.PRISMA_ACCELERATE_URL,
+        process.env.PRISMA_ACCELERATE_URL
+    ),
     nodeEnv:
       globalForPrisma.prismaRuntimeConfig?.nodeEnv ?? process.env.NODE_ENV,
     driver:
