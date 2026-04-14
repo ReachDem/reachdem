@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
+  buildAudiencePayload,
   buildEmailCampaignContent,
   buildScheduledDateTime,
   buildSmsCampaignContent,
@@ -51,92 +52,6 @@ import { cn } from "@/lib/utils";
 
 interface NewCampaignTypePageProps {
   params: Promise<{ type: string }>;
-}
-
-const SCHEDULE_PRESETS = [
-  "Wednesday",
-  "Friday",
-  "In a week",
-  "Tomorrow",
-  "Today",
-] as const;
-
-function getNextWeekday(targetDay: number) {
-  const today = startOfToday();
-  const dayOffset = (targetDay - today.getDay() + 7) % 7 || 7;
-
-  return addDays(today, dayOffset);
-}
-
-function getPresetDate(preset: (typeof SCHEDULE_PRESETS)[number]) {
-  switch (preset) {
-    case "Today":
-      return startOfToday();
-    case "Tomorrow":
-      return addDays(startOfToday(), 1);
-    case "In a week":
-      return addDays(startOfToday(), 7);
-    case "Wednesday":
-      return getNextWeekday(3);
-    case "Friday":
-      return getNextWeekday(5);
-  }
-}
-
-function buildEmailCampaignContent(
-  content: EmailContent,
-  fallbackSubject?: string
-) {
-  return {
-    subject:
-      content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
-    html: content.body || "<p>Empty email</p>",
-    from: content.fromName?.trim() || undefined,
-    bodyJson: content.bodyJson,
-    mode: content.mode,
-    fontFamily: content.fontFamily,
-    fontWeights: content.fontWeights,
-  };
-}
-
-function buildSmsCampaignContent(content: SmsContent) {
-  return {
-    text: content.text || "Empty SMS",
-    from: content.senderId || undefined,
-    senderId: content.senderId,
-  };
-}
-
-function optionalTrimmedString(value: string) {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function buildScheduledDateTime(date: Date, time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  const scheduledDateTime = new Date(date);
-  scheduledDateTime.setHours(hours, minutes, 0, 0);
-  return scheduledDateTime;
-}
-
-function isScheduledDateTimeInPast(date: Date, time: string) {
-  return buildScheduledDateTime(date, time).getTime() <= Date.now();
-}
-
-function buildAudiencePayload(
-  selectedSegmentId: string,
-  selectedGroupId: string
-) {
-  return {
-    audiences: [
-      ...(selectedSegmentId
-        ? [{ sourceType: "segment" as const, sourceId: selectedSegmentId }]
-        : []),
-      ...(selectedGroupId
-        ? [{ sourceType: "group" as const, sourceId: selectedGroupId }]
-        : []),
-    ],
-  };
 }
 
 export default function NewCampaignTypePage({

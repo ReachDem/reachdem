@@ -66,7 +66,7 @@ export function buildSmsCampaignContent(content: SmsContent) {
 
 export function optionalTrimmedString(value: string) {
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function buildScheduledDateTime(date: Date, time: string) {
