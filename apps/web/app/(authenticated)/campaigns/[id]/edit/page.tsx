@@ -1,13 +1,9 @@
 "use client";
 
-import { notFound, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import {
-  BeakerIcon,
-  CalendarDaysIcon,
-  SparklesIcon,
-} from "@heroicons/react/24/outline";
-import { addDays, format, isPast, startOfToday } from "date-fns";
+import { CalendarDaysIcon } from "@heroicons/react/24/outline";
+import { format, isPast, startOfToday } from "date-fns";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +27,17 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import {
+  buildAudiencePayload,
+  buildEmailCampaignContent,
+  buildScheduledDateTime,
+  buildSmsCampaignContent,
+  CampaignFeatureCards,
+  getPresetDate,
+  isScheduledDateTimeInPast,
+  optionalTrimmedString,
+  SCHEDULE_PRESETS,
+} from "@/components/campaigns/campaign-editor-shared";
 import {
   fetchEmailSpamAnalysis,
   getEmailSpamWarningReasons,
@@ -135,7 +142,6 @@ export default function EditCampaignPage({ params }: EditCampaignPageProps) {
 function EditCampaignClient({ params }: EditCampaignPageProps) {
   const router = useRouter();
   const [campaignId, setCampaignId] = useState<string | null>(null);
-  const [campaign, setCampaign] = useState<any>(null);
   const [isLoadingCampaign, setIsLoadingCampaign] = useState(true);
   const [type, setType] = useState<"email" | "sms" | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -211,7 +217,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
           return;
         }
 
-        setCampaign(data);
         setType(data.channel);
         setCampaignTitle(data.name);
         setCampaignDescription(data.description || "");
@@ -869,65 +874,9 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
           {/* Feature Cards */}
           <Separator />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <FeatureCard
-              icon={<SparklesIcon className="h-5 w-5" />}
-              title="AI SUBJECT OPTIMIZER"
-              description="Let AI analyze your copy to generate high-open-rate subject lines for your segment."
-              iconColor=""
-            />
-            <FeatureCard
-              icon={<BeakerIcon className="h-5 w-5" />}
-              title="A/B TESTING"
-              description="Set up an alternate version of this email to see which content drives more conversions."
-              iconColor=""
-            />
-            <FeatureCard
-              icon={<CalendarDaysIcon className="h-5 w-5" />}
-              title="SMART SCHEDULING"
-              description="Automatically send when your recipients are most likely to be in their inboxes."
-              iconColor=""
-            />
-          </div>
+          <CampaignFeatureCards />
         </div>
       </main>
-    </div>
-  );
-}
-
-function FeatureCard({
-  icon,
-  title,
-  description,
-  iconColor,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  iconColor: string;
-}) {
-  return (
-    <div className="bg-muted/30 rounded-lg border px-4 py-4">
-      <div>
-        <div>
-          <div className="flex items-center justify-between pr-2">
-            <h3 className="text-sm font-semibold tracking-wide uppercase">
-              {title}
-            </h3>
-            <div
-              className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-lg",
-                iconColor
-              )}
-            >
-              {icon}
-            </div>
-          </div>
-          <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-            {description}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

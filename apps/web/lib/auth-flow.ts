@@ -76,15 +76,12 @@ export async function getAuthFlowState(): Promise<AuthFlowState> {
     nextStep = onboardingState.currentStep || "workspace";
   }
 
-  // derive nextPath from nextStep
-  let nextPath = "/continue-setup";
-  if (nextStep === "register") {
-    nextPath = "/register";
-  } else if (nextStep === "verify_email") {
-    nextPath = "/verify-email";
-  } else {
-    nextPath = STEP_TO_PATH[nextStep] || "/dashboard";
-  }
+  const nextPath =
+    nextStep === "register"
+      ? "/register"
+      : nextStep === "verify_email"
+        ? "/verify-email"
+        : STEP_TO_PATH[nextStep] || "/dashboard";
 
   const hasCompletedSetup = nextStep === "dashboard_checklist";
   const hasActiveOrganization = Boolean(session.session?.activeOrganizationId);

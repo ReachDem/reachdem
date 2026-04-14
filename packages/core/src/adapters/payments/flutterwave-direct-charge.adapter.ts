@@ -429,7 +429,6 @@ export class FlutterwaveDirectChargeAdapter implements DirectChargeProviderPort 
         });
 
         chargePayload = (authorized.data ?? null) as Record<string, unknown>;
-        chargeData = extractChargeData(chargePayload);
       }
 
       return {

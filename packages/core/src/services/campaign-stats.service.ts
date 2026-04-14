@@ -133,6 +133,25 @@ export class CampaignStatsService {
     return stats;
   }
 
+  static async getCampaignStatsBulk(
+    organizationId: string,
+    campaignIds: string[]
+  ): Promise<Record<string, CampaignStatsResponse>> {
+    const uniqueCampaignIds = [...new Set(campaignIds.filter(Boolean))];
+    if (uniqueCampaignIds.length === 0) {
+      return {};
+    }
+
+    const statsEntries = await Promise.all(
+      uniqueCampaignIds.map(async (campaignId) => [
+        campaignId,
+        await this.getCampaignStats(organizationId, campaignId),
+      ])
+    );
+
+    return Object.fromEntries(statsEntries);
+  }
+
   private static deriveResolvedStatus(input: {
     currentStatus: CampaignStatsResponse["resolvedStatus"];
     updatedAt: Date;

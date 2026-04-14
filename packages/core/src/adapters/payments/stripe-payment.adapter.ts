@@ -163,30 +163,26 @@ export class StripePaymentAdapter implements PaymentProviderPort {
     const eventType = String(payload?.type ?? "");
     const object = payload?.data?.object ?? {};
 
-    let normalizedTransactionStatus:
+    const normalizedTransactionStatus:
       | "processing"
       | "succeeded"
       | "failed"
       | "cancelled"
-      | "refunded" = "processing";
-
-    switch (eventType) {
-      case "checkout.session.completed":
-      case "payment_intent.succeeded":
-        normalizedTransactionStatus = "succeeded";
-        break;
-      case "payment_intent.payment_failed":
-        normalizedTransactionStatus = "failed";
-        break;
-      case "checkout.session.expired":
-        normalizedTransactionStatus = "cancelled";
-        break;
-      case "charge.refunded":
-        normalizedTransactionStatus = "refunded";
-        break;
-      default:
-        normalizedTransactionStatus = "processing";
-    }
+      | "refunded" = (() => {
+      switch (eventType) {
+        case "checkout.session.completed":
+        case "payment_intent.succeeded":
+          return "succeeded";
+        case "payment_intent.payment_failed":
+          return "failed";
+        case "checkout.session.expired":
+          return "cancelled";
+        case "charge.refunded":
+          return "refunded";
+        default:
+          return "processing";
+      }
+    })();
 
     const normalizedSessionStatus =
       normalizedTransactionStatus === "succeeded"
