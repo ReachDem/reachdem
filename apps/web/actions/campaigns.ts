@@ -9,6 +9,7 @@ import {
   SegmentService,
   RequestCampaignLaunchUseCase,
 } from "@reachdem/core";
+import { prisma } from "@reachdem/database";
 import type {
   CreateCampaignDto,
   UpdateCampaignDto,
@@ -134,45 +135,111 @@ export async function createCampaign(data: {
   audienceGroups: string[];
   audienceSegments: string[];
 }) {
-  const { organizationId, userId } = await getOrganizationId();
-
-  const payload: CreateCampaignDto = {
-    name: data.name,
-    description: data.description ?? undefined,
-    channel: data.channel as "sms" | "email",
-    content: data.content,
-  };
-
-  const newCampaign = await CampaignService.createCampaign(
-    organizationId,
-    payload,
-    userId
-  );
-
-  const audiencePayload = [
-    ...data.audienceGroups.map((id) => ({
-      sourceType: "group" as const,
-      sourceId: id,
-    })),
-    ...data.audienceSegments.map((id) => ({
-      sourceType: "segment" as const,
-      sourceId: id,
-    })),
-  ];
-
-  await CampaignService.setAudiences(organizationId, newCampaign.id, {
-    audiences: audiencePayload,
-  });
-
-  // Associate existing tracked links with this campaign
-  await associateLinksWithCampaign(
-    organizationId,
-    newCampaign.id,
-    data.content
-  );
+  const { campaign } = await createCampaignWithAudience(data);
 
   revalidatePath("/campaigns");
-  return { success: true, data: newCampaign };
+  return { success: true, data: campaign };
+}
+
+type CreateCampaignWithAudienceInput = {
+  name: string;
+  description: string | null;
+  channel: "sms" | "email";
+  content: CreateCampaignDto["content"];
+  audienceGroups: string[];
+  audienceSegments: string[];
+  scheduledAt?: string | Date;
+};
+
+async function createCampaignWithAudience(
+  data: CreateCampaignWithAudienceInput
+) {
+  const { organizationId, userId } = await getOrganizationId();
+  let campaign: CampaignResponse | null = null;
+
+  try {
+    const payload: CreateCampaignDto = {
+      name: data.name,
+      description: data.description ?? undefined,
+      channel: data.channel,
+      content: data.content,
+      ...(data.scheduledAt ? { scheduledAt: new Date(data.scheduledAt) } : {}),
+    };
+
+    campaign = await CampaignService.createCampaign(
+      organizationId,
+      payload,
+      userId
+    );
+
+    const audiences = [
+      ...data.audienceGroups.map((id) => ({
+        sourceType: "group" as const,
+        sourceId: id,
+      })),
+      ...data.audienceSegments.map((id) => ({
+        sourceType: "segment" as const,
+        sourceId: id,
+      })),
+    ];
+
+    await CampaignService.setAudiences(organizationId, campaign.id, {
+      audiences,
+    });
+
+    await associateLinksWithCampaign(organizationId, campaign.id, data.content);
+
+    return { organizationId, campaign };
+  } catch (error) {
+    if (campaign) {
+      await prisma.campaign.deleteMany({
+        where: {
+          id: campaign.id,
+          organizationId,
+          status: "draft",
+        },
+      });
+    }
+
+    throw error;
+  }
+}
+
+export async function createAndScheduleCampaign(
+  data: CreateCampaignWithAudienceInput & { scheduledAt: string | Date }
+) {
+  const { campaign } = await createCampaignWithAudience(data);
+
+  revalidatePath("/campaigns");
+
+  return { success: true, data: campaign };
+}
+
+export async function createAndLaunchCampaign(
+  data: CreateCampaignWithAudienceInput
+) {
+  const { organizationId, campaign } = await createCampaignWithAudience(data);
+
+  try {
+    await RequestCampaignLaunchUseCase.execute(
+      organizationId,
+      campaign.id,
+      publishCampaignLaunchJob
+    );
+
+    revalidatePath("/campaigns");
+    return { success: true, data: campaign };
+  } catch (error) {
+    await prisma.campaign.deleteMany({
+      where: {
+        id: campaign.id,
+        organizationId,
+        status: "draft",
+      },
+    });
+
+    throw error;
+  }
 }
 
 // Helper function to associate existing rcdm.ink links with campaign
@@ -181,8 +248,6 @@ async function associateLinksWithCampaign(
   campaignId: string,
   content: any
 ): Promise<void> {
-  const { prisma } = await import("@reachdem/database");
-
   // Extract text content
   let textContent = "";
   if (content?.text) {
@@ -195,25 +260,27 @@ async function associateLinksWithCampaign(
 
   // Find all rcdm.ink links (already shortened)
   const rcdmLinkRegex = /rcdm\.ink\/([a-zA-Z0-9]{4})/g;
-  const matches = textContent.matchAll(rcdmLinkRegex);
+  const matches = Array.from(textContent.matchAll(rcdmLinkRegex));
+  if (matches.length === 0) return;
 
-  for (const match of matches) {
-    const slug = match[1];
-    try {
-      // Update the tracked link to associate it with this campaign
-      await prisma.trackedLink.updateMany({
-        where: {
-          organizationId,
-          slug,
-          campaignId: null, // Only update if not already associated
-        },
-        data: {
-          campaignId,
-        },
-      });
-    } catch (error) {
-      console.error(`Failed to associate link ${slug} with campaign:`, error);
-    }
+  const slugs = [...new Set(matches.map((match) => match[1]))];
+
+  try {
+    await prisma.trackedLink.updateMany({
+      where: {
+        organizationId,
+        slug: { in: slugs },
+        campaignId: null,
+      },
+      data: {
+        campaignId,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `Failed to associate tracked links with campaign ${campaignId}:`,
+      error
+    );
   }
 }
 

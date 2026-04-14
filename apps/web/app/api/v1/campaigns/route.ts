@@ -92,30 +92,29 @@ async function associateLinksWithCampaign(
 
   // Find all rcdm.ink links (already shortened)
   const rcdmLinkRegex = /rcdm\.ink\/([a-zA-Z0-9]{4})/g;
-  const matches = textContent.matchAll(rcdmLinkRegex);
+  const matches = Array.from(textContent.matchAll(rcdmLinkRegex));
+  if (matches.length === 0) return;
 
-  for (const match of matches) {
-    const slug = match[1];
-    try {
-      // Update the tracked link to associate it with this campaign
-      await prisma.trackedLink.updateMany({
-        where: {
-          organizationId,
-          slug,
-          campaignId: null, // Only update if not already associated
-        },
-        data: {
-          campaignId,
-        },
-      });
-      console.log(
-        `[associateLinksWithCampaign] Associated link ${slug} with campaign ${campaignId}`
-      );
-    } catch (error) {
-      console.error(
-        `[associateLinksWithCampaign] Failed to associate link ${slug}:`,
-        error
-      );
-    }
+  const slugs = [...new Set(matches.map((match) => match[1]))];
+
+  try {
+    await prisma.trackedLink.updateMany({
+      where: {
+        organizationId,
+        slug: { in: slugs },
+        campaignId: null,
+      },
+      data: {
+        campaignId,
+      },
+    });
+    console.log(
+      `[associateLinksWithCampaign] Associated ${slugs.length} link(s) with campaign ${campaignId}`
+    );
+  } catch (error) {
+    console.error(
+      `[associateLinksWithCampaign] Failed to associate links for campaign ${campaignId}:`,
+      error
+    );
   }
 }

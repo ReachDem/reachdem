@@ -148,28 +148,35 @@ export function CampaignsClientTable({
       const nonDraftCampaigns = paginatedCampaigns.filter(
         (campaign) => campaign.status !== "draft"
       );
+      const statsQuery = new URLSearchParams();
+      nonDraftCampaigns.forEach((campaign) =>
+        statsQuery.append("ids", campaign.id)
+      );
 
-      const [workerResponse, ...statsResponses] = await Promise.all([
-        fetch("/api/v1/workers/status", { cache: "no-store" }),
-        ...nonDraftCampaigns.map((campaign) =>
-          fetch(`/api/v1/campaigns/${campaign.id}/stats`, {
+      const requests = [fetch("/api/v1/workers/status", { cache: "no-store" })];
+
+      if (nonDraftCampaigns.length > 0) {
+        requests.push(
+          fetch(`/api/v1/campaigns/stats?${statsQuery.toString()}`, {
             cache: "no-store",
           })
-        ),
-      ]);
+        );
+      }
+
+      const [workerResponse, statsResponse] = await Promise.all(requests);
 
       const workerPayload =
         (await workerResponse.json()) as WorkerStatusSnapshot;
       setWorkerStatus(workerPayload);
 
-      const nextStats: Record<string, CampaignStatsSnapshot> = {};
-      await Promise.all(
-        statsResponses.map(async (response, index) => {
-          if (!response.ok) return;
-          const stats = (await response.json()) as CampaignStatsSnapshot;
-          nextStats[nonDraftCampaigns[index].id] = stats;
-        })
-      );
+      if (!statsResponse?.ok) {
+        return;
+      }
+
+      const statsPayload = (await statsResponse.json()) as {
+        items?: Record<string, CampaignStatsSnapshot>;
+      };
+      const nextStats = statsPayload.items ?? {};
 
       if (Object.keys(nextStats).length > 0) {
         setCampaignStats((current) => ({ ...current, ...nextStats }));

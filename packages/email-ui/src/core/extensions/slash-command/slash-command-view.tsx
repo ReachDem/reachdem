@@ -62,8 +62,8 @@ const CommandList = forwardRef<unknown, CommandListProps>((props, ref) => {
         "ArrowRight",
       ];
       if (navigationKeys.includes(event.key)) {
-        let newCommandIndex = selectedCommandIndex;
-        let newGroupIndex = selectedGroupIndex;
+        let newCommandIndex: number;
+        let newGroupIndex: number;
 
         switch (event.key) {
           case "ArrowLeft":

@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import {
-  POST as createCampaignHandler,
-  GET as listCampaignsHandler,
-} from "../app/api/v1/campaigns/route";
+import { POST as createCampaignHandler } from "../app/api/v1/campaigns/route";
 import {
   GET as getCampaignHandler,
   PATCH as updateCampaignHandler,
