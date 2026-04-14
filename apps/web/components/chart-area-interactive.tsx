@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 
+import { ChartAreaSkeleton } from "@/components/skeletons/chart-area-skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Card,
@@ -29,99 +30,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const description = "ReachDem messaging activity chart";
 
-const chartData = [
-  { date: "2024-04-01", sms: 222, email: 150 },
-  { date: "2024-04-02", sms: 97, email: 180 },
-  { date: "2024-04-03", sms: 167, email: 120 },
-  { date: "2024-04-04", sms: 242, email: 260 },
-  { date: "2024-04-05", sms: 373, email: 290 },
-  { date: "2024-04-06", sms: 301, email: 340 },
-  { date: "2024-04-07", sms: 245, email: 180 },
-  { date: "2024-04-08", sms: 409, email: 320 },
-  { date: "2024-04-09", sms: 59, email: 110 },
-  { date: "2024-04-10", sms: 261, email: 190 },
-  { date: "2024-04-11", sms: 327, email: 350 },
-  { date: "2024-04-12", sms: 292, email: 210 },
-  { date: "2024-04-13", sms: 342, email: 380 },
-  { date: "2024-04-14", sms: 137, email: 220 },
-  { date: "2024-04-15", sms: 120, email: 170 },
-  { date: "2024-04-16", sms: 138, email: 190 },
-  { date: "2024-04-17", sms: 446, email: 360 },
-  { date: "2024-04-18", sms: 364, email: 410 },
-  { date: "2024-04-19", sms: 243, email: 180 },
-  { date: "2024-04-20", sms: 89, email: 150 },
-  { date: "2024-04-21", sms: 137, email: 200 },
-  { date: "2024-04-22", sms: 224, email: 170 },
-  { date: "2024-04-23", sms: 138, email: 230 },
-  { date: "2024-04-24", sms: 387, email: 290 },
-  { date: "2024-04-25", sms: 215, email: 250 },
-  { date: "2024-04-26", sms: 75, email: 130 },
-  { date: "2024-04-27", sms: 383, email: 420 },
-  { date: "2024-04-28", sms: 122, email: 180 },
-  { date: "2024-04-29", sms: 315, email: 240 },
-  { date: "2024-04-30", sms: 454, email: 380 },
-  { date: "2024-05-01", sms: 165, email: 220 },
-  { date: "2024-05-02", sms: 293, email: 310 },
-  { date: "2024-05-03", sms: 247, email: 190 },
-  { date: "2024-05-04", sms: 385, email: 420 },
-  { date: "2024-05-05", sms: 481, email: 390 },
-  { date: "2024-05-06", sms: 498, email: 520 },
-  { date: "2024-05-07", sms: 388, email: 300 },
-  { date: "2024-05-08", sms: 149, email: 210 },
-  { date: "2024-05-09", sms: 227, email: 180 },
-  { date: "2024-05-10", sms: 293, email: 330 },
-  { date: "2024-05-11", sms: 335, email: 270 },
-  { date: "2024-05-12", sms: 197, email: 240 },
-  { date: "2024-05-13", sms: 197, email: 160 },
-  { date: "2024-05-14", sms: 448, email: 490 },
-  { date: "2024-05-15", sms: 473, email: 380 },
-  { date: "2024-05-16", sms: 338, email: 400 },
-  { date: "2024-05-17", sms: 499, email: 420 },
-  { date: "2024-05-18", sms: 315, email: 350 },
-  { date: "2024-05-19", sms: 235, email: 180 },
-  { date: "2024-05-20", sms: 177, email: 230 },
-  { date: "2024-05-21", sms: 82, email: 140 },
-  { date: "2024-05-22", sms: 81, email: 120 },
-  { date: "2024-05-23", sms: 252, email: 290 },
-  { date: "2024-05-24", sms: 294, email: 220 },
-  { date: "2024-05-25", sms: 201, email: 250 },
-  { date: "2024-05-26", sms: 213, email: 170 },
-  { date: "2024-05-27", sms: 420, email: 460 },
-  { date: "2024-05-28", sms: 233, email: 190 },
-  { date: "2024-05-29", sms: 78, email: 130 },
-  { date: "2024-05-30", sms: 340, email: 280 },
-  { date: "2024-05-31", sms: 178, email: 230 },
-  { date: "2024-06-01", sms: 178, email: 200 },
-  { date: "2024-06-02", sms: 470, email: 410 },
-  { date: "2024-06-03", sms: 103, email: 160 },
-  { date: "2024-06-04", sms: 439, email: 380 },
-  { date: "2024-06-05", sms: 88, email: 140 },
-  { date: "2024-06-06", sms: 294, email: 250 },
-  { date: "2024-06-07", sms: 323, email: 370 },
-  { date: "2024-06-08", sms: 385, email: 320 },
-  { date: "2024-06-09", sms: 438, email: 480 },
-  { date: "2024-06-10", sms: 155, email: 200 },
-  { date: "2024-06-11", sms: 92, email: 150 },
-  { date: "2024-06-12", sms: 492, email: 420 },
-  { date: "2024-06-13", sms: 81, email: 130 },
-  { date: "2024-06-14", sms: 426, email: 380 },
-  { date: "2024-06-15", sms: 307, email: 350 },
-  { date: "2024-06-16", sms: 371, email: 310 },
-  { date: "2024-06-17", sms: 475, email: 520 },
-  { date: "2024-06-18", sms: 107, email: 170 },
-  { date: "2024-06-19", sms: 341, email: 290 },
-  { date: "2024-06-20", sms: 408, email: 450 },
-  { date: "2024-06-21", sms: 169, email: 210 },
-  { date: "2024-06-22", sms: 317, email: 270 },
-  { date: "2024-06-23", sms: 480, email: 530 },
-  { date: "2024-06-24", sms: 132, email: 180 },
-  { date: "2024-06-25", sms: 141, email: 190 },
-  { date: "2024-06-26", sms: 434, email: 380 },
-  { date: "2024-06-27", sms: 448, email: 490 },
-  { date: "2024-06-28", sms: 149, email: 200 },
-  { date: "2024-06-29", sms: 103, email: 160 },
-  { date: "2024-06-30", sms: 446, email: 400 },
-];
+type ChartPoint = {
+  date: string;
+  sms: number;
+  email: number;
+};
 
 const chartConfig = {
   messages: {
@@ -140,6 +53,8 @@ const chartConfig = {
 export function ChartAreaInteractive() {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("90d");
+  const [chartData, setChartData] = React.useState<ChartPoint[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
     if (isMobile) {
@@ -147,19 +62,71 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile]);
 
-  const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date);
-    const referenceDate = new Date("2024-06-30");
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadChartData() {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/v1/dashboard/chart", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          // Non-OK (e.g. no active workspace yet) — just show empty chart
+          if (!cancelled) setChartData([]);
+          return;
+        }
+
+        const payload = (await response.json()) as { data?: ChartPoint[] };
+        if (!cancelled) {
+          setChartData(Array.isArray(payload.data) ? payload.data : []);
+        }
+      } catch (error) {
+        console.error(
+          "[ChartAreaInteractive] Failed to load chart data:",
+          error
+        );
+        if (!cancelled) {
+          setChartData([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadChartData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filteredData = React.useMemo(() => {
+    if (chartData.length === 0) {
+      return [];
+    }
+
+    const referenceDate = new Date(chartData[chartData.length - 1].date);
     let daysToSubtract = 90;
     if (timeRange === "30d") {
       daysToSubtract = 30;
     } else if (timeRange === "7d") {
       daysToSubtract = 7;
     }
+
     const startDate = new Date(referenceDate);
-    startDate.setDate(startDate.getDate() - daysToSubtract);
-    return date >= startDate;
-  });
+    startDate.setDate(startDate.getDate() - (daysToSubtract - 1));
+
+    return chartData.filter((item) => new Date(item.date) >= startDate);
+  }, [chartData, timeRange]);
+
+  if (isLoading) {
+    return <ChartAreaSkeleton />;
+  }
 
   return (
     <Card className="@container/card">
@@ -167,9 +134,9 @@ export function ChartAreaInteractive() {
         <CardTitle>Message Activity</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            SMS and Email sent over the last 3 months
+            SMS and Email activity from your real workspace data
           </span>
-          <span className="@[540px]/card:hidden">Last 3 months</span>
+          <span className="@[540px]/card:hidden">Workspace activity</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup

@@ -1,8 +1,8 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { authClient, useSession } from "@reachdem/auth/client";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   IconApi,
   IconChartBar,
@@ -50,8 +50,8 @@ const data = {
   ],
   currentWorkspace: {
     id: "1",
-    name: "ReachDem",
-    logo: "/logo.png",
+    name: "",
+    logo: "",
   },
   user: {
     name: "John Doe",
@@ -61,8 +61,13 @@ const data = {
   navMain: [
     {
       title: "Home",
-      url: "#",
+      url: "/dashboard",
       icon: IconHome,
+    },
+    {
+      title: "Campaigns",
+      url: "/campaigns",
+      icon: IconMessage,
     },
     // {
     //   title: "SMS",
@@ -103,22 +108,27 @@ const data = {
       name: "Templates",
       url: "#",
       icon: IconTemplate,
+      disabled: true,
+      badge: "Coming soon",
     },
     {
-      name: "URL Shortener",
+      name: "Links",
       url: "#",
       icon: IconLink,
+      disabled: true,
+      badge: "Coming soon",
     },
     {
       name: "API & Developers",
-      url: "#",
+      url: "/api-config",
       icon: IconApi,
+      disabled: false,
     },
   ],
   navSecondary: [
     {
       title: "Billing",
-      url: "#",
+      url: "/billing",
       icon: IconCreditCard,
     },
     {
@@ -133,7 +143,7 @@ const data = {
     },
     {
       title: "Get Help",
-      url: "#",
+      url: "/help",
       icon: IconHelp,
     },
   ],
@@ -143,28 +153,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { data: organizations } = authClient.useListOrganizations();
+  const [isHydrated, setIsHydrated] = React.useState(false);
 
-  const currentWorkspaceName = activeOrg?.name || data.currentWorkspace.name;
-  const currentWorkspaceLogo = activeOrg?.logo || data.currentWorkspace.logo;
-  const workspaces = organizations?.length
-    ? organizations.map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        logo: org.logo,
-      }))
-    : data.workspaces;
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
-  const userData = session?.user
-    ? {
-        name: session.user.name,
-        email: session.user.email,
-        avatar: session.user.image || data.user.avatar,
-      }
-    : data.user;
+  const currentWorkspaceName = activeOrg?.name ?? "";
+  const isOrgLoading = !isHydrated || !activeOrg?.name;
+  const workspaces =
+    isHydrated && organizations?.length
+      ? organizations.map((org: any) => ({
+          id: org.id,
+          name: org.name,
+          logo: org.logo,
+        }))
+      : data.workspaces;
+
+  const userData =
+    isHydrated && session?.user
+      ? {
+          name: session.user.name,
+          email: session.user.email,
+          avatar: session.user.image || data.user.avatar,
+        }
+      : data.user;
 
   const orgInitial = currentWorkspaceName
     ? currentWorkspaceName.charAt(0).toUpperCase()
-    : "O";
+    : "";
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -173,20 +190,36 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem className="mb-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="w-full data-[slot=sidebar-menu-button]:!p-1.5">
-                  <div className="flex flex-1 items-center gap-2">
-                    <Avatar className="size-8 rounded-md bg-white shadow">
-                      <AvatarImage
-                        src={currentWorkspaceLogo || ""}
-                        alt={currentWorkspaceName}
+                <SidebarMenuButton
+                  id="workspace-switcher-trigger"
+                  className="w-full data-[slot=sidebar-menu-button]:!p-1.5"
+                >
+                  <div
+                    className="flex flex-1 items-center gap-2"
+                    aria-busy={isOrgLoading}
+                  >
+                    {isOrgLoading ? (
+                      <span
+                        className="bg-muted inline-block size-8 animate-pulse rounded-md"
+                        aria-hidden="true"
                       />
-                      <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 font-bold text-white">
-                        {orgInitial}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-base font-semibold">
-                      {currentWorkspaceName}
-                    </span>
+                    ) : (
+                      <Avatar className="size-8 rounded-md bg-white shadow">
+                        <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 font-bold text-white">
+                          {orgInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    {isOrgLoading ? (
+                      <span
+                        className="bg-muted inline-block h-5 w-28 animate-pulse rounded"
+                        aria-label="Chargement de l'organisation"
+                      />
+                    ) : (
+                      <span className="text-base font-semibold">
+                        {currentWorkspaceName}
+                      </span>
+                    )}
                   </div>
                   <IconChevronDown className="text-muted-foreground size-4" />
                 </SidebarMenuButton>
@@ -209,10 +242,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       className="cursor-pointer gap-2"
                     >
                       <Avatar className="size-6 rounded bg-gradient-to-br from-blue-500 to-cyan-400">
-                        <AvatarImage
-                          src={workspace.logo || ""}
-                          alt={workspace.name || ""}
-                        />
                         <AvatarFallback className="rounded bg-gradient-to-br from-blue-500 to-cyan-400 text-xs font-bold text-white">
                           {wsInitial}
                         </AvatarFallback>

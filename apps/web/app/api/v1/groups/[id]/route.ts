@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { groupSchema } from "@reachdem/shared";
 import { z } from "zod";
-import { withWorkspace } from "@reachdem/auth/guards";
+import { withPublicWorkspace } from "@reachdem/auth/guards";
 import { GroupService } from "@reachdem/core";
 
-export const GET = withWorkspace<{ id: string }>(
+export const GET = withPublicWorkspace<{ id: string }>(
   async ({ params, organizationId }) => {
     try {
       const { id } = params;
@@ -28,7 +28,7 @@ export const GET = withWorkspace<{ id: string }>(
   }
 );
 
-export const PATCH = withWorkspace<{ id: string }>(
+export const PATCH = withPublicWorkspace<{ id: string }>(
   async ({ req, params, organizationId }) => {
     try {
       const { id } = params;
@@ -89,7 +89,7 @@ export const PATCH = withWorkspace<{ id: string }>(
   }
 );
 
-export const DELETE = withWorkspace<{ id: string }>(
+export const DELETE = withPublicWorkspace<{ id: string }>(
   async ({ params, organizationId }) => {
     try {
       const { id } = params;

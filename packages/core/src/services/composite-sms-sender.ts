@@ -3,15 +3,40 @@ import type { SmsSender, SmsPayload } from "../ports/sms-sender.port";
 import { ActivityLogger } from "./activity-logger.service";
 import { TwilioAdapter } from "../adapters/sms/twilio.adapter";
 import { InfobipAdapter } from "../adapters/sms/infobip.adapter";
+import { LmtAdapter } from "../adapters/sms/lmt.adapter";
+import { AvlytextAdapter } from "../adapters/sms/avlytext.adapter";
+import { MboaSmsAdapter } from "../adapters/sms/mboa-sms.adapter";
 import { StubAdapter } from "../adapters/sms/stub.adapter";
 import type { SmsProvider } from "@reachdem/database";
+import { getCameroonProviderRoute } from "../utils/cameroon-mobile-routing";
+import { redactMeta } from "../utils/pii-scrubber";
 
 interface SendWithFallbackResult {
   success: boolean;
   providerName: string;
+  senderUsed: string;
+  attempts: Array<{
+    providerName: string;
+    senderUsed: string;
+    durationMs: number;
+    success: boolean;
+    providerMessageId?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    retryable?: boolean;
+    httpStatus?: number;
+    responseMeta?: Record<string, unknown>;
+  }>;
   providerMessageId?: string;
   errorCode?: string;
   errorMessage?: string;
+  httpStatus?: number;
+  responseMeta?: Record<string, unknown>;
+}
+
+interface AdapterExecutionPlan {
+  adapter: SmsSender;
+  payload: SmsPayload;
 }
 
 /**
@@ -31,6 +56,16 @@ function buildAdapter(provider: SmsProvider): SmsSender {
         process.env.INFOBIP_API_KEY!,
         process.env.INFOBIP_BASE_URL!
       );
+    case "lmt":
+      return new LmtAdapter(process.env.LMT_API_KEY!, process.env.LMT_SECRET!);
+    case "mboaSms":
+      return new MboaSmsAdapter(
+        process.env.MBOA_SMS_USERID ?? process.env.NEXT_PUBLIC_MBOA_SMS_USERID!,
+        process.env.MBOA_SMS_API_PASSWORD ??
+          process.env.NEXT_PUBLIC_MBOA_SMS_API_PASSWORD!
+      );
+    case "avlytext":
+      return new AvlytextAdapter(process.env.AVLYTEXT_API_KEY!);
     case "stub":
       return new StubAdapter();
     default: {
@@ -59,6 +94,26 @@ async function buildAdapterChain(organizationId: string): Promise<SmsSender[]> {
   return providers.map(buildAdapter);
 }
 
+async function buildExecutionPlan(
+  organizationId: string,
+  payload: SmsPayload
+): Promise<AdapterExecutionPlan[]> {
+  const cameroonRoute = getCameroonProviderRoute(payload);
+
+  if (cameroonRoute) {
+    return cameroonRoute.map((route) => ({
+      adapter: buildAdapter(route.provider),
+      payload: route.payload,
+    }));
+  }
+
+  const adapters = await buildAdapterChain(organizationId);
+  return adapters.map((adapter) => ({
+    adapter,
+    payload,
+  }));
+}
+
 /**
  * Tries each adapter in order until one succeeds.
  * - Logs an ActivityEvent per attempt (send_attempt, send_success, send_failed, fallback).
@@ -75,13 +130,15 @@ export class CompositeSmseSender {
     correlationId: string,
     payload: SmsPayload
   ): Promise<SendWithFallbackResult> {
-    const adapters = await buildAdapterChain(organizationId);
+    const plan = await buildExecutionPlan(organizationId, payload);
     let lastErrorCode = "unknown";
     let lastErrorMessage = "Unknown error";
+    const attempts: SendWithFallbackResult["attempts"] = [];
     let attemptNo = 0;
 
-    for (let i = 0; i < adapters.length; i++) {
-      const adapter = adapters[i];
+    for (let i = 0; i < plan.length; i++) {
+      const current = plan[i];
+      const adapter = current.adapter;
       attemptNo++;
 
       // Log a fallback event when switching providers
@@ -95,7 +152,7 @@ export class CompositeSmseSender {
           severity: "warn",
           status: "pending",
           meta: {
-            fromProvider: adapters[i - 1].providerName,
+            fromProvider: plan[i - 1].adapter.providerName,
             toProvider: adapter.providerName,
             attemptNo,
           },
@@ -114,9 +171,35 @@ export class CompositeSmseSender {
         meta: { attemptNo },
       });
 
-      const result = await adapter.send(payload);
+      const result = await adapter.send(current.payload);
+      const safeResponseMeta = result.responseMeta
+        ? redactMeta(result.responseMeta)
+        : null;
+
+      console.log("[SMS Provider] Response", {
+        provider: adapter.providerName,
+        attemptNo,
+        success: result.success,
+        retryable: result.success ? null : result.retryable,
+        httpStatus: result.httpStatus ?? null,
+        providerMessageId: result.success
+          ? result.providerMessageId
+          : undefined,
+        errorCode: result.success ? null : result.errorCode,
+        errorMessage: result.success ? null : result.errorMessage,
+        responseMeta: safeResponseMeta,
+      });
 
       if (result.success) {
+        attempts.push({
+          providerName: adapter.providerName,
+          senderUsed: current.payload.from,
+          durationMs: result.durationMs,
+          success: true,
+          providerMessageId: result.providerMessageId,
+          httpStatus: result.httpStatus,
+          responseMeta: safeResponseMeta ?? undefined,
+        });
         await ActivityLogger.log({
           organizationId,
           correlationId,
@@ -126,19 +209,39 @@ export class CompositeSmseSender {
           severity: "info",
           status: "success",
           durationMs: result.durationMs,
-          meta: { providerMessageId: result.providerMessageId, attemptNo },
+          meta: {
+            providerMessageId: result.providerMessageId,
+            attemptNo,
+            httpStatus: result.httpStatus ?? null,
+            responseMeta: safeResponseMeta,
+          },
         });
 
         return {
           success: true,
           providerName: adapter.providerName,
+          senderUsed: current.payload.from,
+          attempts,
           providerMessageId: result.providerMessageId,
+          httpStatus: result.httpStatus,
+          responseMeta: safeResponseMeta ?? undefined,
         };
       }
 
       // Failed — log it
       lastErrorCode = result.errorCode;
       lastErrorMessage = result.errorMessage;
+      attempts.push({
+        providerName: adapter.providerName,
+        senderUsed: current.payload.from,
+        durationMs: result.durationMs,
+        success: false,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        retryable: result.retryable,
+        httpStatus: result.httpStatus,
+        responseMeta: safeResponseMeta ?? undefined,
+      });
 
       await ActivityLogger.log({
         organizationId,
@@ -154,6 +257,8 @@ export class CompositeSmseSender {
           errorMessage: result.errorMessage,
           retryable: result.retryable,
           attemptNo,
+          httpStatus: result.httpStatus ?? null,
+          responseMeta: safeResponseMeta,
         },
       });
 
@@ -165,9 +270,13 @@ export class CompositeSmseSender {
 
     return {
       success: false,
-      providerName: adapters[adapters.length - 1]?.providerName ?? "none",
+      providerName: plan[plan.length - 1]?.adapter.providerName ?? "none",
+      senderUsed: plan[plan.length - 1]?.payload.from ?? payload.from,
+      attempts,
       errorCode: lastErrorCode,
       errorMessage: lastErrorMessage,
+      httpStatus: attempts.at(-1)?.httpStatus,
+      responseMeta: attempts.at(-1)?.responseMeta,
     };
   }
 }

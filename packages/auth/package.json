@@ -6,25 +6,29 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/auth-client.ts",
+    "./api-key": "./src/api-key.ts",
     "./permissions": "./src/permissions.ts",
     "./guards": "./src/guards.ts"
   },
   "dependencies": {
     "@better-auth/core": "1.4.3",
     "@reachdem/database": "workspace:*",
+    "@reachdem/shared": "workspace:*",
+    "@reachdem/core": "workspace:*",
     "@reachdem/transactional": "workspace:*",
     "@react-email/components": "^1.0.8",
     "@react-email/render": "^2.0.4",
     "better-auth": "^1.4.3",
-    "next": "^14.0.0 || ^15.0.0 || ^16.0.0",
+    "next": "16.2.2",
     "nodemailer": "^8.0.1",
-    "react": "^19.2.4",
+    "react": "^19.0.0",
+    "react-dom": "19.0.0",
     "resend": "^6.9.2"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.0.10",
     "typescript": "^5"
   }
 }

@@ -14,3 +14,13 @@ export {
 
 // Permissions (shared between server and client)
 export { ac, owner, admin, member, statement } from "./permissions";
+
+// API key helpers
+export {
+  API_KEY_PREFIX,
+  authenticateApiKey,
+  createApiKeyToken,
+  createWorkspaceApiKey,
+  ensureDefaultApiKeyForOrganization,
+  rotateDefaultApiKeyForOrganization,
+} from "./api-key";

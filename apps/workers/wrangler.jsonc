@@ -1,0 +1,121 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reachdem-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "no_handle_cross_request_promise_resolution"
+  ],
+  "find_additional_modules": true,
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "CAMPAIGN_LAUNCH_QUEUE",
+        "queue": "reachdem-campaign-launch-queue"
+      },
+      {
+        "binding": "SMS_QUEUE",
+        "queue": "reachdem-sms-queue"
+      },
+      {
+        "binding": "EMAIL_QUEUE",
+        "queue": "reachdem-email-queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "reachdem-campaign-launch-queue",
+        "max_batch_size": 5,
+        "max_batch_timeout": 2,
+        "max_concurrency": 2,
+        "max_retries": 5
+      },
+      {
+        "queue": "reachdem-sms-queue",
+        "max_batch_size": 50,
+        "max_batch_timeout": 2,
+        "max_concurrency": 10,
+        "max_retries": 5
+      },
+      {
+        "queue": "reachdem-email-queue",
+        "max_batch_size": 40,
+        "max_batch_timeout": 2,
+        "max_concurrency": 5,
+        "max_retries": 5
+      }
+    ]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "API_BASE_URL": "http://localhost:3000"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        "ENVIRONMENT": "production",
+        "API_BASE_URL": "https://develop.reachdem.cc"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-production"
+          },
+          {
+            "binding": "SMS_QUEUE",
+            "queue": "reachdem-sms-queue-production"
+          },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-campaign-launch-queue-production",
+            "max_batch_size": 5,
+            "max_batch_timeout": 2,
+            "max_concurrency": 2,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-sms-queue-production",
+            "max_batch_size": 50,
+            "max_batch_timeout": 2,
+            "max_concurrency": 10,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-email-queue-production",
+            "max_batch_size": 40,
+            "max_batch_timeout": 2,
+            "max_concurrency": 5,
+            "max_retries": 5
+          }
+        ]
+      }
+    }
+  }
+}

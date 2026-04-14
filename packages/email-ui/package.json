@@ -1,0 +1,50 @@
+{
+  "name": "@reachdem/email-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Email editor and templates for ReachDem campaigns",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.mjs",
+      "require": "./dist/editor/index.js"
+    },
+    "./templates": {
+      "types": "./dist/templates/index.d.ts",
+      "import": "./dist/templates/index.mjs",
+      "require": "./dist/templates/index.js"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@maily-to/core": "^0.3.7",
+    "@react-email/components": "^1.0.8",
+    "@tiptap/core": "^2.11.5",
+    "@tiptap/pm": "^3.20.5",
+    "@tiptap/react": "^2.11.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "tsup": "^8.0.0",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19"
+  }
+}

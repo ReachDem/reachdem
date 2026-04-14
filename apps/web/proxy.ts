@@ -1,10 +1,15 @@
 import { betterFetch } from "@better-fetch/fetch";
-import type { Session } from "better-auth/types";
 import { NextResponse, type NextRequest } from "next/server";
 
+type FlowStateResponse = {
+  hasSession: boolean;
+  isReady: boolean;
+  nextPath: string;
+};
+
 export default async function authProxy(request: NextRequest) {
-  const { data: session } = await betterFetch<Session>(
-    "/api/auth/get-session",
+  const { data: flow } = await betterFetch<FlowStateResponse>(
+    "/api/auth/flow-state",
     {
       baseURL: request.nextUrl.origin,
       headers: {
@@ -13,12 +18,24 @@ export default async function authProxy(request: NextRequest) {
     }
   );
 
-  if (!session) {
+  if (!flow?.hasSession) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+
+  if (!flow.isReady) {
+    if (flow.nextPath && new URL(request.url).pathname !== flow.nextPath) {
+      return NextResponse.redirect(new URL(flow.nextPath, request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard"],
+  matcher: [
+    "/dashboard",
+    "/campaigns/:path*",
+    "/contacts/:path*",
+    "/settings/:path*",
+  ],
 };

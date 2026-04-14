@@ -46,6 +46,13 @@ export class InfobipAdapter implements SmsSender {
             success: true,
             providerMessageId: msg.messageId,
             durationMs,
+            httpStatus: res.status,
+            responseMeta: {
+              messageId: msg.messageId ?? null,
+              statusId: msg.status?.id ?? null,
+              groupName: msg.status?.groupName ?? null,
+              description: msg.status?.description ?? null,
+            },
           };
         }
         // Infobip sometimes returns 200 with an error in body
@@ -58,6 +65,13 @@ export class InfobipAdapter implements SmsSender {
           errorMessage,
           retryable: classifyError(String(errorCode)) === "retryable",
           durationMs,
+          httpStatus: res.status,
+          responseMeta: {
+            messageId: msg?.messageId ?? null,
+            statusId: msg?.status?.id ?? null,
+            groupName: msg?.status?.groupName ?? null,
+            description: msg?.status?.description ?? null,
+          },
         };
       }
 
@@ -72,6 +86,11 @@ export class InfobipAdapter implements SmsSender {
         errorMessage,
         retryable: classifyError(errorCode) === "retryable",
         durationMs,
+        httpStatus: res.status,
+        responseMeta: {
+          messageId: data.requestError?.serviceException?.messageId ?? null,
+          text: data.requestError?.serviceException?.text ?? null,
+        },
       };
     } catch (err: any) {
       const durationMs = Date.now() - start;
@@ -82,6 +101,9 @@ export class InfobipAdapter implements SmsSender {
         errorMessage: err?.message ?? "Network error",
         retryable: true,
         durationMs,
+        responseMeta: {
+          errorName: err?.name ?? null,
+        },
       };
     }
   }

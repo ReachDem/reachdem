@@ -42,6 +42,16 @@ packages/stripe-app/.build/*
 .react-email
 .contentlayer
 .vscode
-*.csv
+
+# Customer data files - DO NOT COMMIT
+company_prospects_from_backup_cleaned.csv
+reachdem_contacts_from_formulaire.csv
+company_prospects_chunks_100/
+*.xlsx
+*.xls
+*.tsv
 *.ndjson
+*.jsonl
+
+# Test data
 .vitest

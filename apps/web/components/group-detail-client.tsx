@@ -253,7 +253,7 @@ function GroupMembersPanel({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => removeTarget && handleRemoveSingle(removeTarget)}
-              className="bg-destructive hover:bg-destructive/90 text-white"
+              variant="destructive"
             >
               Remove
             </AlertDialogAction>

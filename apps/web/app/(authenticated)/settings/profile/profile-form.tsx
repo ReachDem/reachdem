@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import * as z from "zod";
 import { authClient, useSession } from "@reachdem/auth/client";
 import { toast } from "sonner";
 import { Loader2, Camera, Mail } from "lucide-react";
@@ -21,6 +20,7 @@ import {
   SettingsCardTitle,
 } from "@/components/settings-card";
 import { AvatarCropperDialog } from "@/components/avatar-cropper-dialog";
+import { zodFormResolver } from "@/lib/zod-form-resolver";
 
 const nameFormSchema = z.object({
   name: z
@@ -53,14 +53,14 @@ export function ProfileForm() {
   const user = session?.user;
 
   const nameForm = useForm<NameFormValues>({
-    resolver: zodResolver(nameFormSchema),
+    resolver: zodFormResolver(nameFormSchema),
     defaultValues: {
       name: "",
     },
   });
 
   const passwordForm = useForm<PasswordFormValues>({
-    resolver: zodResolver(passwordFormSchema),
+    resolver: zodFormResolver(passwordFormSchema),
     defaultValues: {
       currentPassword: "",
       newPassword: "",

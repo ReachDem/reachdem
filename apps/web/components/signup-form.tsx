@@ -46,7 +46,7 @@ export function SignupForm({
           email,
           password,
           name,
-          callbackURL: "/dashboard",
+          callbackURL: "/",
         },
         {
           onError: (ctx) => {
@@ -54,7 +54,7 @@ export function SignupForm({
             setLoading(false);
           },
           onSuccess: () => {
-            router.push("/dashboard");
+            router.replace("/");
           },
         }
       );
@@ -69,7 +69,7 @@ export function SignupForm({
       setLoading(true);
       await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: "/",
       });
     } catch (error) {
       console.error("Google login error:", error);

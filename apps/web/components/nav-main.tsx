@@ -5,6 +5,7 @@ import {
   IconMessage,
   type Icon,
 } from "@tabler/icons-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import { TipsCard } from "@/components/onboarding/tips-card";
+import { getTipContent } from "@/components/onboarding/tips-engine";
 
 export function NavMain({
   items,
@@ -59,16 +62,16 @@ export function NavMain({
         <SidebarMenu>
           {items.map((item) =>
             item.items ? (
-              <div key={item.title} className="mb-2 flex flex-col gap-1">
+              <div key={item.title} className="flex flex-col gap-1">
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip={item.title} asChild>
                     <a href={item.url}>
                       {item.icon && <item.icon />}
-                      <span className="font-semibold">{item.title}</span>
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuSub className="ml-4 flex flex-col gap-1 border-l-0 pr-0">
+                <SidebarMenuSub className="ml-4 flex flex-col border-l-0 pr-0">
                   {item.items.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
@@ -84,19 +87,38 @@ export function NavMain({
                 </SidebarMenuSub>
               </div>
             ) : (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton tooltip={item.title}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                  {item.badge && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-auto px-1.5 py-0 text-[10px]"
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
+              <SidebarMenuItem key={item.title} className="relative">
+                <SidebarMenuButton tooltip={item.title} asChild>
+                  <Link href={item.url}>
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                    {item.badge && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto px-1.5 py-0 text-[10px]"
+                      >
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
                 </SidebarMenuButton>
+
+                {item.title === "Campaigns" && (
+                  <TipsCard
+                    tipId="step3"
+                    title={getTipContent("step3").title}
+                    description={getTipContent("step3").description}
+                    position="right"
+                  />
+                )}
+                {item.title === "Contacts" && (
+                  <TipsCard
+                    tipId="step2"
+                    title={getTipContent("step2").title}
+                    description={getTipContent("step2").description}
+                    position="right"
+                  />
+                )}
               </SidebarMenuItem>
             )
           )}

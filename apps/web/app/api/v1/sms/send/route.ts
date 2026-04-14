@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@reachdem/auth/guards";
-import { SendSmsUseCase } from "@reachdem/core";
+import {
+  EnqueueSmsUseCase,
+  MessageInsufficientCreditsError,
+  MessageSendValidationError,
+} from "@reachdem/core";
 import { sendSmsSchema } from "@reachdem/shared";
+import { publishSmsJob } from "../../../../../lib/publish-sms-job";
 
 export const POST = withWorkspace(async ({ req, organizationId }) => {
   try {
@@ -15,12 +20,22 @@ export const POST = withWorkspace(async ({ req, organizationId }) => {
       );
     }
 
-    const result = await SendSmsUseCase.execute(organizationId, parsed.data);
+    const result = await EnqueueSmsUseCase.execute(
+      organizationId,
+      parsed.data,
+      publishSmsJob
+    );
 
     return NextResponse.json(result, {
       status: result.idempotent ? 200 : 201,
     });
   } catch (error: any) {
+    if (
+      error instanceof MessageSendValidationError ||
+      error instanceof MessageInsufficientCreditsError
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     if (error.message?.startsWith("No SMS provider configured")) {
       return NextResponse.json({ error: error.message }, { status: 422 });
     }

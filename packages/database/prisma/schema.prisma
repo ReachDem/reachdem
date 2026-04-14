@@ -17,15 +17,25 @@ model User {
   email                 String   @unique
   emailVerified         Boolean  @default(false)
   image                 String?
+  firstName             String?
+  lastName              String?
+  termsAcceptedAt       DateTime?
+  privacyAcceptedAt     DateTime?
   role                  String? // Added for new onboarding flow
   defaultOrganizationId String? // Added for new onboarding flow
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  members     Member[]
-  invitations Invitation[]
+  accounts            Account[]
+  sessions            Session[]
+  members             Member[]
+  invitations         Invitation[]
+  paymentSessions     PaymentSession[]     @relation("PaymentSessionInitiator")
+  paymentTransactions PaymentTransaction[] @relation("PaymentTransactionInitiator")
+  feedbacks           Feedback[]
+  onboardingState     OnboardingState?
+  createdApiKeys      ApiKey[]             @relation("ApiKeyCreator")
+  revokedApiKeys      ApiKey[]             @relation("ApiKeyRevoker")
 
   @@map("user")
 }
@@ -84,23 +94,43 @@ model Verification {
 // ─── Better Auth Organization Plugin Models ───────────────────────────────────
 
 model Organization {
-  id        String   @id
-  name      String
-  slug      String   @unique
-  logo      String?
-  metadata  String?
-  createdAt DateTime @default(now())
+  id                          String                      @id
+  name                        String
+  slug                        String                      @unique
+  logo                        String?
+  metadata                    String?
+  companyName                 String?
+  country                     String?
+  planCode                    String                      @default("free")
+  creditBalance               Int                         @default(0)
+  smsQuotaUsed                Int                         @default(0)
+  emailQuotaUsed              Int                         @default(0)
+  workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
+  workspaceVerifiedAt         DateTime?
+  senderId                    String?                     @unique
+  websiteUrl                  String?
+  idDocumentKey               String?
+  businessDocumentKey         String?
+  createdAt                   DateTime                    @default(now())
 
-  members        Member[]
-  invitations    Invitation[]
-  sessions       Session[]
-  contacts       Contact[]
-  contactFields  ContactFieldDefinition[]
-  groups         Group[]
-  segments       Segment[]
-  activityEvents ActivityEvent[]
-  smsConfig      WorkspaceSmsConfig?
-  messages       Message[]
+  members             Member[]
+  invitations         Invitation[]
+  sessions            Session[]
+  contacts            Contact[]
+  contactFields       ContactFieldDefinition[]
+  groups              Group[]
+  segments            Segment[]
+  activityEvents      ActivityEvent[]
+  smsConfig           WorkspaceSmsConfig?
+  messages            Message[]
+  campaigns           Campaign[]
+  trackedLinks        TrackedLink[]
+  emailDeliveryEvents EmailDeliveryEvent[]
+  paymentSessions     PaymentSession[]
+  paymentTransactions PaymentTransaction[]
+  feedbacks           Feedback[]
+  onboardingStates    OnboardingState[]
+  apiKeys             ApiKey[]
 
   @@map("organization")
 }
@@ -138,6 +168,34 @@ model Invitation {
   @@map("invitation")
 }
 
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  token          String
+  salt           String
+  encryptedSecret String?
+  redacted       String
+  title          String
+  type           String
+  lastUsedAt     DateTime?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  revokedBy      String?
+  revokedAt      DateTime?
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User         @relation("ApiKeyCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  revoker      User?        @relation("ApiKeyRevoker", fields: [revokedBy], references: [id], onDelete: SetNull)
+  messages     Message[]
+  campaigns    Campaign[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, revokedAt, deletedAt])
+  @@map("api_key")
+}
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Gender {
@@ -154,6 +212,57 @@ enum ContactFieldType {
   BOOLEAN
   URL
   SELECT
+}
+
+enum ReachDemRole {
+  ENTREPRENEUR
+  MARKETER
+  SALES
+  DEVELOPER
+}
+
+enum OnboardingStep {
+  register
+  verify_email
+  workspace
+  profile
+  acquisition
+  transition
+  dashboard_checklist
+}
+
+enum AcquisitionSource {
+  linkedin
+  facebook
+  google
+  tiktok
+  friend_colleague
+  other
+}
+
+model OnboardingState {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  organizationId    String?
+  role              ReachDemRole?
+  acquisitionSource AcquisitionSource?
+  acquisitionOther  String?
+  status            String            @default("in_progress") // in_progress | completed | skipped
+  currentStep       OnboardingStep    @default(register)
+  step1CompletedAt  DateTime?         // workspace
+  step2CompletedAt  DateTime?         // profile
+  step3CompletedAt  DateTime?         // acquisition
+  skippedAt         DateTime?
+  completedAt       DateTime?
+  uiState           Json?             // { lastTooltipSeen, tooltipDismissedAt, resumeAnchor }
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("onboarding_state")
 }
 
 // ─── ReachDem App Models ──────────────────────────────────────────────────────
@@ -176,23 +285,29 @@ model ContactFieldDefinition {
 }
 
 model Contact {
-  id             String    @id @default(uuid())
-  organizationId String
-  name           String
-  phoneE164      String?
-  email          String?
-  gender         Gender?   @default(UNKNOWN)
-  birthdate      DateTime? @db.Date // Only store date component
-  address        String?
-  work           String?
-  enterprise     String?
-  customFields   Json? // Map of key to value
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime? // Soft delete
+  id                  String    @id @default(uuid())
+  organizationId      String
+  name                String
+  phoneE164           String?
+  email               String?
+  hasValidEmail       Boolean?
+  hasEmailableAddress Boolean?
+  hasValidNumber      Boolean?
+  gender              Gender?   @default(UNKNOWN)
+  birthdate           DateTime? @db.Date // Only store date component
+  address             String?
+  work                String?
+  enterprise          String?
+  customFields        Json? // Map of key to value
+    unsubscribe         Json? // Map of channel to unsubscription status
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime? // Soft delete
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships  GroupMember[]
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships     GroupMember[]
+  campaignTargets CampaignTarget[]
+  trackedLinks    TrackedLink[]
 
   @@index([organizationId])
   @@index([phoneE164])
@@ -357,15 +472,21 @@ model ProviderCall {
 enum SmsProvider {
   twilio
   infobip
+  lmt
+  mboaSms
+  avlytext
   stub
 }
 
 enum MessageChannel {
   sms
+  email
 }
 
 enum MessageStatus {
+  scheduled
   queued
+  sending
   sent
   failed
 }
@@ -374,6 +495,16 @@ enum AttemptStatus {
   queued
   sent
   failed
+}
+
+enum EmailDeliveryEventType {
+  delivered
+  bounced
+  opened
+  clicked
+  complained
+  unsubscribed
+  resubscribed
 }
 
 model WorkspaceSmsConfig {
@@ -392,24 +523,37 @@ model WorkspaceSmsConfig {
 model Message {
   id               String         @id @default(cuid())
   organizationId   String
+  campaignId       String?
+  apiKeyId         String?
   channel          MessageChannel @default(sms)
+  toEmail          String?
+  toE164           String?
   toHashed         String // SHA-256 of full E.164 number
   toLast4          String // Last 4 digits for display/debug
   from             String // Sender ID
-  text             String // Content (in clear for MVP)
+  subject          String?
+  text             String? // Content (in clear for MVP)
+  html             String?
   status           MessageStatus  @default(queued)
   providerSelected String? // Name of the winning provider
   correlationId    String         @default(uuid())
   idempotencyKey   String
+  scheduledAt      DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   attempts     MessageAttempt[]
+  trackedLinks TrackedLink[]
+  deliveryEvents EmailDeliveryEvent[]
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, createdAt])
+  @@index([organizationId, campaignId])
+  @@index([organizationId, apiKeyId])
   @@index([organizationId, status])
+  @@index([organizationId, channel, status, scheduledAt])
   @@map("message")
 }
 
@@ -426,9 +570,353 @@ model MessageAttempt {
   durationMs        Int
   createdAt         DateTime      @default(now())
 
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message             Message               @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  emailDeliveryEvents EmailDeliveryEvent[]
 
   @@index([messageId])
   @@index([organizationId, createdAt])
   @@map("message_attempt")
+}
+
+model EmailDeliveryEvent {
+  id                    String                 @id @default(uuid())
+  organizationId        String
+  campaignId            String?
+  messageId             String?
+  messageAttemptId      String?
+  provider              String
+  providerEventId       String                 @unique
+  providerEventType     String
+  providerMessageId     String?
+  providerMailMessageId String?
+  eventType             EmailDeliveryEventType
+  recipientEmail        String?
+  senderEmail           String?
+  url                   String?
+  userAgent             String?
+  clientIp              String?
+  errorCode             String?
+  errorMessage          String?
+  failureType           String?
+  providerTag           String?
+  rawPayload            Json
+  occurredAt            DateTime
+  createdAt             DateTime               @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  attempt      MessageAttempt? @relation(fields: [messageAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, campaignId, eventType])
+  @@index([organizationId, messageId, eventType])
+  @@index([organizationId, providerMessageId])
+  @@index([organizationId, occurredAt])
+  @@map("email_delivery_event")
+}
+
+// ─── Campaigns ──────────────────────────────────────────────────────────────
+
+enum CampaignStatus {
+  draft
+  running
+  partial
+  completed
+  failed
+  expired
+}
+
+enum CampaignChannel {
+  sms
+  email
+}
+
+enum TrackedLinkStatus {
+  active
+  disabled
+}
+
+enum PaymentKind {
+  subscription
+  creditPurchase
+}
+
+enum PaymentProvider {
+  flutterwave
+  stripe
+}
+
+enum PaymentSessionStatus {
+  pending
+  providerRedirected
+  processing
+  succeeded
+  failed
+  cancelled
+  expired
+}
+
+enum PaymentTransactionStatus {
+  initiated
+  pending
+  processing
+  succeeded
+  failed
+  cancelled
+  refunded
+}
+
+enum WorkspaceVerificationStatus {
+  not_submitted
+  pending
+  verified
+  rejected
+}
+
+enum AudienceSourceType {
+  group
+  segment
+}
+
+enum TargetStatus {
+  pending
+  sent
+  failed
+  skipped
+}
+
+enum FeedbackSource {
+  dashboard
+  widget
+  email
+  api
+  manual
+}
+
+enum FeedbackStatus {
+  new
+  reviewed
+  archived
+}
+
+model Campaign {
+  id             String          @id @default(uuid())
+  organizationId String
+  apiKeyId       String?
+  name           String
+  description    String?
+  channel        CampaignChannel @default(sms)
+  status         CampaignStatus  @default(draft)
+  content        Json
+  scheduledAt    DateTime?
+  createdBy      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey       ApiKey?            @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  audiences    CampaignAudience[]
+  targets      CampaignTarget[]
+  trackedLinks TrackedLink[]
+  deliveryEvents EmailDeliveryEvent[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, apiKeyId])
+  @@map("campaign")
+}
+
+model CampaignAudience {
+  id             String             @id @default(uuid())
+  campaignId     String
+  organizationId String
+  sourceType     AudienceSourceType
+  sourceId       String // ID of the Group or Segment
+
+  createdAt DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, sourceType, sourceId])
+  @@index([campaignId])
+  @@map("campaign_audience")
+}
+
+model CampaignTarget {
+  id             String       @id @default(uuid())
+  campaignId     String
+  organizationId String
+  contactId      String
+  resolvedTo     String // Hashed phone E.164
+  status         TargetStatus @default(pending)
+  messageId      String? // Reference to the actual sent Message (nullable)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Note: We don't define a strict relation to Message to avoid circular dependencies
+  // or cascade issues, it's just a reference ID.
+
+  @@unique([campaignId, contactId]) // Prevent duplicate targets in the same campaign
+  @@index([campaignId, status])
+  @@index([organizationId, contactId])
+  @@map("campaign_target")
+}
+
+model TrackedLink {
+  id              String            @id @default(uuid())
+  organizationId  String
+  sinkLinkId      String
+  slug            String
+  shortUrl        String
+  targetUrl       String
+  campaignId      String?
+  messageId       String?
+  contactId       String?
+  channel         MessageChannel?
+  status          TrackedLinkStatus @default(active)
+  totalClicks     Int?
+  uniqueClicks    Int?
+  lastStatsSyncAt DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  message      Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, slug])
+  @@unique([sinkLinkId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, campaignId])
+  @@index([organizationId, messageId])
+  @@index([organizationId, contactId])
+  @@map("tracked_link")
+}
+
+model PaymentSession {
+  id                  String               @id @default(uuid())
+  organizationId      String
+  initiatedByUserId   String
+  kind                PaymentKind
+  providerPrimary     PaymentProvider
+  providerSelected    PaymentProvider?
+  status              PaymentSessionStatus @default(pending)
+  currency            String
+  amountMinor         Int
+  planCode            String?
+  creditsQuantity     Int?
+  providerCheckoutUrl String?
+  providerSessionId   String?
+  providerReference   String?
+  metadata            Json?
+  activatedAt         DateTime?
+  failedAt            DateTime?
+  cancelledAt         DateTime?
+  expiredAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy  User                 @relation("PaymentSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  transactions PaymentTransaction[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, kind, createdAt])
+  @@index([organizationId, initiatedByUserId])
+  @@index([providerSelected, status])
+  @@map("payment_session")
+}
+
+model PaymentTransaction {
+  id                    String                   @id @default(uuid())
+  paymentSessionId      String
+  organizationId        String
+  initiatedByUserId     String?
+  provider              PaymentProvider
+  status                PaymentTransactionStatus @default(initiated)
+  amountMinor           Int
+  currency              String
+  providerTransactionId String?
+  providerSessionId     String?
+  providerReference     String?
+  providerEventId       String?
+  rawStatus             String?
+  rawPayload            Json?
+  confirmedAt           DateTime?
+  failedAt              DateTime?
+  cancelledAt           DateTime?
+  refundedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  paymentSession PaymentSession @relation(fields: [paymentSessionId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy    User?          @relation("PaymentTransactionInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([paymentSessionId, createdAt])
+  @@index([organizationId, provider, status])
+  @@index([provider, providerReference])
+  @@index([provider, providerTransactionId])
+  @@index([provider, providerEventId])
+  @@map("payment_transaction")
+}
+
+model Feedback {
+  id             String         @id @default(uuid())
+  organizationId String?
+  userId         String?
+  source         FeedbackSource @default(dashboard)
+  status         FeedbackStatus @default(new)
+  category       String?
+  rating         Int?
+  pagePath       String?
+  message        String
+  email          String?
+  metadata       Json?
+  reviewedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@map("feedbacks")
+}
+
+model PaymentWebhookEvent {
+  id                String          @id @default(uuid())
+  provider          PaymentProvider
+  providerEventId   String?
+  providerReference String?
+  providerSignature String?
+  signatureValid    Boolean         @default(false)
+  processed         Boolean         @default(false)
+  processedAt       DateTime?
+  rawPayload        Json
+  receivedAt        DateTime        @default(now())
+
+  @@unique([provider, providerEventId])
+  @@index([provider, providerReference])
+  @@index([provider, receivedAt])
+  @@index([provider, processed])
+  @@map("payment_webhook_event")
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_setting")
 }

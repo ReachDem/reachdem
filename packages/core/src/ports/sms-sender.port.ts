@@ -17,6 +17,8 @@ export type SmsResult =
       success: true;
       providerMessageId: string;
       durationMs: number;
+      httpStatus?: number;
+      responseMeta?: Record<string, unknown>;
     }
   | {
       success: false;
@@ -28,6 +30,8 @@ export type SmsResult =
        */
       retryable: boolean;
       durationMs: number;
+      httpStatus?: number;
+      responseMeta?: Record<string, unknown>;
     };
 
 export interface SmsSender {

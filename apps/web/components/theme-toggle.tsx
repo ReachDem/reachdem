@@ -3,89 +3,68 @@
 import type React from "react";
 
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
 
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const currentTheme = resolvedTheme === "dark" ? "dark" : "light";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const handleThemeChange = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const newTheme = resolvedTheme === "dark" ? "light" : "dark";
-    const button = event.currentTarget;
+  const setTransitionOrigin = (button: HTMLButtonElement) => {
     const rect = button.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
 
-    // Calculate the maximum distance to any corner of the viewport
-    const maxX = Math.max(x, window.innerWidth - x);
-    const maxY = Math.max(y, window.innerHeight - y);
-    const maxRadius = Math.sqrt(maxX * maxX + maxY * maxY);
-
-    // Create the ripple overlay
-    const ripple = document.createElement("div");
-    ripple.style.cssText = `
-      position: fixed;
-      top: ${y}px;
-      left: ${x}px;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      z-index: 9999;
-      background-color: ${newTheme === "dark" ? "oklch(0.145 0 0)" : "oklch(1 0 0)"};
-    `;
-    document.body.appendChild(ripple);
-
-    // Animate the ripple
-    ripple.animate(
-      [
-        { width: "0px", height: "0px", opacity: 1 },
-        {
-          width: `${maxRadius * 2}px`,
-          height: `${maxRadius * 2}px`,
-          opacity: 1,
-        },
-      ],
-      {
-        duration: 600,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-        fill: "forwards",
-      }
-    ).onfinish = () => {
-      setTheme(newTheme);
-      setTimeout(() => {
-        ripple.animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: 200,
-          easing: "ease-out",
-          fill: "forwards",
-        }).onfinish = () => {
-          ripple.remove();
-        };
-      }, 50);
-    };
+    document.documentElement.style.setProperty("--theme-wave-x", `${x}px`);
+    document.documentElement.style.setProperty("--theme-wave-y", `${y}px`);
   };
 
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-        <Sun className="h-4 w-4" />
-      </Button>
-    );
-  }
+  const changeThemeWithWave = (
+    nextTheme: "light" | "dark",
+    button: HTMLButtonElement
+  ) => {
+    if (currentTheme === nextTheme) {
+      return;
+    }
 
-  const isDark = resolvedTheme === "dark";
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const transitionDocument = document as Document & {
+      startViewTransition?: (callback: () => void) => {
+        finished: Promise<void>;
+      };
+    };
+
+    setTransitionOrigin(button);
+
+    if (!transitionDocument.startViewTransition || prefersReducedMotion) {
+      setTheme(nextTheme);
+      return;
+    }
+
+    document.documentElement.classList.add("theme-transition");
+
+    const transition = transitionDocument.startViewTransition(() => {
+      setTheme(nextTheme);
+    });
+
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove("theme-transition");
+    });
+  };
+
+  const handleThemeChange = (event: React.MouseEvent<HTMLButtonElement>) => {
+    changeThemeWithWave(
+      currentTheme === "dark" ? "light" : "dark",
+      event.currentTarget
+    );
+  };
+
+  const isDark = currentTheme === "dark";
 
   return (
     <Button
-      ref={buttonRef}
       variant="ghost"
       size="icon"
       className="relative h-8 w-8 rounded-full"
@@ -93,9 +72,11 @@ export function ThemeToggle() {
     >
       <Sun
         className={`absolute h-4 w-4 transition-all duration-300 ${isDark ? "scale-100 rotate-0 opacity-100" : "scale-0 rotate-90 opacity-0"}`}
+        suppressHydrationWarning
       />
       <Moon
         className={`absolute h-4 w-4 transition-all duration-300 ${isDark ? "scale-0 -rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"}`}
+        suppressHydrationWarning
       />
       <span className="sr-only">Toggle theme</span>
     </Button>

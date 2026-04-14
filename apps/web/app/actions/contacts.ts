@@ -2,7 +2,11 @@
 
 import { prisma, Prisma } from "@reachdem/database";
 import { auth } from "@reachdem/auth";
+import { computeContactChannelFlags } from "@reachdem/shared";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { promises as dns } from "node:dns";
+import validator from "validator";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -16,6 +20,111 @@ async function getOrganizationId() {
     throw new Error("Organization selection required");
   }
   return organizationId;
+}
+
+const emailMxCache = new Map<string, boolean>();
+
+export interface InvalidImportedEmailContact {
+  name: string;
+  originalEmail: string;
+  phoneE164: string | null;
+  reason: string;
+}
+
+export interface PreparedImportContactsResult {
+  contacts: any[];
+  invalidEmailContacts: InvalidImportedEmailContact[];
+  removedEmailCount: number;
+  rowsMissingRequired: number;
+}
+
+async function hasMxRecords(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+
+  if (!domain) {
+    return false;
+  }
+
+  const cached = emailMxCache.get(domain);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const records = await dns.resolveMx(domain);
+    const hasRecords = records.length > 0;
+    emailMxCache.set(domain, hasRecords);
+    return hasRecords;
+  } catch {
+    emailMxCache.set(domain, false);
+    return false;
+  }
+}
+
+async function sanitizeImportedContacts(
+  contacts: any[]
+): Promise<PreparedImportContactsResult> {
+  const sanitizedContacts: any[] = [];
+  const invalidEmailContacts: InvalidImportedEmailContact[] = [];
+
+  for (const contact of contacts) {
+    const prepared = { ...contact };
+    const normalizedEmail =
+      typeof prepared.email === "string"
+        ? prepared.email.toLowerCase().trim()
+        : "";
+
+    if (normalizedEmail) {
+      const validFormat = validator.isEmail(normalizedEmail, {
+        allow_utf8_local_part: false,
+        require_tld: true,
+      });
+      const validMx = validFormat ? await hasMxRecords(normalizedEmail) : false;
+
+      if (!validFormat || !validMx) {
+        invalidEmailContacts.push({
+          name: prepared.name || "Unnamed contact",
+          originalEmail: normalizedEmail,
+          phoneE164: prepared.phoneE164 || null,
+          reason:
+            "This email did not seem ready to receive messages, so it was left blank during import.",
+        });
+        prepared.email = null;
+      } else {
+        prepared.email = normalizedEmail;
+      }
+    }
+
+    const hasName = Boolean(prepared.name && String(prepared.name).trim());
+    const hasPhone = Boolean(
+      prepared.phoneE164 && String(prepared.phoneE164).trim()
+    );
+    const hasEmail = Boolean(prepared.email && String(prepared.email).trim());
+
+    if (hasName && (hasPhone || hasEmail)) {
+      sanitizedContacts.push(prepared);
+    }
+  }
+
+  return {
+    contacts: sanitizedContacts,
+    invalidEmailContacts,
+    removedEmailCount: invalidEmailContacts.length,
+    rowsMissingRequired: contacts.length - sanitizedContacts.length,
+  };
+}
+
+export async function prepareContactsForImport(
+  orgId: string,
+  contacts: any[]
+): Promise<PreparedImportContactsResult> {
+  if (orgId) {
+    await getOrganizationId();
+  } else {
+    await getOrganizationId();
+  }
+
+  return sanitizeImportedContacts(contacts);
 }
 
 /**
@@ -77,11 +186,29 @@ export async function importContactsBulk(
   const organizationId = orgId || (await getOrganizationId());
 
   if (!contacts || contacts.length === 0) {
-    return { success: true, count: 0 };
+    return {
+      success: true,
+      count: 0,
+      invalidEmailContacts: [],
+      removedEmailCount: 0,
+      rowsMissingRequired: 0,
+    };
+  }
+
+  const prepared = await sanitizeImportedContacts(contacts);
+
+  if (prepared.contacts.length === 0) {
+    return {
+      success: true,
+      count: 0,
+      invalidEmailContacts: prepared.invalidEmailContacts,
+      removedEmailCount: prepared.removedEmailCount,
+      rowsMissingRequired: prepared.rowsMissingRequired,
+    };
   }
 
   // ── 1. Normalise & sanitise each contact ──────────────────────────────────
-  const normalised = contacts.map((c) => {
+  const normalised = prepared.contacts.map((c) => {
     const email = c.email ? c.email.toLowerCase().trim() : undefined;
     const phone = c.phoneE164 || undefined;
 
@@ -169,13 +296,26 @@ export async function importContactsBulk(
           ...c.customFields,
         };
       }
+      Object.assign(
+        updateData,
+        computeContactChannelFlags({
+          email:
+            updateData.email !== undefined ? updateData.email : existing.email,
+          phoneE164:
+            updateData.phoneE164 !== undefined
+              ? updateData.phoneE164
+              : existing.phoneE164,
+        })
+      );
       toUpdate.push({ id: existing.id, data: updateData });
     } else {
       toCreate.push({
         organizationId,
         name: c.name || "Unknown",
-        email: c.email || null,
-        phoneE164: c.phoneE164 || null,
+        ...computeContactChannelFlags({
+          email: c.email || null,
+          phoneE164: c.phoneE164 || null,
+        }),
         gender: c.gender || "UNKNOWN",
         birthdate: c.birthdate || null,
         address: c.address || null,
@@ -206,7 +346,16 @@ export async function importContactsBulk(
     successCount += toUpdate.length;
   }
 
-  return { success: true, count: successCount };
+  revalidatePath("/dashboard");
+  revalidatePath("/contacts");
+
+  return {
+    success: true,
+    count: successCount,
+    invalidEmailContacts: prepared.invalidEmailContacts,
+    removedEmailCount: prepared.removedEmailCount,
+    rowsMissingRequired: prepared.rowsMissingRequired,
+  };
 }
 
 /**
@@ -234,4 +383,90 @@ export async function getContacts() {
   });
 
   return contacts;
+}
+
+/**
+ * Update a single contact for the active organization.
+ */
+export async function updateContact(
+  contactId: string,
+  data: {
+    name?: string;
+    email?: string | null;
+    phoneE164?: string | null;
+    gender?: string;
+    birthdate?: Date | null;
+    address?: string | null;
+    work?: string | null;
+    enterprise?: string | null;
+    customFields?: Record<string, unknown>;
+  }
+) {
+  try {
+    const organizationId = await getOrganizationId();
+
+    // Verify the contact belongs to this organization
+    const existing = await prisma.contact.findFirst({
+      where: {
+        id: contactId,
+        organizationId,
+        deletedAt: null,
+      },
+    });
+
+    if (!existing) {
+      return { success: false, error: "Contact not found" };
+    }
+
+    // Update the contact
+    const updateData: any = {
+      ...data,
+      ...computeContactChannelFlags({
+        email: data.email !== undefined ? data.email : existing.email,
+        phoneE164:
+          data.phoneE164 !== undefined ? data.phoneE164 : existing.phoneE164,
+      }),
+    };
+
+    const updated = await prisma.contact.update({
+      where: { id: contactId },
+      data: updateData,
+    });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/contacts");
+
+    return { success: true, contact: updated };
+  } catch (error) {
+    console.error("Error updating contact:", error);
+    return { success: false, error: "Failed to update contact" };
+  }
+}
+
+/**
+ * Soft-delete one or more contacts for the active organization.
+ */
+export async function deleteContacts(ids: string[]) {
+  const organizationId = await getOrganizationId();
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+  if (uniqueIds.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const result = await prisma.contact.updateMany({
+    where: {
+      id: { in: uniqueIds },
+      organizationId,
+      deletedAt: null,
+    },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/contacts");
+
+  return { success: true, count: result.count };
 }

@@ -1,0 +1,8 @@
+API_BASE_URL=http://localhost:3000
+INTERNAL_API_SECRET=replace-me
+ENVIRONMENT=development
+ALIBABA_ACCESS_KEY_ID=replace-me
+ALIBABA_ACCESS_KEY_SECRET=replace-me
+ALIBABA_REGION=eu-central-1
+ALIBABA_SENDER_EMAIL=notifications@example.com
+ALIBABA_SENDER_NAME=ReachDem Notifications

@@ -110,6 +110,8 @@ export class SegmentService {
           name: true,
           phoneE164: true,
           email: true,
+          hasValidNumber: true,
+          hasEmailableAddress: true,
           gender: true,
           enterprise: true,
         },

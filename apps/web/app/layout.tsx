@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./fonts.css";
+import { Providers } from "@/components/providers";
+import { getThemeScript } from "@/lib/theme";
 
 const neueMontreal = localFont({
   src: [
@@ -36,15 +38,27 @@ export const metadata: Metadata = {
   },
 };
 
+const themeScript = getThemeScript({
+  attribute: "class",
+  defaultTheme: "system",
+  enableSystem: true,
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+          suppressHydrationWarning
+        />
+      </head>
       <body className={`${neueMontreal.variable} font-sans antialiased`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

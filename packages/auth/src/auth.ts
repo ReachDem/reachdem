@@ -4,9 +4,11 @@ import { organization, emailOTP } from "better-auth/plugins";
 import { prisma } from "@reachdem/database";
 import { ac, owner, admin, member } from "./permissions";
 import { render } from "@react-email/render";
-import { VerificationEmail } from "@reachdem/transactional";
+import { VerificationEmail } from "@reachdem/transactional/emails/verification";
+import { WelcomeEmail } from "@reachdem/transactional/emails/welcome";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
+import { ActivityLogger } from "@reachdem/core";
 
 const smtpHost = process.env.SMTP_HOST;
 const smtpUser = process.env.SMTP_USER;
@@ -32,6 +34,18 @@ const smtpOptions: SMTPTransport.Options = {
   authMethod: "LOGIN",
 };
 const transporter = nodemailer.createTransport(smtpOptions);
+
+function getWelcomeDisplayName(user: { name?: string | null; email: string }) {
+  const trimmedName = user.name?.trim();
+
+  if (trimmedName) {
+    return trimmedName;
+  }
+
+  const emailLocalPart = user.email.split("@")[0]?.trim();
+
+  return emailLocalPart || "there";
+}
 
 /**
  * Central Better Auth configuration shared by all apps (ReachDem + Links).
@@ -92,23 +106,43 @@ export const auth = betterAuth({
     organization({
       ac,
       roles: { owner, admin, member },
-      allowUserToCreateOrganization: true,
+      allowUserToCreateOrganization: async (user: any) => {
+        return user.emailVerified === true;
+      },
       creatorRole: "owner",
-      async sendInvitationEmail(data) {
+      async sendInvitationEmail(data: any) {
         // TODO: Wire to your email provider (Resend / Alibaba DM)
-        // For now, log the invitation link to console
         const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invitation/${data.id}`;
-        console.log(`[Auth] Invitation email to ${data.email}:`, inviteLink);
-        console.log(
-          `  Invited by: ${data.inviter.user.name} (${data.inviter.user.email})`
-        );
-        console.log(`  Organization: ${data.organization.name}`);
-        console.log(`  Role: ${data.role}`);
+
+        await ActivityLogger.log({
+          organizationId: data.organization.id,
+          actorType: "user",
+          actorId: data.inviter.user.id,
+          category: "auth",
+          action: "send_success",
+          status: "success",
+          meta: {
+            inviteEmail: data.email,
+            inviteLink,
+            role: data.role,
+            action: "invitation_email",
+          },
+        }).catch(() => {});
       },
     }),
     emailOTP({
       async sendVerificationOTP({ email, otp, type }, request) {
-        console.log(`[EmailOTP] Sending ${type} OTP`);
+        const fallbackOrg = await prisma.organization.findFirst();
+        const fallbackOrgId = fallbackOrg?.id || "fallback";
+
+        await ActivityLogger.log({
+          organizationId: fallbackOrgId,
+          actorType: "system",
+          category: "auth",
+          action: "send_attempt",
+          status: "pending",
+          meta: { email, type, action: "sending_otp" },
+        }).catch(() => {});
 
         const html = await render(VerificationEmail({ otp, name: "User" }));
 
@@ -119,9 +153,27 @@ export const auth = betterAuth({
             subject: "Verify your email address",
             html,
           });
-          console.log(`[EmailOTP] Successfully sent OTP`);
+          await ActivityLogger.log({
+            organizationId: fallbackOrgId,
+            actorType: "system",
+            category: "auth",
+            action: "send_success",
+            status: "success",
+            meta: { email, type, action: "sent_otp_success" },
+          }).catch(() => {});
         } catch (err) {
-          console.error("[EmailOTP] Failed to send OTP email:", err);
+          await ActivityLogger.log({
+            organizationId: fallbackOrgId,
+            actorType: "system",
+            category: "auth",
+            action: "send_failed",
+            status: "failed",
+            meta: {
+              email,
+              type,
+              error: err instanceof Error ? err.message : "Unknown error",
+            },
+          }).catch(() => {});
         }
       },
     }),
@@ -149,6 +201,75 @@ export const auth = betterAuth({
             }
           }
           return { data: session };
+        },
+      },
+    },
+    user: {
+      create: {
+        after: async (user) => {
+          const fallbackOrg = await prisma.organization.findFirst();
+          const fallbackOrgId = fallbackOrg?.id || "fallback";
+
+          await ActivityLogger.log({
+            organizationId: fallbackOrgId,
+            actorType: "system",
+            actorId: user.id,
+            category: "auth",
+            action: "send_attempt",
+            status: "pending",
+            meta: { email: user.email, action: "welcome_email_sending" },
+          }).catch(() => {});
+
+          try {
+            const html = await render(
+              WelcomeEmail({ name: getWelcomeDisplayName(user) })
+            );
+            await transporter.sendMail({
+              from: `"Belrick from ReachDem" <${process.env.SMTP_USER}>`,
+              replyTo: "contact@reachdem.cc",
+              to: user.email,
+              subject: "Welcome to ReachDem",
+              html,
+            });
+            await ActivityLogger.log({
+              organizationId: fallbackOrgId,
+              actorType: "system",
+              actorId: user.id,
+              category: "auth",
+              action: "send_success",
+              status: "success",
+              meta: { email: user.email, action: "welcome_email_sent" },
+            }).catch(() => {});
+          } catch (err) {
+            await ActivityLogger.log({
+              organizationId: fallbackOrgId,
+              actorType: "system",
+              actorId: user.id,
+              category: "auth",
+              action: "send_failed",
+              status: "failed",
+              meta: {
+                email: user.email,
+                error: err instanceof Error ? err.message : "Unknown error",
+                action: "welcome_email_failed",
+              },
+            }).catch(() => {});
+          }
+
+          // Admin notification for new signup
+          try {
+            await transporter.sendMail({
+              from: `"ReachDem App" <${process.env.SMTP_USER}>`,
+              to: "contact@reachdem.cc",
+              subject: `🎉 Un nouveau client vient de s'inscrire !`,
+              text: `Un nouvel utilisateur vient de s'inscrire :\n\nNom: ${user.name || "Non spécifié"}\nEmail: ${user.email}\nID: ${user.id}\n\nYAY!`,
+            });
+          } catch (err) {
+            console.error(
+              "[Hooks] Failed to send admin notification email:",
+              err
+            );
+          }
         },
       },
     },

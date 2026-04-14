@@ -42,6 +42,29 @@ export class ActivityLogger {
   }
 
   /**
+   * Creates an activity event once for a given idempotency key.
+   * Falls back to log() when no idempotency key is provided.
+   */
+  static async logOnce(input: CreateEventInput) {
+    if (!input.idempotencyKey) {
+      return this.log(input);
+    }
+
+    const existing = await prisma.activityEvent.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        idempotencyKey: input.idempotencyKey,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.log(input);
+  }
+
+  /**
    * Creates a ProviderCall record linked to an ActivityEvent.
    */
   static async logProviderCall(input: CreateProviderCallInput) {

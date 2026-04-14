@@ -2,48 +2,75 @@ import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAuthFlowState } from "@/lib/auth-flow";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { OrganizationVerificationBanner } from "@/components/organization-verification-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { TipsProvider } from "@/components/onboarding/tips-engine";
 
 export default async function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const flow = await getAuthFlowState();
 
-  if (!session) {
+  if (!flow.hasSession || !flow.session) {
     redirect("/login");
   }
 
-  // Check if user has completed onboarding
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { defaultOrganizationId: true },
-  });
-
-  if (!dbUser?.defaultOrganizationId) {
-    redirect("/signup");
+  if (!flow.hasCompletedSetup) {
+    redirect("/continue-setup");
   }
 
+  const activeOrganizationId =
+    flow.session?.session.activeOrganizationId ?? flow.defaultOrganizationId;
+
+  const activeOrganization = activeOrganizationId
+    ? await prisma.organization.findUnique({
+        where: { id: activeOrganizationId },
+        select: {
+          senderId: true,
+          workspaceVerificationStatus: true,
+        },
+      })
+    : null;
+
+  const showVerificationBanner = Boolean(
+    activeOrganization?.senderId &&
+    activeOrganization.workspaceVerificationStatus !== "verified"
+  );
+
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+    <TipsProvider>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          {showVerificationBanner ? (
+            <OrganizationVerificationBanner
+              senderId={activeOrganization!.senderId!}
+              verificationStatus={
+                activeOrganization!.workspaceVerificationStatus as
+                  | "not_submitted"
+                  | "pending"
+                  | "verified"
+                  | "rejected"
+              }
+            />
+          ) : null}
+          <SiteHeader />
+          {children}
+        </SidebarInset>
+      </SidebarProvider>
+    </TipsProvider>
   );
 }
