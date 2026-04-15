@@ -130,9 +130,13 @@ export async function verifyOtpCompletion() {
     });
 
     if (dbUser?.emailVerified) {
-      await prisma.onboardingState.update({
+      await prisma.onboardingState.upsert({
         where: { userId: user.id },
-        data: { currentStep: "workspace" },
+        update: { currentStep: "workspace" },
+        create: {
+          userId: user.id,
+          currentStep: "workspace",
+        },
       });
       return { success: true };
     }
@@ -199,9 +203,15 @@ export async function createWorkspace(
         data: { defaultOrganizationId: organization.id },
       });
 
-      await tx.onboardingState.update({
+      await tx.onboardingState.upsert({
         where: { userId: user.id },
-        data: {
+        update: {
+          organizationId: organization.id,
+          currentStep: "profile",
+          step1CompletedAt: new Date(),
+        },
+        create: {
+          userId: user.id,
           organizationId: organization.id,
           currentStep: "profile",
           step1CompletedAt: new Date(),
@@ -227,9 +237,15 @@ export async function createWorkspace(
 
 export async function savePrimaryRole(role: ReachDemRole) {
   return withAuthAction(async ({ user }) => {
-    await prisma.onboardingState.update({
+    await prisma.onboardingState.upsert({
       where: { userId: user.id },
-      data: {
+      update: {
+        role,
+        currentStep: "acquisition",
+        step2CompletedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         role,
         currentStep: "acquisition",
         step2CompletedAt: new Date(),
@@ -245,9 +261,16 @@ export async function saveAcquisitionSource(
   otherText?: string
 ) {
   return withAuthAction(async ({ user }) => {
-    await prisma.onboardingState.update({
+    await prisma.onboardingState.upsert({
       where: { userId: user.id },
-      data: {
+      update: {
+        acquisitionSource: source,
+        acquisitionOther: otherText || null,
+        currentStep: "transition",
+        step3CompletedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         acquisitionSource: source,
         acquisitionOther: otherText || null,
         currentStep: "transition",
@@ -261,9 +284,15 @@ export async function saveAcquisitionSource(
 
 export async function completeOnboarding() {
   return withAuthAction(async ({ user }) => {
-    await prisma.onboardingState.update({
+    await prisma.onboardingState.upsert({
       where: { userId: user.id },
-      data: {
+      update: {
+        status: "completed",
+        currentStep: "dashboard_checklist",
+        completedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         status: "completed",
         currentStep: "dashboard_checklist",
         completedAt: new Date(),
