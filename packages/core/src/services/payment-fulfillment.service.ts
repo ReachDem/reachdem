@@ -16,16 +16,28 @@ interface FulfillPaymentInput {
 
 export class PaymentFulfillmentService {
   static async fulfill(input: FulfillPaymentInput): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      const session = await tx.paymentSession.findUnique({
-        where: { id: input.paymentSessionId },
-        include: {
-          initiatedBy: true,
+    const session = await prisma.paymentSession.findUnique({
+      where: { id: input.paymentSessionId },
+      include: {
+        initiatedBy: true,
+      },
+    });
+
+    if (!session || session.activatedAt) {
+      return;
+    }
+
+    const fulfilled = await prisma.$transaction(async (tx) => {
+      // Use updateMany for atomic check-and-set
+      const result = await tx.paymentSession.updateMany({
+        where: { id: input.paymentSessionId, activatedAt: null },
+        data: {
+          activatedAt: new Date(),
         },
       });
 
-      if (!session || session.activatedAt) {
-        return;
+      if (result.count === 0) {
+        return false; // Already fulfilled!
       }
 
       if (input.kind === "subscription") {
@@ -52,15 +64,11 @@ export class PaymentFulfillmentService {
         });
       }
 
-      await tx.paymentSession.update({
-        where: { id: input.paymentSessionId },
-        data: {
-          activatedAt: new Date(),
-        },
-      });
+      return true;
+    });
 
-      // Send email out of transaction or as a side-effect, we can just do it here loosely
-      // but without awaiting heavily if we don't want to block, or we just fire and forget.
+    if (fulfilled) {
+      // Send email out of transaction
       try {
         if (session.initiatedBy?.email) {
           const userName = session.initiatedBy.name || "User";
@@ -92,6 +100,6 @@ export class PaymentFulfillmentService {
       } catch (err) {
         console.error("Failed to send payment success email:", err);
       }
-    });
+    }
   }
 }

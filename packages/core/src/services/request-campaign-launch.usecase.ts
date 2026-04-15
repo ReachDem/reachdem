@@ -151,11 +151,11 @@ export class RequestCampaignLaunchUseCase {
           ...(updateContent ? { content: updateContent } : {}),
         },
       });
-    });
 
-    await publishCampaignLaunchJob({
-      campaign_id: campaignId,
-      organization_id: organizationId,
+      await publishCampaignLaunchJob({
+        campaign_id: campaignId,
+        organization_id: organizationId,
+      });
     });
 
     await ActivityLogger.log({

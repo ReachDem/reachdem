@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { uploadImageToS3, uploadImageFromUrl } from "@/lib/upload-image";
+import { NextResponse } from "next/server";
+import { uploadImageToS3 } from "@/lib/upload-image";
+import { withWorkspace } from "@reachdem/auth/guards";
 
-export async function POST(request: NextRequest) {
+export const POST = withWorkspace(async ({ req, organizationId }) => {
   try {
-    const contentType = request.headers.get("content-type");
+    const contentType = req.headers.get("content-type");
 
     // Handle file upload
     if (contentType?.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      const formData = await req.formData();
       const file = formData.get("file") as File;
 
       if (!file) {
@@ -38,20 +39,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ url });
     }
 
-    // Handle URL upload
-    if (contentType?.includes("application/json")) {
-      const body = await request.json();
-      const { url: imageUrl } = body;
-
-      if (!imageUrl) {
-        return NextResponse.json({ error: "No URL provided" }, { status: 400 });
-      }
-
-      const url = await uploadImageFromUrl(imageUrl);
-
-      return NextResponse.json({ url });
-    }
-
     return NextResponse.json(
       { error: "Invalid content type" },
       { status: 400 }
@@ -63,4 +50,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
