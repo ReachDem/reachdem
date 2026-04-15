@@ -4,12 +4,26 @@ import {
   EnqueueSmsUseCase,
   MessageInsufficientCreditsError,
   MessageSendValidationError,
+  RateLimiter,
 } from "@reachdem/core";
 import { sendSmsSchema } from "@reachdem/shared";
 import { publishSmsJob } from "../../../../../lib/publish-sms-job";
 
+// Enterprise-Grade Optimization: Rate limiting per Workspace to prevent SMS pump abuse (e.g. 50/min/org)
+const smsRateLimiter = new RateLimiter(50, 60 * 1000);
+
 export const POST = withWorkspace(async ({ req, organizationId }) => {
   try {
+    if (!smsRateLimiter.check(organizationId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Rate limit exceeded. Too many SMS requests from this workspace.",
+        },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
+
     const body = await req.json();
     const parsed = sendSmsSchema.safeParse(body);
 

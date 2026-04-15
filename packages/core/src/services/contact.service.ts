@@ -16,7 +16,11 @@ export class ContactService {
   /**
    * Create a new contact
    */
-  static async createContact(organizationId: string, data: CreateContactInput) {
+  static async createContact(
+    organizationId: string,
+    data: CreateContactInput,
+    db: Prisma.TransactionClient = prisma
+  ) {
     // Validation: Must have either phone or email
     if (
       (!data.phoneE164 || data.phoneE164.length === 0) &&
@@ -34,7 +38,7 @@ export class ContactService {
         );
       }
 
-      const definitions = await prisma.contactFieldDefinition.findMany({
+      const definitions = await db.contactFieldDefinition.findMany({
         where: { organizationId },
       });
 
@@ -44,7 +48,7 @@ export class ContactService {
       }
     }
 
-    return prisma.contact.create({
+    return db.contact.create({
       data: {
         ...data,
         ...computeContactChannelFlags({
@@ -56,6 +60,46 @@ export class ContactService {
           ? (data.customFields as Prisma.InputJsonValue)
           : Prisma.JsonNull,
       },
+    });
+  }
+
+  /**
+   * Bulk Create Contacts (Optimization: Bulk Operations + Unit of Work)
+   */
+  static async createContacts(
+    organizationId: string,
+    contacts: CreateContactInput[],
+    db: Prisma.TransactionClient = prisma
+  ) {
+    if (contacts.length === 0) return { count: 0 };
+
+    // Fetch definitions once for the whole batch
+    const definitions = await db.contactFieldDefinition.findMany({
+      where: { organizationId },
+    });
+
+    const validData = contacts.map((data) => {
+      if (data.customFields) {
+        const validation = validateCustomFields(data.customFields, definitions);
+        if (!validation.isValid) throw new Error(validation.error);
+      }
+      return {
+        ...data,
+        ...computeContactChannelFlags({
+          email: data.email,
+          phoneE164: data.phoneE164,
+        }),
+        organizationId,
+        customFields: data.customFields
+          ? (data.customFields as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+      };
+    });
+
+    // Uses createMany for bulk performance instead of N queries
+    return db.contact.createMany({
+      data: validData,
+      skipDuplicates: true, // Graceful failure for collisions
     });
   }
 

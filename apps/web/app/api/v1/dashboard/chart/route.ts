@@ -25,43 +25,36 @@ export const GET = withWorkspace(async ({ organizationId }) => {
     const dateSeries = buildDateSeries();
     const startDate = new Date(`${dateSeries[0]}T00:00:00.000Z`);
 
-    const messages = await prisma.message.findMany({
-      where: {
-        organizationId,
-        createdAt: {
-          gte: startDate,
-        },
-      },
-      select: {
-        channel: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    const rawAggregates = await prisma.$queryRaw<
+      { day: Date; channel: string; total: bigint }[]
+    >`
+      SELECT 
+        DATE("createdAt") as day,
+        channel,
+        COUNT(*)::bigint as total
+      FROM "Message"
+      WHERE "organizationId" = ${organizationId}
+        AND "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt"), channel
+    `;
 
     const counts = new Map<string, { sms: number; email: number }>();
-
     for (const day of dateSeries) {
       counts.set(day, { sms: 0, email: 0 });
     }
 
-    for (const message of messages) {
-      if (!MESSAGE_CHANNELS.has(message.channel)) {
-        continue;
-      }
+    for (const row of rawAggregates) {
+      if (!MESSAGE_CHANNELS.has(row.channel)) continue;
 
-      const dayKey = formatDayKey(message.createdAt);
+      const dayKey = formatDayKey(row.day);
       const current = counts.get(dayKey);
-      if (!current) {
-        continue;
-      }
 
-      if (message.channel === "sms") {
-        current.sms += 1;
-      } else if (message.channel === "email") {
-        current.email += 1;
+      if (current) {
+        if (row.channel === "sms") {
+          current.sms += Number(row.total);
+        } else if (row.channel === "email") {
+          current.email += Number(row.total);
+        }
       }
     }
 
