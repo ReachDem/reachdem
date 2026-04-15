@@ -60,6 +60,19 @@ function readRuntimeConfig() {
   };
 }
 
+function isSslModeValid(
+  sslMode: string | null,
+  usesLibpqCompat: boolean
+): boolean {
+  return (
+    usesLibpqCompat ||
+    !sslMode ||
+    sslMode === "disable" ||
+    sslMode === "allow" ||
+    sslMode === "verify-full"
+  );
+}
+
 function normalizeDatabaseUrl(connectionString: string): string {
   try {
     const url = new URL(connectionString);
@@ -67,13 +80,7 @@ function normalizeDatabaseUrl(connectionString: string): string {
     const usesLibpqCompat =
       url.searchParams.get("uselibpqcompat")?.toLowerCase() === "true";
 
-    if (
-      usesLibpqCompat ||
-      !sslMode ||
-      sslMode === "disable" ||
-      sslMode === "allow" ||
-      sslMode === "verify-full"
-    ) {
+    if (isSslModeValid(sslMode, usesLibpqCompat)) {
       return connectionString;
     }
 
