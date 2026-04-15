@@ -45,13 +45,21 @@ export default function WorkspaceSetupPage() {
   const watchCompanyName = watch("companyName");
   const watchWorkspaceName = watch("workspaceName");
 
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setValue("companyName", newValue);
+    if (!watchWorkspaceName || watchWorkspaceName === watchCompanyName) {
+      setValue("workspaceName", newValue, { shouldValidate: true });
+    }
+  };
+
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     setError(null);
 
     const result = await createWorkspace(data);
 
-    if (!result.success && "error" in result && result.error) {
+    if ("error" in result && result.error) {
       setError(result.error);
       setIsSubmitting(false);
       return;
@@ -75,17 +83,7 @@ export default function WorkspaceSetupPage() {
                 id="companyName"
                 placeholder="Acme Inc."
                 {...register("companyName")}
-                onChange={(e) => {
-                  setValue("companyName", e.target.value);
-                  if (
-                    !watchWorkspaceName ||
-                    watchWorkspaceName === watchCompanyName
-                  ) {
-                    setValue("workspaceName", e.target.value, {
-                      shouldValidate: true,
-                    });
-                  }
-                }}
+                onChange={handleCompanyNameChange}
               />
               {errors.companyName && (
                 <p className="text-destructive text-sm">
