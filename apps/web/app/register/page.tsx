@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { RegisterForm } from "@/components/register-form";
 import { getAuthFlowState } from "@/lib/auth-flow";
-import { Shader6 } from "@/components/shader6";
+import { VisualSplashBackground } from "@/components/visual-splash-background";
 
 export default async function RegisterPage() {
   const flow = await getAuthFlowState();
@@ -21,12 +21,7 @@ export default async function RegisterPage() {
       </div>
 
       {/* Right side: Visual Splash */}
-      <div className="bg-muted relative hidden w-1/2 items-center justify-center overflow-hidden p-12 md:flex">
-        <div className="absolute inset-0 z-0">
-          <Shader6 />
-        </div>
-        <div className="from-primary/20 via-background/80 to-primary/5 absolute inset-0 z-[5] bg-gradient-to-br" />
-      </div>
+      <VisualSplashBackground />
     </div>
   );
 }

@@ -1,24 +1,24 @@
 import { Prisma } from "@reachdem/database";
 import { SegmentNode, SegmentConditionNode } from "@reachdem/shared";
 
+const STANDARD_DB_FIELDS = new Set([
+  "name",
+  "email",
+  "phoneE164",
+  "gender",
+  "birthdate",
+  "address",
+  "enterprise",
+  "work",
+]);
+
 function compileCondition(
   node: SegmentConditionNode
 ): Prisma.ContactWhereInput {
   const { field, operator, type, value } = node;
 
-  const STANDARD_DB_FIELDS = [
-    "name",
-    "email",
-    "phoneE164",
-    "gender",
-    "birthdate",
-    "address",
-    "enterprise",
-    "work",
-  ];
-
   // Handle JSONB Custom Fields (or fields strictly not in the DB schema)
-  if (field.startsWith("custom.") || !STANDARD_DB_FIELDS.includes(field)) {
+  if (field.startsWith("custom.") || !STANDARD_DB_FIELDS.has(field)) {
     const customKey = field.startsWith("custom.") ? field.substring(7) : field;
     switch (operator) {
       case "eq":

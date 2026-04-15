@@ -51,97 +51,101 @@ function getNameParts(name: string | null | undefined): {
   };
 }
 
-function getCustomFieldValue(
-  customFields: Record<string, unknown>,
-  key: string
-): string | null {
-  const directValue = customFields[key];
-  if (
-    typeof directValue === "string" ||
-    typeof directValue === "number" ||
-    typeof directValue === "boolean"
-  ) {
-    return String(directValue);
-  }
-
-  const normalizedKey = key.toLowerCase();
-  for (const [entryKey, entryValue] of Object.entries(customFields)) {
-    if (entryKey.toLowerCase() !== normalizedKey) {
-      continue;
-    }
-
-    if (
-      typeof entryValue === "string" ||
-      typeof entryValue === "number" ||
-      typeof entryValue === "boolean"
-    ) {
-      return String(entryValue);
-    }
-  }
-
-  return null;
-}
-
-function resolveVariableValue(contact: ContactLike | null, variable: string) {
-  if (!contact) {
-    return null;
-  }
-
-  const normalized = normalizeVariableName(variable);
-  const customFields = toRecord(contact.customFields);
-  const { firstName, lastName } = getNameParts(contact.name);
-  const company =
-    contact.enterprise?.trim() ||
-    contact.work?.trim() ||
-    getCustomFieldValue(customFields, "company") ||
-    "";
-
-  const baseValues: Record<string, string> = {
-    "contact.name": contact.name?.trim() ?? "",
-    "contact.fullname": contact.name?.trim() ?? "",
-    "contact.firstname": firstName,
-    "contact.lastname": lastName,
-    "contact.email": contact.email?.trim() ?? "",
-    "contact.phone": contact.phoneE164?.trim() ?? "",
-    "contact.phonee164": contact.phoneE164?.trim() ?? "",
-    "contact.company": company,
-    "contact.enterprise": contact.enterprise?.trim() ?? "",
-    "contact.work": contact.work?.trim() ?? "",
-    "contact.address": contact.address?.trim() ?? "",
-    firstname: firstName,
-    lastname: lastName,
-    fullname: contact.name?.trim() ?? "",
-    name: contact.name?.trim() ?? "",
-    email: contact.email?.trim() ?? "",
-    phone: contact.phoneE164?.trim() ?? "",
-    company,
-  };
-
-  if (normalized in baseValues) {
-    return baseValues[normalized] ?? "";
-  }
-
-  if (normalized.startsWith("contact.")) {
-    return getCustomFieldValue(
-      customFields,
-      normalized.slice("contact.".length)
-    );
-  }
-
-  return getCustomFieldValue(customFields, normalized);
-}
-
 export function personalizeTemplate(
   template: string,
   contact: ContactLike | null,
   options: PersonalizeTemplateOptions = {}
 ): string {
-  if (!template.includes("{{")) {
+  if (!template.includes("{{") || !contact) {
     return template;
   }
 
+  const customFields = toRecord(contact.customFields);
+
+  // O(N) single pass to cache lowercase keys instead of doing Object.entries on every token
+  const lowercaseCustomFields = new Map<string, string>();
+  for (const [key, value] of Object.entries(customFields)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      lowercaseCustomFields.set(key.toLowerCase(), String(value));
+    }
+  }
+
+  const getCustomField = (key: string) => {
+    return lowercaseCustomFields.get(key.toLowerCase()) ?? null;
+  };
+
+  // Lazy evaluation for name parts to avoid doing it if unused
+  let namePartsCache: { firstName: string; lastName: string } | null = null;
+  const getLazyNameParts = () => {
+    if (!namePartsCache) {
+      namePartsCache = getNameParts(contact.name);
+    }
+    return namePartsCache;
+  };
+
+  const getLazyCompany = () => {
+    return (
+      contact.enterprise?.trim() ||
+      contact.work?.trim() ||
+      getCustomField("company") ||
+      ""
+    );
+  };
+
   return template.replace(VARIABLE_PATTERN, (fullMatch, rawVariable) => {
-    const resolved = resolveVariableValue(contact, rawVariable);
+    const normalized = normalizeVariableName(rawVariable);
+    let resolved: string | null = null;
+
+    switch (normalized) {
+      case "contact.name":
+      case "contact.fullname":
+      case "fullname":
+      case "name":
+        resolved = contact.name?.trim() ?? "";
+        break;
+      case "contact.firstname":
+      case "firstname":
+        resolved = getLazyNameParts().firstName;
+        break;
+      case "contact.lastname":
+      case "lastname":
+        resolved = getLazyNameParts().lastName;
+        break;
+      case "contact.email":
+      case "email":
+        resolved = contact.email?.trim() ?? "";
+        break;
+      case "contact.phone":
+      case "contact.phonee164":
+      case "phone":
+        resolved = contact.phoneE164?.trim() ?? "";
+        break;
+      case "contact.company":
+      case "company":
+        resolved = getLazyCompany();
+        break;
+      case "contact.enterprise":
+        resolved = contact.enterprise?.trim() ?? "";
+        break;
+      case "contact.work":
+        resolved = contact.work?.trim() ?? "";
+        break;
+      case "contact.address":
+        resolved = contact.address?.trim() ?? "";
+        break;
+      default:
+        let fieldName = normalized;
+        if (normalized.startsWith("contact.")) {
+          fieldName = normalized.slice("contact.".length);
+        }
+        resolved = getCustomField(fieldName);
+        break;
+    }
+
     if (resolved == null) {
       return fullMatch;
     }
