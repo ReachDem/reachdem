@@ -265,13 +265,21 @@ export function ContactImportDialog({
     });
   }, [mappingResult, sampleData, manualOverrides, displayCustomFields]);
 
+  const isOverrideActive = (override: string | undefined): boolean => {
+    return (
+      override !== undefined &&
+      override !== "__unmapped" &&
+      override !== "__concat"
+    );
+  };
+
   const getUnusedColumns = () => {
     if (!mappingResult) return [];
     const usedStandard = new Set<string>();
     for (const field of STANDARD_FIELDS) {
       const mapping = mappingResult.standardMappings[field.key];
       const override = manualOverrides[field.key];
-      if (override && override !== "__unmapped" && override !== "__concat") {
+      if (isOverrideActive(override)) {
         usedStandard.add(override);
       } else if (!override && mapping.transform !== "none") {
         mapping.sourceColumns.forEach((c) => usedStandard.add(c));
@@ -289,6 +297,41 @@ export function ContactImportDialog({
     setManualOverrides((prev) => ({ ...prev, [key]: colName }));
   };
 
+  // Helper to map standard fields
+  const mapStandardFields = (
+    sourceRow: Record<string, string>
+  ): Record<string, string> => {
+    const mapped: Record<string, string> = {};
+    for (const field of STANDARD_FIELDS) {
+      const override = manualOverrides[field.key];
+      if (override) {
+        mapped[field.key] =
+          override === "__unmapped" ? "" : sourceRow[override] || "";
+      } else {
+        const mapping = mappingResult?.standardMappings[field.key];
+        mapped[field.key] = mapping ? applyMapping(mapping, sourceRow) : "";
+      }
+    }
+    return mapped;
+  };
+
+  // Helper to map custom fields
+  const mapCustomFields = (
+    sourceRow: Record<string, string>
+  ): Record<string, string> => {
+    const mapped: Record<string, string> = {};
+    for (const cf of displayCustomFields) {
+      mapped[cf.key] = sourceRow[cf.currentSource] || "";
+    }
+    return mapped;
+  };
+
+  // Helper to standardize field values
+  const standardizeRow = (row: any, countryCode: string): void => {
+    if (row.email) row.email = row.email.toLowerCase().trim();
+    if (row.phone) row.phoneE164 = formatPhoneE164(row.phone, countryCode);
+  };
+
   // Helper to map a full row
   const getMappedRow = (
     sourceRow: Record<string, string>,
@@ -297,27 +340,9 @@ export function ContactImportDialog({
     const row: any = { customFields: {} };
     if (!mappingResult) return row;
 
-    for (const field of STANDARD_FIELDS) {
-      const override = manualOverrides[field.key];
-      let val = "";
-      if (override) {
-        val = override === "__unmapped" ? "" : sourceRow[override] || "";
-      } else {
-        val = applyMapping(
-          mappingResult.standardMappings[field.key],
-          sourceRow
-        );
-      }
-      row[field.key] = val;
-    }
-
-    for (const cf of displayCustomFields) {
-      row.customFields[cf.key] = sourceRow[cf.currentSource] || "";
-    }
-
-    // Standardize
-    if (row.email) row.email = row.email.toLowerCase().trim();
-    if (row.phone) row.phoneE164 = formatPhoneE164(row.phone, countryCode);
+    Object.assign(row, mapStandardFields(sourceRow));
+    row.customFields = mapCustomFields(sourceRow);
+    standardizeRow(row, countryCode);
 
     return row;
   };

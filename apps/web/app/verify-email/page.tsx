@@ -34,6 +34,12 @@ export default function VerifyEmailPage() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
+  useEffect(() => {
+    if (sessionData?.user?.emailVerified) {
+      router.push("/continue-setup");
+    }
+  }, [sessionData, router]);
+
   if (isPending) {
     return (
       <div className="flex min-h-svh items-center justify-center">

@@ -50,6 +50,34 @@ const workspaceRoles = [
 type WorkspaceRole = (typeof workspaceRoles)[number];
 type OnboardingMode = "email-signup" | "verify-email" | "account-setup";
 
+const ROLE_TABS: Record<WorkspaceRole, string[]> = {
+  "Software Engineer": [
+    "Repositories",
+    "Code Review",
+    "Deployments",
+    "Issues",
+    "Settings",
+  ],
+  "Product Manager": [
+    "Roadmap",
+    "Sprint Planning",
+    "Backlog",
+    "User Feedback",
+    "Settings",
+  ],
+  Designer: [
+    "Design System",
+    "Prototypes",
+    "Assets",
+    "User Testing",
+    "Settings",
+  ],
+  Founder: ["Analytics", "Team Directory", "Billing", "Reports", "Settings"],
+  Sales: ["CRM", "Leads", "Pipeline", "Contracts", "Settings"],
+  Marketing: ["Campaigns", "Analytics", "Social Media", "Content", "Settings"],
+  Other: ["Dashboard", "Projects", "Tasks", "Activity", "Settings"],
+};
+
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
@@ -106,10 +134,8 @@ export function OnboardingWizard({
 
   useEffect(() => {
     if (currentStep > prevStepRef.current) {
-      if (currentStep === 0) playRound1();
-      else if (currentStep === 1) playRound2();
-      else if (currentStep === 2) playFinalRound();
-      else if (currentStep === 3) playReady();
+      const sounds = [playRound1, playRound2, playFinalRound, playReady];
+      sounds[currentStep]?.();
     }
     prevStepRef.current = currentStep;
   }, [currentStep, playRound1, playRound2, playFinalRound, playReady]);
@@ -202,46 +228,49 @@ export function OnboardingWizard({
     return null;
   };
 
+  const handleDirectWorkspaceSetup = async (data: FormValues) => {
+    const setupError = await finalizeWorkspace(data.workspaceName, data.role);
+
+    if (setupError) {
+      setError(setupError);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleEmailSignup = async (data: FormValues) => {
+    const { error: signUpError } = await signUp.email({
+      email: data.email,
+      password: data.password,
+      name: data.name,
+    });
+
+    if (signUpError) {
+      setError(signUpError.message || "Failed to sign up.");
+      return false;
+    }
+
+    const sent = await sendVerificationCode();
+    if (!sent) {
+      return false;
+    }
+
+    return true;
+  };
+
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      if (!isEmailSignup) {
-        const setupError = await finalizeWorkspace(
-          data.workspaceName,
-          data.role
-        );
+      const success = isEmailSignup
+        ? await handleEmailSignup(data)
+        : await handleDirectWorkspaceSetup(data);
 
-        if (setupError) {
-          setError(setupError);
-          setIsSubmitting(false);
-          return;
-        }
-
-        return;
-      }
-
-      const { error: signUpError } = await signUp.email({
-        email: data.email,
-        password: data.password,
-        name: data.name,
-      });
-
-      if (signUpError) {
-        setError(signUpError.message || "Failed to sign up.");
+      if (!success) {
         setIsSubmitting(false);
-        return;
       }
-
-      const sent = await sendVerificationCode();
-
-      if (!sent) {
-        setIsSubmitting(false);
-        return;
-      }
-
-      setIsSubmitting(false);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred."
@@ -300,55 +329,6 @@ export function OnboardingWizard({
 
   const roles = workspaceRoles;
 
-  const getTabsForRole = (role: WorkspaceRole) => {
-    switch (role) {
-      case "Software Engineer":
-        return [
-          "Repositories",
-          "Code Review",
-          "Deployments",
-          "Issues",
-          "Settings",
-        ];
-      case "Product Manager":
-        return [
-          "Roadmap",
-          "Sprint Planning",
-          "Backlog",
-          "User Feedback",
-          "Settings",
-        ];
-      case "Designer":
-        return [
-          "Design System",
-          "Prototypes",
-          "Assets",
-          "User Testing",
-          "Settings",
-        ];
-      case "Founder":
-        return [
-          "Analytics",
-          "Team Directory",
-          "Billing",
-          "Reports",
-          "Settings",
-        ];
-      case "Sales":
-        return ["CRM", "Leads", "Pipeline", "Contracts", "Settings"];
-      case "Marketing":
-        return [
-          "Campaigns",
-          "Analytics",
-          "Social Media",
-          "Content",
-          "Settings",
-        ];
-      default:
-        return ["Dashboard", "Projects", "Tasks", "Activity", "Settings"];
-    }
-  };
-
   const submitLabel = isEmailSignup ? "Create account" : "Finish setup";
   const submittingLabel = isEmailSignup
     ? "Creating your account..."
@@ -357,94 +337,135 @@ export function OnboardingWizard({
     ? "Failed to create account"
     : "Failed to finish setup";
 
+  const renderStep0Content = () => {
+    if (isVerifyEmail) {
+      return (
+        <div className="space-y-6 py-4">
+          <div className="space-y-3">
+            <p className="text-sm leading-6">
+              You are signed in, but your account is not ready yet. Verify{" "}
+              <span className="font-semibold">{watchEmail}</span> before
+              creating your workspace.
+            </p>
+            <p className="text-muted-foreground text-sm leading-6">
+              We will send a 6-digit verification code and keep you in setup
+              until the account is fully provisioned.
+            </p>
+          </div>
+
+          {error && (
+            <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
+              <p className="font-semibold">Unable to continue</p>
+              <p>{error}</p>
+            </div>
+          )}
+
+          <Button
+            type="button"
+            onClick={async () => {
+              setError(null);
+              const sent = await sendVerificationCode();
+              if (!sent) {
+                setError("Failed to send verification code.");
+              }
+            }}
+            className="w-full"
+          >
+            {verificationEmailSent
+              ? "Send a new verification code"
+              : "Send verification code"}
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <form className="space-y-6 py-4">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Full name</Label>
+            <Input id="name" placeholder="John Doe" {...register("name")} />
+            {errors.name && (
+              <p className="text-destructive text-sm">{errors.name.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="john@example.com"
+              {...register("email")}
+            />
+            {errors.email && (
+              <p className="text-destructive text-sm">{errors.email.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              {...register("password")}
+            />
+            {errors.password && (
+              <p className="text-destructive text-sm">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+        </div>
+        <Button type="button" onClick={handleNext} className="mt-4 w-full">
+          Continue
+        </Button>
+      </form>
+    );
+  };
+
   return (
     <div className="flex min-h-svh items-center justify-center py-10">
       <div className="w-full max-w-5xl px-4">
-        {currentStep === 0 && (
-          <OnboardingStep>
-            <OnboardingStepLeftWrapper
-              title={steps[0].title}
-              currentStep={0 - minimumStep}
-              totalSteps={totalSteps}
-            >
-              {isVerifyEmail ? (
-                <div className="space-y-6 py-4">
-                  <div className="space-y-3">
-                    <p className="text-sm leading-6">
-                      You are signed in, but your account is not ready yet.
-                      Verify <span className="font-semibold">{watchEmail}</span>{" "}
-                      before creating your workspace.
-                    </p>
-                    <p className="text-muted-foreground text-sm leading-6">
-                      We will send a 6-digit verification code and keep you in
-                      setup until the account is fully provisioned.
-                    </p>
-                  </div>
-
-                  {error && (
-                    <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
-                      <p className="font-semibold">Unable to continue</p>
-                      <p>{error}</p>
-                    </div>
-                  )}
-
-                  <Button
-                    type="button"
-                    onClick={async () => {
-                      setError(null);
-                      const sent = await sendVerificationCode();
-                      if (!sent) {
-                        setError("Failed to send verification code.");
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    {verificationEmailSent
-                      ? "Send a new verification code"
-                      : "Send verification code"}
-                  </Button>
-                </div>
-              ) : (
+        {[
+          () => (
+            <OnboardingStep>
+              <OnboardingStepLeftWrapper
+                title={steps[0].title}
+                currentStep={0 - minimumStep}
+                totalSteps={totalSteps}
+              >
+                {renderStep0Content()}
+              </OnboardingStepLeftWrapper>
+              <OnboardingStepRightWrapper>
+                <DashboardIllustration
+                  userProfile={{
+                    name: watch("name"),
+                    email: watchEmail,
+                  }}
+                />
+              </OnboardingStepRightWrapper>
+            </OnboardingStep>
+          ),
+          () => (
+            <OnboardingStep>
+              <OnboardingStepLeftWrapper
+                title={steps[1].title}
+                currentStep={1 - minimumStep}
+                totalSteps={totalSteps}
+                goBack={handleBack}
+              >
                 <form className="space-y-6 py-4">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Full name</Label>
+                      <Label htmlFor="workspaceName">Workspace Name</Label>
                       <Input
-                        id="name"
-                        placeholder="John Doe"
-                        {...register("name")}
+                        id="workspaceName"
+                        placeholder="Acme Inc."
+                        {...register("workspaceName")}
                       />
-                      {errors.name && (
+                      {errors.workspaceName && (
                         <p className="text-destructive text-sm">
-                          {errors.name.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="john@example.com"
-                        {...register("email")}
-                      />
-                      {errors.email && (
-                        <p className="text-destructive text-sm">
-                          {errors.email.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        {...register("password")}
-                      />
-                      {errors.password && (
-                        <p className="text-destructive text-sm">
-                          {errors.password.message}
+                          {errors.workspaceName.message}
                         </p>
                       )}
                     </div>
@@ -457,184 +478,138 @@ export function OnboardingWizard({
                     Continue
                   </Button>
                 </form>
-              )}
-            </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper>
-              <DashboardIllustration
-                userProfile={{
-                  name: watch("name"),
-                  email: watchEmail,
-                }}
-              />
-            </OnboardingStepRightWrapper>
-          </OnboardingStep>
-        )}
-
-        {currentStep === 1 && (
-          <OnboardingStep>
-            <OnboardingStepLeftWrapper
-              title={steps[1].title}
-              currentStep={1 - minimumStep}
-              totalSteps={totalSteps}
-              goBack={handleBack}
-            >
-              <form className="space-y-6 py-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="workspaceName">Workspace Name</Label>
-                    <Input
-                      id="workspaceName"
-                      placeholder="Acme Inc."
-                      {...register("workspaceName")}
-                    />
-                    {errors.workspaceName && (
-                      <p className="text-destructive text-sm">
-                        {errors.workspaceName.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="mt-4 w-full"
-                >
-                  Continue
-                </Button>
-              </form>
-            </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-b">
-              <DashboardIllustration
-                variant="zoomed-in"
-                title={watchWorkspace || "Your Workspace"}
-              />
-            </OnboardingStepRightWrapper>
-          </OnboardingStep>
-        )}
-
-        {currentStep === 2 && (
-          <OnboardingStep>
-            <OnboardingStepLeftWrapper
-              title={steps[2].title}
-              currentStep={2 - minimumStep}
-              totalSteps={totalSteps}
-              goBack={handleBack}
-            >
-              <div className="flex h-full flex-col justify-between py-4">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-sm">What best describes your work?</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {roles.map((role) => (
-                        <div
-                          key={role}
-                          role="button"
-                          className={cn(
-                            "cursor-pointer rounded-lg border px-3 py-2 text-sm",
-                            watchRole === role
-                              ? "border-primary bg-primary/10"
-                              : "hover:bg-muted/50"
-                          )}
-                          onClick={() =>
-                            setValue("role", role, { shouldValidate: true })
-                          }
-                        >
-                          {role}
-                        </div>
-                      ))}
-                    </div>
-                    {errors.role && (
-                      <p className="text-destructive mt-2 text-sm">
-                        {errors.role.message}
-                      </p>
-                    )}
-                    <p className="text-muted-foreground mt-4 text-xs italic">
-                      We will personalize your experience based on your
-                      selection.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="mt-4 w-full"
-                >
-                  Continue
-                </Button>
-              </div>
-            </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper>
-              <DashboardIllustration
-                title={watchWorkspace || "Your Workspace"}
-                tabs={getTabsForRole(watchRole)}
-              />
-            </OnboardingStepRightWrapper>
-          </OnboardingStep>
-        )}
-
-        {currentStep === 3 && (
-          <OnboardingStep>
-            <OnboardingStepLeftWrapper
-              title={steps[3].title}
-              currentStep={3 - minimumStep}
-              totalSteps={totalSteps}
-              goBack={handleBack}
-            >
-              <form
-                onSubmit={handleSubmit(onSubmit)}
-                className="space-y-6 py-4"
+              </OnboardingStepLeftWrapper>
+              <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-b">
+                <DashboardIllustration
+                  variant="zoomed-in"
+                  title={watchWorkspace || "Your Workspace"}
+                />
+              </OnboardingStepRightWrapper>
+            </OnboardingStep>
+          ),
+          () => (
+            <OnboardingStep>
+              <OnboardingStepLeftWrapper
+                title={steps[2].title}
+                currentStep={2 - minimumStep}
+                totalSteps={totalSteps}
+                goBack={handleBack}
               >
-                <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Name
-                    </p>
-                    <p>{watch("name")}</p>
+                <div className="flex h-full flex-col justify-between py-4">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-sm">What best describes your work?</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {roles.map((role) => (
+                          <div
+                            key={role}
+                            role="button"
+                            className={cn(
+                              "cursor-pointer rounded-lg border px-3 py-2 text-sm",
+                              watchRole === role
+                                ? "border-primary bg-primary/10"
+                                : "hover:bg-muted/50"
+                            )}
+                            onClick={() =>
+                              setValue("role", role, { shouldValidate: true })
+                            }
+                          >
+                            {role}
+                          </div>
+                        ))}
+                      </div>
+                      {errors.role && (
+                        <p className="text-destructive mt-2 text-sm">
+                          {errors.role.message}
+                        </p>
+                      )}
+                      <p className="text-muted-foreground mt-4 text-xs italic">
+                        We will personalize your experience based on your
+                        selection.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Email
-                    </p>
-                    <p>{watchEmail}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Workspace Name
-                    </p>
-                    <p>{watchWorkspace}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Role
-                    </p>
-                    <p>{watchRole}</p>
-                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="mt-4 w-full"
+                  >
+                    Continue
+                  </Button>
                 </div>
-
-                {error && (
-                  <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
-                    <p className="font-semibold">{failureTitle}</p>
-                    <p>{error}</p>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isSubmitting}
+              </OnboardingStepLeftWrapper>
+              <OnboardingStepRightWrapper>
+                <DashboardIllustration
+                  title={watchWorkspace || "Your Workspace"}
+                  tabs={ROLE_TABS[watchRole] || ROLE_TABS["Other"]}
+                />
+              </OnboardingStepRightWrapper>
+            </OnboardingStep>
+          ),
+          () => (
+            <OnboardingStep>
+              <OnboardingStepLeftWrapper
+                title={steps[3].title}
+                currentStep={3 - minimumStep}
+                totalSteps={totalSteps}
+                goBack={handleBack}
+              >
+                <form
+                  onSubmit={handleSubmit(onSubmit)}
+                  className="space-y-6 py-4"
                 >
-                  {isSubmitting ? submittingLabel : submitLabel}
-                </Button>
-              </form>
-            </OnboardingStepLeftWrapper>
-            <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-t">
-              <DashboardIllustration
-                variant="zoomed-in"
-                title={watchWorkspace || "Welcome!"}
-              />
-            </OnboardingStepRightWrapper>
-          </OnboardingStep>
-        )}
+                  <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Name
+                      </p>
+                      <p>{watch("name")}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Email
+                      </p>
+                      <p>{watchEmail}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Workspace Name
+                      </p>
+                      <p>{watchWorkspace}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Role
+                      </p>
+                      <p>{watchRole}</p>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="border-destructive/50 text-destructive bg-destructive/10 rounded-lg border p-4 text-sm">
+                      <p className="font-semibold">{failureTitle}</p>
+                      <p>{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? submittingLabel : submitLabel}
+                  </Button>
+                </form>
+              </OnboardingStepLeftWrapper>
+              <OnboardingStepRightWrapper className="from-background to-muted bg-gradient-to-t">
+                <DashboardIllustration
+                  variant="zoomed-in"
+                  title={watchWorkspace || "Welcome!"}
+                />
+              </OnboardingStepRightWrapper>
+            </OnboardingStep>
+          ),
+        ][currentStep]?.()}
       </div>
 
       <Dialog open={isOtpModalOpen} onOpenChange={setIsOtpModalOpen}>
