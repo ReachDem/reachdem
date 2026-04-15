@@ -44,7 +44,7 @@ export default function ConsentPage() {
         lastName,
       });
 
-      if (result.error) {
+      if ("error" in result && result.error) {
         setError(result.error);
         setIsSubmitting(false);
         return;

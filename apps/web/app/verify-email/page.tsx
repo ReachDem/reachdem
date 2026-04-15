@@ -99,7 +99,7 @@ export default function VerifyEmailPage() {
     setOtpError(null);
     const result = await sendVerificationOtp(email);
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setOtpError(result.error);
     } else {
       setResendCooldown(60);

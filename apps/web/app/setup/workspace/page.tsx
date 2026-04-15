@@ -51,7 +51,7 @@ export default function WorkspaceSetupPage() {
 
     const result = await createWorkspace(data);
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setError(result.error);
       setIsSubmitting(false);
       return;

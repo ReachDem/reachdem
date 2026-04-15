@@ -43,7 +43,7 @@ export function SenderIdDialog({
     const result = await submitSenderId(senderId);
     setIsSubmitting(false);
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setError(result.error);
       return;
     }

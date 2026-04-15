@@ -109,7 +109,11 @@ export function RegisterForm() {
         lastName: data.lastName,
       });
 
-      if (consentResult.error) {
+      if (
+        !consentResult.success &&
+        "error" in consentResult &&
+        consentResult.error
+      ) {
         setServerError("Unexpected error after signup.");
         setIsSubmitting(false);
         return;

@@ -20,7 +20,7 @@ export default function TransitionSetupPage() {
     // 1. Mark onboarding as complete in the DB
     const markComplete = async () => {
       const result = await completeOnboarding();
-      if (result.error) {
+      if (!result.success && "error" in result && result.error) {
         setError(result.error);
         console.error("Failed to complete onboarding:", result.error);
       }
