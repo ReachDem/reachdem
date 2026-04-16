@@ -31,38 +31,49 @@ interface EditContactDialogProps {
   onSuccess?: () => void;
 }
 
-export function EditContactDialog({
-  contact,
-  open,
-  onOpenChange,
-  onSuccess,
-}: EditContactDialogProps) {
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [formData, setFormData] = React.useState({
-    name: contact.name || "",
-    email: contact.email || "",
-    phoneE164: contact.phoneE164 || "",
-    gender: (contact.gender as string) || "UNKNOWN",
-    work: contact.work || "",
-    enterprise: contact.enterprise || "",
-    address: "",
-  });
+type FormData = {
+  name: string;
+  email: string;
+  phoneE164: string;
+  gender: string;
+  work: string;
+  enterprise: string;
+  address: string;
+};
+
+const getInitialFormData = (contact: ContactRow): FormData => ({
+  name: contact.name || "",
+  email: contact.email || "",
+  phoneE164: contact.phoneE164 || "",
+  gender: (contact.gender as string) || "UNKNOWN",
+  work: contact.work || "",
+  enterprise: contact.enterprise || "",
+  address: "",
+});
+
+const useFormData = (contact: ContactRow, open: boolean) => {
+  const [formData, setFormData] = React.useState<FormData>(
+    getInitialFormData(contact)
+  );
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     if (open) {
-      setFormData({
-        name: contact.name || "",
-        email: contact.email || "",
-        phoneE164: contact.phoneE164 || "",
-        gender: (contact.gender as string) || "UNKNOWN",
-        work: contact.work || "",
-        enterprise: contact.enterprise || "",
-        address: "",
-      });
+      setFormData(getInitialFormData(contact));
       setErrors({});
     }
   }, [open, contact]);
+
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -79,7 +90,53 @@ export function EditContactDialog({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  return { formData, errors, handleChange, validateForm };
+};
+
+const buildContactPayload = (formData: FormData) => ({
+  name: formData.name,
+  email: formData.email || null,
+  phoneE164: formData.phoneE164 || null,
+  gender: formData.gender || "UNKNOWN",
+  work: formData.work || null,
+  enterprise: formData.enterprise || null,
+  address: formData.address || null,
+});
+
+const useContactSubmit = (
+  contactId: string,
+  onOpenChange: (open: boolean) => void,
+  onSuccess?: () => void
+) => {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleUpdateSuccess = () => {
+    toast.success("Contact updated successfully");
+    onOpenChange(false);
+    onSuccess?.();
+  };
+
+  const handleUpdateError = (error: string | undefined) => {
+    toast.error(error || "Failed to update contact");
+  };
+
+  const submitContactUpdate = async (
+    payload: ReturnType<typeof buildContactPayload>
+  ) => {
+    const result = await updateContact(contactId, payload);
+
+    if (result.success) {
+      handleUpdateSuccess();
+    } else {
+      handleUpdateError(result.error);
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent,
+    formData: FormData,
+    validateForm: () => boolean
+  ) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -88,23 +145,7 @@ export function EditContactDialog({
 
     setIsSubmitting(true);
     try {
-      const result = await updateContact(contact.id, {
-        name: formData.name,
-        email: formData.email || null,
-        phoneE164: formData.phoneE164 || null,
-        gender: formData.gender || "UNKNOWN",
-        work: formData.work || null,
-        enterprise: formData.enterprise || null,
-        address: formData.address || null,
-      });
-
-      if (result.success) {
-        toast.success("Contact updated successfully");
-        onOpenChange(false);
-        onSuccess?.();
-      } else {
-        toast.error(result.error || "Failed to update contact");
-      }
+      await submitContactUpdate(buildContactPayload(formData));
     } catch (error) {
       toast.error("An error occurred while updating the contact");
       console.error(error);
@@ -113,16 +154,130 @@ export function EditContactDialog({
     }
   };
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
+  return { isSubmitting, handleSubmit };
+};
+
+interface ContactFormFieldsProps {
+  formData: FormData;
+  errors: Record<string, string>;
+  isSubmitting: boolean;
+  handleChange: (field: string, value: string) => void;
+}
+
+function ContactFormFields({
+  formData,
+  errors,
+  handleChange,
+}: ContactFormFieldsProps) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="name">Name *</Label>
+        <Input
+          id="name"
+          placeholder="John Doe"
+          value={formData.name}
+          onChange={(e) => handleChange("name", e.target.value)}
+        />
+        {errors.name && (
+          <p className="text-destructive text-sm">{errors.name}</p>
+        )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="john@example.com"
+            value={formData.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+          />
+          {errors.email && (
+            <p className="text-destructive text-sm">{errors.email}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phoneE164">Phone</Label>
+          <Input
+            id="phoneE164"
+            placeholder="+237123456789"
+            value={formData.phoneE164}
+            onChange={(e) => handleChange("phoneE164", e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="gender">Gender</Label>
+          <Select
+            value={formData.gender}
+            onValueChange={(value) => handleChange("gender", value)}
+          >
+            <SelectTrigger id="gender">
+              <SelectValue placeholder="Select gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MALE">Male</SelectItem>
+              <SelectItem value="FEMALE">Female</SelectItem>
+              <SelectItem value="OTHER">Other</SelectItem>
+              <SelectItem value="UNKNOWN">Unknown</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="work">Work</Label>
+          <Input
+            id="work"
+            placeholder="Software Engineer"
+            value={formData.work}
+            onChange={(e) => handleChange("work", e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="enterprise">Enterprise</Label>
+        <Input
+          id="enterprise"
+          placeholder="Company Name"
+          value={formData.enterprise}
+          onChange={(e) => handleChange("enterprise", e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="address">Address</Label>
+        <Input
+          id="address"
+          placeholder="123 Main St, City"
+          value={formData.address}
+          onChange={(e) => handleChange("address", e.target.value)}
+        />
+      </div>
+    </>
+  );
+}
+
+export function EditContactDialog({
+  contact,
+  open,
+  onOpenChange,
+  onSuccess,
+}: EditContactDialogProps) {
+  const { formData, errors, handleChange, validateForm } = useFormData(
+    contact,
+    open
+  );
+  const { isSubmitting, handleSubmit } = useContactSubmit(
+    contact.id,
+    onOpenChange,
+    onSuccess
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,95 +289,16 @@ export function EditContactDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              placeholder="John Doe"
-              value={formData.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-            />
-            {errors.name && (
-              <p className="text-destructive text-sm">{errors.name}</p>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="john@example.com"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-              />
-              {errors.email && (
-                <p className="text-destructive text-sm">{errors.email}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneE164">Phone</Label>
-              <Input
-                id="phoneE164"
-                placeholder="+237123456789"
-                value={formData.phoneE164}
-                onChange={(e) => handleChange("phoneE164", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="gender">Gender</Label>
-              <Select
-                value={formData.gender}
-                onValueChange={(value) => handleChange("gender", value)}
-              >
-                <SelectTrigger id="gender">
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">Male</SelectItem>
-                  <SelectItem value="FEMALE">Female</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
-                  <SelectItem value="UNKNOWN">Unknown</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="work">Work</Label>
-              <Input
-                id="work"
-                placeholder="Software Engineer"
-                value={formData.work}
-                onChange={(e) => handleChange("work", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="enterprise">Enterprise</Label>
-            <Input
-              id="enterprise"
-              placeholder="Company Name"
-              value={formData.enterprise}
-              onChange={(e) => handleChange("enterprise", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              placeholder="123 Main St, City"
-              value={formData.address}
-              onChange={(e) => handleChange("address", e.target.value)}
-            />
-          </div>
+        <form
+          onSubmit={(e) => handleSubmit(e, formData, validateForm)}
+          className="space-y-4"
+        >
+          <ContactFormFields
+            formData={formData}
+            errors={errors}
+            isSubmitting={isSubmitting}
+            handleChange={handleChange}
+          />
 
           <div className="flex justify-end gap-3 pt-4">
             <Button
