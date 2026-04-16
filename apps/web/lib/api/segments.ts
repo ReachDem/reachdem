@@ -4,50 +4,137 @@
  * For server-side initial loads, use the server actions in app/actions/segments.ts
  */
 import { SegmentNode } from "@reachdem/shared";
+import {
+  CursorValue,
+  SearchQuery,
+  IsoDateString,
+  ApiEndpointPath,
+  ApiUrl,
+  ErrorMessage,
+  Page,
+} from "./common-types";
+
+export type SegmentId = string;
+export type SegmentName = string;
+export type SegmentDescription = string;
+export type OrganizationId = string;
+export type ContactId = string;
+export type ContactName = string;
+export type EmailAddress = string;
+export type PhoneNumber = string;
+export type EnterpriseName = string;
 
 export interface Segment {
-  id: string;
-  name: string;
-  description: string | null;
+  id: SegmentId;
+  name: SegmentName;
+  description: SegmentDescription | null;
   definition: SegmentNode;
-  organizationId: string;
-  createdAt: string;
-  updatedAt: string;
+  organizationId: OrganizationId;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
   _count?: { contacts: number };
 }
 
 export interface Contact {
-  id: string;
-  name: string;
-  email: string | null;
-  phoneE164: string | null;
-  enterprise: string | null;
-  createdAt: string;
-}
-
-export interface Page<T> {
-  items: T[];
-  meta: {
-    total: number;
-    limit: number;
-    nextCursor: string | null;
-  };
+  id: ContactId;
+  name: ContactName;
+  email: EmailAddress | null;
+  phoneE164: PhoneNumber | null;
+  enterprise: EnterpriseName | null;
+  createdAt: IsoDateString;
 }
 
 // ─── Segments CRUD ────────────────────────────────────────────────────────────
 
-export async function listSegments(params?: {
-  limit?: number;
-  cursor?: string;
-}): Promise<Page<Segment>> {
-  const url = new URL("/api/v1/segments", window.location.origin);
+function buildUrl(
+  pathname: ApiEndpointPath,
+  params?: {
+    limit?: number;
+    cursor?: CursorValue;
+    q?: SearchQuery;
+  }
+): ApiUrl {
+  const url = new URL(pathname, window.location.origin);
   if (params?.limit) url.searchParams.set("limit", String(params.limit));
   if (params?.cursor) url.searchParams.set("cursor", params.cursor);
+  if (params?.q) url.searchParams.set("q", params.q);
+  return url.toString();
+}
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Failed to list segments: ${res.status}`);
+function buildSegmentsUrl(params?: {
+  limit?: number;
+  cursor?: CursorValue;
+}): ApiUrl {
+  return buildUrl("/api/v1/segments", params);
+}
 
-  const json = await res.json();
+async function handleJsonError(res: Response): Promise<ErrorMessage> {
+  const json = await res.json().catch(() => ({}));
+  return json.error || "";
+}
+
+async function handleFetchError(
+  res: Response,
+  defaultMessage: ErrorMessage
+): Promise<never> {
+  const errorMsg = await handleJsonError(res);
+  throw new Error(errorMsg || `${defaultMessage} (Error ${res.status})`);
+}
+
+async function checkResponse(
+  res: Response,
+  defaultMessage: ErrorMessage
+): Promise<void> {
+  if (!res.ok) {
+    await handleFetchError(res, defaultMessage);
+  }
+}
+
+async function fetchJsonWithErrorHandling<T>(
+  url: ApiUrl | ApiEndpointPath,
+  options: RequestInit,
+  errorMessage: ErrorMessage
+): Promise<T> {
+  const res = await fetch(url, options);
+  await checkResponse(res, errorMessage);
+  return res.json();
+}
+
+async function fetchMutationWithErrorHandling<T>(
+  url: ApiUrl | ApiEndpointPath,
+  method: "POST" | "PATCH" | "PUT",
+  data: unknown,
+  errorMessage: ErrorMessage
+): Promise<T> {
+  return fetchJsonWithErrorHandling(
+    url,
+    {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+    errorMessage
+  );
+}
+
+async function fetchVoidWithErrorHandling(
+  url: ApiUrl | ApiEndpointPath,
+  options: RequestInit,
+  errorMessage: ErrorMessage
+): Promise<void> {
+  const res = await fetch(url, options);
+  await checkResponse(res, errorMessage);
+}
+
+export async function listSegments(params?: {
+  limit?: number;
+  cursor?: CursorValue;
+}): Promise<Page<Segment>> {
+  const json = await fetchJsonWithErrorHandling<{
+    items?: Segment[];
+    meta?: { total?: number; limit?: number; nextCursor?: CursorValue | null };
+  }>(buildSegmentsUrl(params), { method: "GET" }, "Failed to list segments");
+
   return {
     items: json.items ?? [],
     meta: {
@@ -59,91 +146,70 @@ export async function listSegments(params?: {
 }
 
 export async function createSegment(data: {
-  name: string;
-  description?: string;
+  name: SegmentName;
+  description?: SegmentDescription;
   definition: SegmentNode;
 }): Promise<Segment> {
-  const res = await fetch("/api/v1/segments", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json.error || `Failed to create segment: ${res.status}`);
-  }
-
-  const segment = await res.json();
-  return segment;
+  return fetchMutationWithErrorHandling(
+    "/api/v1/segments",
+    "POST",
+    data,
+    "Failed to create segment"
+  );
 }
 
-export async function getSegment(id: string): Promise<Segment> {
-  const res = await fetch(`/api/v1/segments/${id}`);
-  if (!res.ok) throw new Error(`Segment not found`);
-  const segment = await res.json();
-  return segment;
+export async function getSegment(id: SegmentId): Promise<Segment> {
+  return fetchJsonWithErrorHandling(
+    `/api/v1/segments/${id}`,
+    { method: "GET" },
+    `Segment not found`
+  );
 }
 
 export async function updateSegment(
-  id: string,
-  data: { name?: string; description?: string; definition?: SegmentNode }
-): Promise<Segment> {
-  const res = await fetch(`/api/v1/segments/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json.error || `Failed to update segment: ${res.status}`);
+  id: SegmentId,
+  data: {
+    name?: SegmentName;
+    description?: SegmentDescription;
+    definition?: SegmentNode;
   }
-
-  const segment = await res.json();
-  return segment;
+): Promise<Segment> {
+  return fetchMutationWithErrorHandling(
+    `/api/v1/segments/${id}`,
+    "PATCH",
+    data,
+    "Failed to update segment"
+  );
 }
 
-export async function deleteSegment(id: string): Promise<void> {
-  const res = await fetch(`/api/v1/segments/${id}`, { method: "DELETE" });
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json.error || `Failed to delete segment: ${res.status}`);
-  }
+export async function deleteSegment(id: SegmentId): Promise<void> {
+  return fetchVoidWithErrorHandling(
+    `/api/v1/segments/${id}`,
+    { method: "DELETE" },
+    "Failed to delete segment"
+  );
 }
 
 // ─── Segment Contacts Preview ─────────────────────────────────────────────────
 
 export async function listSegmentContactsPreview(
-  segmentId: string,
-  params?: { limit?: number; cursor?: string; q?: string }
+  segmentId: SegmentId,
+  params?: { limit?: number; cursor?: CursorValue; q?: SearchQuery }
 ): Promise<Page<Contact>> {
-  const url = new URL(
-    `/api/v1/segments/${segmentId}/contacts`,
-    window.location.origin
+  const url = buildUrl(`/api/v1/segments/${segmentId}/contacts`, params);
+  return fetchJsonWithErrorHandling<Page<Contact>>(
+    url,
+    { method: "GET" },
+    "Failed to list segment contacts"
   );
-  if (params?.limit) url.searchParams.set("limit", String(params.limit));
-  if (params?.cursor) url.searchParams.set("cursor", params.cursor);
-  if (params?.q) url.searchParams.set("q", params.q);
-
-  const res = await fetch(url.toString());
-  if (!res.ok)
-    throw new Error(`Failed to list segment contacts: ${res.status}`);
-
-  const data = await res.json();
-  return data; // API returns paginated contacts result structure
 }
 
 export async function evaluateSegmentContactsPreview(
   definition: SegmentNode,
-  params?: { limit?: number; cursor?: string; q?: string }
+  params?: { limit?: number; cursor?: CursorValue; q?: SearchQuery }
 ): Promise<Page<Contact>> {
-  const url = new URL(`/api/v1/segments/preview`, window.location.origin);
-  if (params?.limit) url.searchParams.set("limit", String(params.limit));
-  if (params?.cursor) url.searchParams.set("cursor", params.cursor);
-  if (params?.q) url.searchParams.set("q", params.q);
-
-  const res = await fetch(url.toString(), {
+  const url = buildUrl(`/api/v1/segments/preview`, params);
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ definition }),

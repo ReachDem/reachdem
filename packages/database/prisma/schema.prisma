@@ -12,10 +12,10 @@ datasource db {
 // ─── Better Auth Core Models ──────────────────────────────────────────────────
 
 model User {
-  id                    String   @id
+  id                    String    @id
   name                  String
-  email                 String   @unique
-  emailVerified         Boolean  @default(false)
+  email                 String    @unique
+  emailVerified         Boolean   @default(false)
   image                 String?
   firstName             String?
   lastName              String?
@@ -23,8 +23,8 @@ model User {
   privacyAcceptedAt     DateTime?
   role                  String? // Added for new onboarding flow
   defaultOrganizationId String? // Added for new onboarding flow
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   accounts            Account[]
   sessions            Session[]
@@ -36,8 +36,33 @@ model User {
   onboardingState     OnboardingState?
   createdApiKeys      ApiKey[]             @relation("ApiKeyCreator")
   revokedApiKeys      ApiKey[]             @relation("ApiKeyRevoker")
+  deferredEmails      AuthDeferredEmail[]
 
   @@map("user")
+}
+
+model AuthDeferredEmail {
+  id           String    @id @default(uuid())
+  userId       String
+  kind         String
+  toEmail      String
+  subject      String
+  html         String
+  fromName     String
+  replyTo      String?
+  scheduledAt  DateTime
+  claimedAt    DateTime?
+  sentAt       DateTime?
+  attemptCount Int       @default(0)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([scheduledAt, sentAt, claimedAt])
+  @@map("auth_deferred_email")
 }
 
 model Session {
@@ -169,21 +194,21 @@ model Invitation {
 }
 
 model ApiKey {
-  id             String    @id @default(cuid())
-  organizationId String
-  token          String
-  salt           String
+  id              String    @id @default(cuid())
+  organizationId  String
+  token           String
+  salt            String
   encryptedSecret String?
-  redacted       String
-  title          String
-  type           String
-  lastUsedAt     DateTime?
-  createdBy      String
-  createdAt      DateTime  @default(now())
-  revokedBy      String?
-  revokedAt      DateTime?
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  redacted        String
+  title           String
+  type            String
+  lastUsedAt      DateTime?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  revokedBy       String?
+  revokedAt       DateTime?
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   creator      User         @relation("ApiKeyCreator", fields: [createdBy], references: [id], onDelete: Restrict)
@@ -241,22 +266,22 @@ enum AcquisitionSource {
 }
 
 model OnboardingState {
-  id                String            @id @default(uuid())
-  userId            String            @unique
+  id                String             @id @default(uuid())
+  userId            String             @unique
   organizationId    String?
   role              ReachDemRole?
   acquisitionSource AcquisitionSource?
   acquisitionOther  String?
-  status            String            @default("in_progress") // in_progress | completed | skipped
-  currentStep       OnboardingStep    @default(register)
-  step1CompletedAt  DateTime?         // workspace
-  step2CompletedAt  DateTime?         // profile
-  step3CompletedAt  DateTime?         // acquisition
+  status            String             @default("in_progress") // in_progress | completed | skipped
+  currentStep       OnboardingStep     @default(register)
+  step1CompletedAt  DateTime? // workspace
+  step2CompletedAt  DateTime? // profile
+  step3CompletedAt  DateTime? // acquisition
   skippedAt         DateTime?
   completedAt       DateTime?
-  uiState           Json?             // { lastTooltipSeen, tooltipDismissedAt, resumeAnchor }
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  uiState           Json? // { lastTooltipSeen, tooltipDismissedAt, resumeAnchor }
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -299,7 +324,7 @@ model Contact {
   work                String?
   enterprise          String?
   customFields        Json? // Map of key to value
-    unsubscribe         Json? // Map of channel to unsubscription status
+  unsubscribe         Json? // Map of channel to unsubscription status
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime? // Soft delete
@@ -542,10 +567,10 @@ model Message {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  apiKey       ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  attempts     MessageAttempt[]
-  trackedLinks TrackedLink[]
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  attempts       MessageAttempt[]
+  trackedLinks   TrackedLink[]
   deliveryEvents EmailDeliveryEvent[]
 
   @@unique([organizationId, idempotencyKey])
@@ -570,7 +595,7 @@ model MessageAttempt {
   durationMs        Int
   createdAt         DateTime      @default(now())
 
-  message             Message               @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message             Message              @relation(fields: [messageId], references: [id], onDelete: Cascade)
   emailDeliveryEvents EmailDeliveryEvent[]
 
   @@index([messageId])
@@ -603,9 +628,9 @@ model EmailDeliveryEvent {
   occurredAt            DateTime
   createdAt             DateTime               @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  message      Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  message      Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
   attempt      MessageAttempt? @relation(fields: [messageAttemptId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, campaignId, eventType])
@@ -714,11 +739,11 @@ model Campaign {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  apiKey       ApiKey?            @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  audiences    CampaignAudience[]
-  targets      CampaignTarget[]
-  trackedLinks TrackedLink[]
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  audiences      CampaignAudience[]
+  targets        CampaignTarget[]
+  trackedLinks   TrackedLink[]
   deliveryEvents EmailDeliveryEvent[]
 
   @@index([organizationId, status])

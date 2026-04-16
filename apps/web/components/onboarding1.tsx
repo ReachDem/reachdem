@@ -994,9 +994,26 @@ const StepFiveComponent = ({
           </div>
 
           <p className="text-muted-foreground text-xs">
-            By continuing you agree to our Terms of Service and Privacy Policy.
-            Invited members will receive an email with instructions to join your
-            workspace.
+            By continuing you agree to our{" "}
+            <a
+              href="https://reachdem.cc/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://reachdem.cc/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              Privacy Policy
+            </a>
+            . Invited members will receive an email with instructions to join
+            your workspace.
           </p>
         </div>
       </OnboardingStepLeftWrapper>
@@ -1024,7 +1041,7 @@ const Onboarding1 = ({
   companyLogo = "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/shadcnblocks-logo-word.svg",
   copyright = `© ${new Date().getFullYear()} ShadcnBlocks`,
   footerLinks = [
-    { label: "Privacy Policy", href: "https://shadcnblocks.com" },
+    { label: "Privacy Policy", href: "https://reachdem.cc/privacy" },
     {
       label: "Support",
       href: "https://shadcnblocks.com",

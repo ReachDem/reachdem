@@ -44,7 +44,7 @@ export default function ConsentPage() {
         lastName,
       });
 
-      if (result.error) {
+      if ("error" in result && result.error) {
         setError(result.error);
         setIsSubmitting(false);
         return;
@@ -97,14 +97,18 @@ export default function ConsentPage() {
             >
               I accept the{" "}
               <a
-                href="#"
+                href="https://reachdem.cc/terms"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-primary font-semibold hover:underline"
               >
                 Terms of Service
               </a>{" "}
               and the{" "}
               <a
-                href="#"
+                href="https://reachdem.cc/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-primary font-semibold hover:underline"
               >
                 Privacy Policy

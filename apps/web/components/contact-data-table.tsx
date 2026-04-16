@@ -79,13 +79,23 @@ export function buildContactColumns<T extends ContactRow>(
 ): ColumnDef<T>[] {
   const { renderActions, showSelect = true } = options;
 
-  // Discover custom field keys from the dataset
+  // Single pass O(N) to discover field keys and detect filled optional columns
   const customFieldKeys = new Set<string>();
-  rows.forEach((r) => {
+  let hasGender = false;
+  let hasWork = false;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!hasGender && r.gender) hasGender = true;
+    if (!hasWork && (r.work || r.enterprise)) hasWork = true;
+
     if (r.customFields && typeof r.customFields === "object") {
-      Object.keys(r.customFields).forEach((k) => customFieldKeys.add(k));
+      const keys = Object.keys(r.customFields);
+      for (let j = 0; j < keys.length; j++) {
+        customFieldKeys.add(keys[j]);
+      }
     }
-  });
+  }
 
   const cols: ColumnDef<T>[] = [];
 
@@ -183,9 +193,6 @@ export function buildContactColumns<T extends ContactRow>(
   );
 
   // Optional: gender / work (only if data has them)
-  const hasGender = rows.some((r) => r.gender != null);
-  const hasWork = rows.some((r) => r.work != null);
-
   if (hasGender) {
     cols.push({
       accessorKey: "gender",

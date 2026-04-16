@@ -177,8 +177,23 @@ export function SignupForm({
         </CardContent>
       </Card>
       <div className="text-muted-foreground [&_a]:hover:text-primary text-center text-xs text-balance [&_a]:underline [&_a]:underline-offset-4">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our{" "}
+        <a
+          href="https://reachdem.cc/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Terms of Service
+        </a>{" "}
+        and{" "}
+        <a
+          href="https://reachdem.cc/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Privacy Policy
+        </a>
+        .
       </div>
     </div>
   );

@@ -64,6 +64,96 @@ import {
 
 import { useGroupsStore } from "@/lib/stores/groups-store";
 
+// ─── Group Panel Toolbar ──────────────────────────────────────────────────────
+
+function GroupPanelToolbar({
+  group,
+  globalFilter,
+  setGlobalFilter,
+  table,
+}: {
+  group: Group;
+  globalFilter: string;
+  setGlobalFilter: (value: string) => void;
+  table: any;
+}) {
+  const router = useRouter();
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="relative max-w-sm flex-1">
+        <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Input
+          placeholder="Search members..."
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="h-9 pl-8"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* Columns toggle */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <IconLayoutColumns className="size-4" />
+              <span className="hidden lg:inline">Columns</span>
+              <IconChevronDown className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {table
+              .getAllColumns()
+              .filter((c: any) => c.getCanHide())
+              .map((c: any) => (
+                <DropdownMenuCheckboxItem
+                  key={c.id}
+                  className="text-sm capitalize"
+                  checked={c.getIsVisible()}
+                  onCheckedChange={(v) => c.toggleVisibility(!!v)}
+                >
+                  {c.id
+                    .replace("custom_", "")
+                    .replace(/([A-Z])/g, " $1")
+                    .trim()}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 gap-1.5"
+          onClick={() => router.push(`/contacts/groups/${group.id}`)}
+        >
+          <IconPencil className="size-4" />
+          <span className="hidden sm:inline">Manage</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Group Panel Loading State ────────────────────────────────────────────────
+
+function GroupPanelLoading() {
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Panel header skeleton */}
+      <div className="mb-4 flex items-start justify-between gap-4 px-6">
+        <div className="min-w-0">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="mt-1.5 h-3.5 w-48" />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4">
+        <ContactsTableSkeleton rows={10} compact showToolbar={true} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Group Panel (right column) ───────────────────────────────────────────────
 
 function GroupPanel({ group }: { group: Group }) {
@@ -143,75 +233,16 @@ function GroupPanel({ group }: { group: Group }) {
   );
 
   if (loading) {
-    return (
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Panel header skeleton */}
-        <div className="mb-4 flex items-start justify-between gap-4 px-6">
-          <div className="min-w-0">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="mt-1.5 h-3.5 w-48" />
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4">
-          <ContactsTableSkeleton rows={10} compact showToolbar={true} />
-        </div>
-      </div>
-    );
+    return <GroupPanelLoading />;
   }
 
   const toolbar = (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <div className="relative max-w-sm flex-1">
-        <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-        <Input
-          placeholder="Search members..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="h-9 pl-8"
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        {/* Columns toggle */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <IconLayoutColumns className="size-4" />
-              <span className="hidden lg:inline">Columns</span>
-              <IconChevronDown className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {table
-              .getAllColumns()
-              .filter((c) => c.getCanHide())
-              .map((c) => (
-                <DropdownMenuCheckboxItem
-                  key={c.id}
-                  className="text-sm capitalize"
-                  checked={c.getIsVisible()}
-                  onCheckedChange={(v) => c.toggleVisibility(!!v)}
-                >
-                  {c.id
-                    .replace("custom_", "")
-                    .replace(/([A-Z])/g, " $1")
-                    .trim()}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0 gap-1.5"
-          onClick={() => router.push(`/contacts/groups/${group.id}`)}
-        >
-          <IconPencil className="size-4" />
-          <span className="hidden sm:inline">Manage</span>
-        </Button>
-      </div>
-    </div>
+    <GroupPanelToolbar
+      group={group}
+      globalFilter={globalFilter}
+      setGlobalFilter={setGlobalFilter}
+      table={table}
+    />
   );
 
   const footer = (
@@ -249,37 +280,19 @@ function GroupPanel({ group }: { group: Group }) {
   );
 }
 
-// ─── Main Groups Client ───────────────────────────────────────────────────────
+// ─── Custom hooks for groups state ───────────────────────────────────────────
 
-interface GroupsClientProps {
-  initialGroups: Group[];
-}
-
-export function GroupsClient({ initialGroups }: GroupsClientProps) {
-  const router = useRouter();
-
-  // ── Zustand store ──
+function useGroupsState(initialGroups: Group[]) {
   const storeGroups = useGroupsStore((s) => s.groups);
-  // Use initialGroups on first render to avoid empty flash
   const groups = storeGroups.length > 0 ? storeGroups : initialGroups;
   const selectedGroupId = useGroupsStore((s) => s.selectedGroupId);
   const search = useGroupsStore((s) => s.search);
-  const isLoading = useGroupsStore((s) => s.isLoading);
   const setGroups = useGroupsStore((s) => s.setGroups);
   const selectGroup = useGroupsStore((s) => s.selectGroup);
   const setSearch = useGroupsStore((s) => s.setSearch);
   const addGroup = useGroupsStore((s) => s.addGroup);
   const removeGroup = useGroupsStore((s) => s.removeGroup);
-  const refreshGroups = useGroupsStore((s) => s.refreshGroups);
 
-  // ── Local UI state (dialogs / loading) ──
-  const [createOpen, setCreateOpen] = React.useState(false);
-  const [createError, setCreateError] = React.useState<string | null>(null);
-  const [isPending, setIsPending] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<Group | null>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
-  // Hydrate store on mount to ensure global state is populated
   React.useEffect(() => {
     setGroups(initialGroups);
   }, [initialGroups, setGroups]);
@@ -299,6 +312,23 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
     );
   }, [groups, search]);
 
+  return {
+    groups,
+    selectedGroup,
+    filtered,
+    search,
+    selectedGroupId,
+    selectGroup,
+    setSearch,
+  };
+}
+
+function useCreateGroupDialog() {
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [createError, setCreateError] = React.useState<string | null>(null);
+  const [isPending, setIsPending] = React.useState(false);
+  const addGroup = useGroupsStore((s) => s.addGroup);
+
   async function handleCreate(data: { name: string; description: string }) {
     setIsPending(true);
     setCreateError(null);
@@ -316,6 +346,21 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
     }
   }
 
+  return {
+    createOpen,
+    setCreateOpen,
+    createError,
+    setCreateError,
+    isPending,
+    handleCreate,
+  };
+}
+
+function useDeleteGroupDialog() {
+  const [deleteTarget, setDeleteTarget] = React.useState<Group | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const removeGroup = useGroupsStore((s) => s.removeGroup);
+
   async function handleDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -331,7 +376,37 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
     }
   }
 
-  // ── Main layout ──
+  return { deleteTarget, setDeleteTarget, isDeleting, handleDelete };
+}
+
+// ─── Main Groups Client ───────────────────────────────────────────────────────
+
+interface GroupsClientProps {
+  initialGroups: Group[];
+}
+
+export function GroupsClient({ initialGroups }: GroupsClientProps) {
+  const router = useRouter();
+  const {
+    groups,
+    selectedGroup,
+    filtered,
+    search,
+    selectedGroupId,
+    selectGroup,
+    setSearch,
+  } = useGroupsState(initialGroups);
+  const {
+    createOpen,
+    setCreateOpen,
+    createError,
+    setCreateError,
+    isPending,
+    handleCreate,
+  } = useCreateGroupDialog();
+  const { deleteTarget, setDeleteTarget, isDeleting, handleDelete } =
+    useDeleteGroupDialog();
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Page header */}
