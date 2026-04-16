@@ -54,9 +54,9 @@ const data = {
     logo: "",
   },
   user: {
-    name: "John Doe",
-    email: "john@startup.com",
-    avatar: "/avatars/user.jpg",
+    name: "",
+    email: "",
+    avatar: "",
   },
   navMain: [
     {
