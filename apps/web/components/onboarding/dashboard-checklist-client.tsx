@@ -1,19 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DashboardChecklistStep } from "@reachdem/shared";
 import { useTipsEngine } from "./tips-engine";
+import { SenderIdDialog } from "./sender-id-dialog";
 
 function StepItem({
   step,
   index,
   activeIndex,
+  onOpenSenderId,
 }: {
   step: DashboardChecklistStep;
   index: number;
   activeIndex: number;
+  onOpenSenderId: () => void;
 }) {
   const isDone = step.status === "done";
   const isActive = !isDone && index === activeIndex;
@@ -46,17 +50,29 @@ function StepItem({
 
           <div className="relative">
             {step.href && !isDone ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8 w-fit rounded-full px-4 text-xs font-medium"
-                asChild
-              >
-                <Link href={step.href}>
+              step.id === "step1" ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 w-fit rounded-full px-4 text-xs font-medium"
+                  onClick={onOpenSenderId}
+                >
                   Continue
                   <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 w-fit rounded-full px-4 text-xs font-medium"
+                  asChild
+                >
+                  <Link href={step.href}>
+                    Continue
+                    <ChevronRight className="ml-1 size-3.5" />
+                  </Link>
+                </Button>
+              )
             ) : null}
           </div>
         </div>
@@ -73,17 +89,33 @@ export function ChecklistStepsClient({
   const currentStepIndex = steps.findIndex((step) => step.status !== "done");
   const activeIndex = currentStepIndex === -1 ? 0 : currentStepIndex;
 
+  const [openSenderIdModal, setOpenSenderIdModal] = useState(false);
+
   return (
-    <div className="relative flex flex-col gap-6 sm:gap-8">
-      {steps.map((step, index) => (
-        <div key={step.id} className="relative">
-          {/* Vertical connecting line */}
-          {index < steps.length - 1 && (
-            <div className="bg-border absolute top-10 left-4 h-[calc(100%+0.5rem)] w-px -translate-x-1/2 sm:h-[calc(100%+1rem)]" />
-          )}
-          <StepItem step={step} index={index} activeIndex={activeIndex} />
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="relative flex flex-col gap-6 sm:gap-8">
+        {steps.map((step, index) => (
+          <div key={step.id} className="relative">
+            {/* Vertical connecting line */}
+            {index < steps.length - 1 && (
+              <div className="bg-border absolute top-10 left-4 h-[calc(100%+0.5rem)] w-px -translate-x-1/2 sm:h-[calc(100%+1rem)]" />
+            )}
+            <StepItem
+              step={step}
+              index={index}
+              activeIndex={activeIndex}
+              onOpenSenderId={() => setOpenSenderIdModal(true)}
+            />
+          </div>
+        ))}
+      </div>
+      <SenderIdDialog
+        open={openSenderIdModal}
+        onOpenChange={setOpenSenderIdModal}
+        onSuccess={() => {
+          // Additional logic on success if needed, router.refresh is inside the modal
+        }}
+      />
+    </>
   );
 }
