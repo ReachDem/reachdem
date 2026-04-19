@@ -70,7 +70,7 @@ export function ComparisonPricing({
       <Head />
       <Body>
         <Preview>{title}</Preview>
-        <Container className="mx-auto max-w-[600px] rounded-[8px] bg-white p-[24px]">
+        <Container className="mx-auto max-w-[640px] rounded-[8px] bg-white p-[24px]">
           <Section className="mb-[42px]">
             <Heading className="mb-[12px] text-center text-[24px] leading-[32px]">
               {title}
