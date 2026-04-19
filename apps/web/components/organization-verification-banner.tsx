@@ -17,7 +17,7 @@ export function OrganizationVerificationBanner({
 
   return (
     <div className="border-b border-black/10 bg-[#ff751f] text-white xl:-mt-2">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-center px-4 py-1 text-center lg:px-6">
+      <div className="mx-auto flex w-full max-w-[160px] flex-wrap items-center justify-center px-4 py-1 text-center lg:px-6">
         <p className="text-sm font-medium text-white">
           You are currently in preview mode. All SMS sent will use a default
           sender ID.

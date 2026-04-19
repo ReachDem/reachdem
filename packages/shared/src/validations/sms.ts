@@ -10,7 +10,7 @@ export const sendSmsSchema = z.object({
   text: z
     .string()
     .min(1, "Text cannot be empty")
-    .max(1600, "Text cannot exceed 1600 characters (10 SMS segments)"),
+    .max(160, "Text cannot exceed 160 characters (10 SMS segments)"),
   from: z
     .string()
     .min(1, "Sender ID is required")

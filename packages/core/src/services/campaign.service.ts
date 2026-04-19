@@ -52,7 +52,7 @@ export class CampaignService {
           text: this.getSafeString(
             rawContent.text,
             "Error loading content",
-            1600
+            160
           ),
           ...(typeof rawContent.from === "string" && rawContent.from.trim()
             ? { from: rawContent.from.trim().slice(0, 20) }

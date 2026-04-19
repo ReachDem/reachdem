@@ -431,7 +431,7 @@ export default function ApiReferencePage() {
                     name: "text",
                     meta: "string | SMS only",
                     description:
-                      "Plain-text SMS content, up to 1600 characters.",
+                      "Plain-text SMS content, up to 160 characters.",
                   },
                   {
                     name: "subject / html",
