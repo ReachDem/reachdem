@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { promises as dns } from "node:dns";
 import validator from "validator";
+import { getContactImportLimit } from "@/lib/utils/contact-import";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -20,6 +21,23 @@ async function getOrganizationId() {
     throw new Error("Organization selection required");
   }
   return organizationId;
+}
+
+async function enforceContactImportLimit(
+  organizationId: string,
+  contactsCount: number
+) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { planCode: true },
+  });
+
+  const importLimit = getContactImportLimit(organization?.planCode);
+  if (contactsCount > importLimit) {
+    throw new Error(
+      `Import limit reached for your current plan. You can import up to ${importLimit.toLocaleString()} contacts at once.`
+    );
+  }
 }
 
 const emailMxCache = new Map<string, boolean>();
@@ -118,11 +136,8 @@ export async function prepareContactsForImport(
   orgId: string,
   contacts: any[]
 ): Promise<PreparedImportContactsResult> {
-  if (orgId) {
-    await getOrganizationId();
-  } else {
-    await getOrganizationId();
-  }
+  const organizationId = orgId || (await getOrganizationId());
+  await enforceContactImportLimit(organizationId, contacts.length);
 
   return sanitizeImportedContacts(contacts);
 }
@@ -184,6 +199,7 @@ export async function importContactsBulk(
   strategy: "skip" | "update" | "merge" = "skip"
 ) {
   const organizationId = orgId || (await getOrganizationId());
+  await enforceContactImportLimit(organizationId, contacts.length);
 
   if (!contacts || contacts.length === 0) {
     return {

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconUpload,
   IconFileSpreadsheet,
@@ -54,10 +54,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import {
+  getVcfRichPayload,
   parseContactFile,
   getSampleData,
   isValidContactFile,
 } from "@/lib/utils/parse-contacts-file";
+import { getContactImportLimit } from "@/lib/utils/contact-import";
 import { generateContactMapping, MappingResult } from "@/lib/utils/ai-mapping";
 import { STANDARD_FIELDS, applyMapping } from "@/lib/utils/ai-mapping-client";
 import { formatPhoneE164 } from "@/lib/utils/phone";
@@ -123,8 +125,46 @@ export function ContactImportDialog({
   const [isImporting, setIsImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importStats, setImportStats] = useState({ success: 0, total: 0 });
+  const [importLimit, setImportLimit] = useState(() =>
+    getContactImportLimit("free")
+  );
 
   const stepIndex = STEPS.indexOf(currentStep);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let isActive = true;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/v1/workspace/billing", {
+          credentials: "same-origin",
+        });
+        if (!response.ok) {
+          if (isActive) {
+            setImportLimit(getContactImportLimit("free"));
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as { planCode?: string };
+        if (isActive) {
+          setImportLimit(getContactImportLimit(payload.planCode));
+        }
+      } catch {
+        if (isActive) {
+          setImportLimit(getContactImportLimit("free"));
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [open]);
 
   const handleReset = () => {
     setCurrentStep("Upload");
@@ -167,8 +207,10 @@ export function ContactImportDialog({
 
     try {
       const parsed = await parseContactFile(selectedFile);
-      if (parsed.totalRows > 100) {
-        toast.error("File is too large. Please upload at most 100 contacts.");
+      if (parsed.totalRows > importLimit) {
+        toast.error(
+          `File is too large. Please upload at most ${importLimit} contacts for your current plan.`
+        );
         return;
       }
       if (parsed.totalRows === 0) {
@@ -342,6 +384,13 @@ export function ContactImportDialog({
 
     Object.assign(row, mapStandardFields(sourceRow));
     row.customFields = mapCustomFields(sourceRow);
+    const vcfRichPayload = getVcfRichPayload(sourceRow);
+    if (vcfRichPayload) {
+      row.customFields = {
+        ...vcfRichPayload,
+        ...row.customFields,
+      };
+    }
     standardizeRow(row, countryCode);
 
     return row;
@@ -412,9 +461,6 @@ export function ContactImportDialog({
 
       setImportStats({ success: 0, total: validRows.length });
 
-      let successCount = 0;
-      const chunkSize = 10;
-
       if (validRows.length === 0) {
         toast.success("No valid contacts to import.", {
           id: toastId,
@@ -425,22 +471,13 @@ export function ContactImportDialog({
         return;
       }
 
-      for (let i = 0; i < validRows.length; i += chunkSize) {
-        toast.loading(
-          `Importing contacts... ${successCount} / ${validRows.length}`,
-          {
-            id: toastId,
-            position: "bottom-right",
-          }
-        );
-        const chunk = validRows.slice(i, i + chunkSize);
-        const result = await importContactsBulk("", chunk, duplicateStrategy);
-        successCount += result.count;
-        setImportStats({ success: successCount, total: validRows.length });
-
-        // Let React paint the progress bar before next chunk
-        await new Promise((r) => setTimeout(r, 150));
-      }
+      toast.loading(`Importing contacts... 0 / ${validRows.length}`, {
+        id: toastId,
+        position: "bottom-right",
+      });
+      const result = await importContactsBulk("", validRows, duplicateStrategy);
+      const successCount = result.count;
+      setImportStats({ success: successCount, total: validRows.length });
 
       toast.success(
         `Import completed successfully! ${successCount} contacts imported.`,
@@ -570,13 +607,14 @@ export function ContactImportDialog({
                   Drop your file here or click to browse
                 </p>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  Supports CSV and XLSX files up to 10MB, Max 100 rows
+                  Supports CSV, XLSX, XLS, and VCF files up to 10MB, Max{" "}
+                  {importLimit.toLocaleString()} rows
                 </p>
               </div>
               <input
                 type="file"
                 className="hidden"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.vcf"
                 onChange={(e) => {
                   if (e.target.files?.length) onFileSelected(e.target.files[0]);
                 }}
