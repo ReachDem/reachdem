@@ -20,6 +20,10 @@ const URL_REGEX =
 export class RequestCampaignLaunchUseCase {
   private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
 
+  private static resolveLogCategory(channel: "sms" | "email" | "whatsapp") {
+    return channel;
+  }
+
   static async execute(
     organizationId: string,
     campaignId: string,
@@ -74,14 +78,17 @@ export class RequestCampaignLaunchUseCase {
       PlanEntitlementsService.get(organization.planCode),
       { hasSuccessfulTopUp: Boolean(successfulTopUp) }
     );
-    const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
-      entitlements,
-      {
-        smsQuotaUsed: organization.smsQuotaUsed,
-        emailQuotaUsed: organization.emailQuotaUsed,
-      },
-      campaign.channel
-    );
+    const remainingIncluded =
+      campaign.channel === "whatsapp"
+        ? null
+        : PlanEntitlementsService.getRemainingIncluded(
+            entitlements,
+            {
+              smsQuotaUsed: organization.smsQuotaUsed,
+              emailQuotaUsed: organization.emailQuotaUsed,
+            },
+            campaign.channel
+          );
 
     if (remainingIncluded != null) {
       if (eligibleTargetCount > remainingIncluded) {
@@ -136,11 +143,13 @@ export class RequestCampaignLaunchUseCase {
                   increment: eligibleTargetCount,
                 },
               }
-            : {
-                emailQuotaUsed: {
-                  increment: eligibleTargetCount,
-                },
-              }),
+            : campaign.channel === "email"
+              ? {
+                  emailQuotaUsed: {
+                    increment: eligibleTargetCount,
+                  },
+                }
+              : {}),
         },
       });
 
@@ -162,7 +171,7 @@ export class RequestCampaignLaunchUseCase {
       organizationId,
       actorType: "system",
       actorId: "system",
-      category: campaign.channel === "email" ? "email" : "sms",
+      category: this.resolveLogCategory(campaign.channel),
       action: "updated",
       resourceType: "campaign",
       resourceId: campaignId,
@@ -180,10 +189,10 @@ export class RequestCampaignLaunchUseCase {
     const content = campaign.content as any;
     let textContent = "";
     let htmlContent = "";
-    const channel = campaign.channel as "sms" | "email";
+    const channel = campaign.channel as "sms" | "email" | "whatsapp";
 
     // Extract text content based on channel
-    if (channel === "sms" && content?.text) {
+    if ((channel === "sms" || channel === "whatsapp") && content?.text) {
       textContent = content.text;
     } else if (channel === "email" && content?.html) {
       htmlContent = content.html;
@@ -241,7 +250,7 @@ export class RequestCampaignLaunchUseCase {
       });
 
       // Update campaign content
-      if (channel === "sms") {
+      if (channel === "sms" || channel === "whatsapp") {
         await prisma.campaign.update({
           where: { id: campaign.id },
           data: {
@@ -268,7 +277,7 @@ export class RequestCampaignLaunchUseCase {
   private static async countEligibleTargets(
     organizationId: string,
     campaignId: string,
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ): Promise<number> {
     const audiences = await CampaignService.getAudiences(
       organizationId,
@@ -284,7 +293,7 @@ export class RequestCampaignLaunchUseCase {
             memberships: {
               some: { groupId: audience.sourceId },
             },
-            ...(channel === "sms"
+            ...(channel === "sms" || channel === "whatsapp"
               ? { phoneE164: { not: null } }
               : { email: { not: null } }),
           },
@@ -332,11 +341,11 @@ export class RequestCampaignLaunchUseCase {
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
     }>,
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ): void {
     for (const contact of contacts) {
       const eligible =
-        channel === "sms"
+        channel === "sms" || channel === "whatsapp"
           ? Boolean(contact.phoneE164) && contact.hasValidNumber !== false
           : Boolean(contact.email) && contact.hasEmailableAddress !== false;
 

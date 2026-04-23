@@ -5,6 +5,7 @@ export * from "./validations/segments";
 export * from "./validations/activity";
 export * from "./validations/sms";
 export * from "./validations/campaigns";
+export * from "./validations/whatsapp";
 export * from "./validations/links";
 export * from "./validations/billing-catalog";
 export * from "./validations/payments";

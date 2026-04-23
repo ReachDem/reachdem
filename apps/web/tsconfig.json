@@ -3,6 +3,7 @@
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
+    "baseUrl": ".",
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -19,7 +20,19 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@reachdem/auth": ["../../packages/auth/src/index.ts"],
+      "@reachdem/auth/*": ["../../packages/auth/src/*"],
+      "@reachdem/core": ["../../packages/core/src/index.ts"],
+      "@reachdem/core/*": ["../../packages/core/src/*"],
+      "@reachdem/database": ["../../packages/database/src/index.ts"],
+      "@reachdem/database/*": ["../../packages/database/src/*"],
+      "@reachdem/email-ui": ["../../packages/email-ui/src/index.ts"],
+      "@reachdem/email-ui/*": ["../../packages/email-ui/src/*"],
+      "@reachdem/shared": ["../../packages/shared/src/index.ts"],
+      "@reachdem/shared/*": ["../../packages/shared/src/*"],
+      "@reachdem/transactional": ["../../packages/transactional/index.ts"],
+      "@reachdem/transactional/*": ["../../packages/transactional/*"]
     }
   },
   "include": [

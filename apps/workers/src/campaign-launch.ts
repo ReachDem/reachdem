@@ -4,7 +4,9 @@ import {
   emailWorkerConfig,
   getEmailQueueName,
   getSmsQueueName,
+  getWhatsAppQueueName,
   smsWorkerConfig,
+  whatsappWorkerConfig,
 } from "./config";
 import { requireCampaignWorkerEnv } from "./env";
 import type { CampaignLaunchMessage, Env, MessageBatch } from "./types";
@@ -20,6 +22,7 @@ export async function handleCampaignLaunchBatch(
     environment: env.ENVIRONMENT,
     smsQueue: getSmsQueueName(env.ENVIRONMENT),
     emailQueue: getEmailQueueName(env.ENVIRONMENT),
+    whatsappQueue: getWhatsAppQueueName(env.ENVIRONMENT),
   });
 
   for (const message of batch.messages) {
@@ -48,6 +51,14 @@ export async function handleCampaignLaunchBatch(
             queue: getEmailQueueName(env.ENVIRONMENT),
           });
           await env.EMAIL_QUEUE.send(emailJob);
+        },
+        async (whatsAppJob) => {
+          console.log("[Campaign Launch Queue] Publishing WhatsApp child job", {
+            campaignId: job.campaign_id,
+            messageId: whatsAppJob.message_id,
+            queue: getWhatsAppQueueName(env.ENVIRONMENT),
+          });
+          await env.WHATSAPP_QUEUE.send(whatsAppJob);
         }
       );
 

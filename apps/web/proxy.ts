@@ -7,11 +7,19 @@ type FlowStateResponse = {
   nextPath: string;
 };
 
+function getAuthFlowBaseUrl(request: NextRequest) {
+  if (process.env.NODE_ENV === "development") {
+    return "http://127.0.0.1:3000";
+  }
+
+  return request.nextUrl.origin;
+}
+
 export default async function authProxy(request: NextRequest) {
   const { data: flow } = await betterFetch<FlowStateResponse>(
     "/api/auth/flow-state",
     {
-      baseURL: request.nextUrl.origin,
+      baseURL: getAuthFlowBaseUrl(request),
       headers: {
         cookie: request.headers.get("cookie") || "",
       },
