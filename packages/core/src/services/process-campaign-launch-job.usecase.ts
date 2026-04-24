@@ -21,6 +21,10 @@ type ResolvedContact = {
 };
 
 export class ProcessCampaignLaunchJobUseCase {
+  private static normalizeCampaignChannel(channel: string): "sms" | "email" {
+    return channel === "email" ? "email" : "sms";
+  }
+
   private static resolveMessageScheduledAt(
     campaignScheduledAt: Date | null
   ): string | undefined {
@@ -60,10 +64,14 @@ export class ProcessCampaignLaunchJobUseCase {
         return "skipped";
       }
 
+      const deliveryChannel = this.normalizeCampaignChannel(
+        refreshedCampaign.channel
+      );
+
       const targets = await this.resolveAndCreateTargets(
         job.organization_id,
         job.campaign_id,
-        refreshedCampaign.channel
+        deliveryChannel
       );
 
       if (targets.length === 0) {
@@ -96,8 +104,7 @@ export class ProcessCampaignLaunchJobUseCase {
       const parsedCampaign = CampaignService.getCampaignContent(
         refreshedCampaign as any
       );
-      const isEmailCampaign =
-        (refreshedCampaign.channel as "sms" | "email") === "email";
+      const isEmailCampaign = deliveryChannel === "email";
       const logCategory = isEmailCampaign ? "email" : "sms";
 
       for (const target of targets) {

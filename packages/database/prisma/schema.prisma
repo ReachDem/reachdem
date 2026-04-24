@@ -37,6 +37,7 @@ model User {
   createdApiKeys      ApiKey[]             @relation("ApiKeyCreator")
   revokedApiKeys      ApiKey[]             @relation("ApiKeyRevoker")
   deferredEmails      AuthDeferredEmail[]
+  aiSettings          AiUserSettings[]
 
   @@map("user")
 }
@@ -156,8 +157,28 @@ model Organization {
   feedbacks           Feedback[]
   onboardingStates    OnboardingState[]
   apiKeys             ApiKey[]
+  aiSettings          AiUserSettings[]
 
   @@map("organization")
+}
+
+model AiUserSettings {
+  id                   String   @id @default(cuid())
+  userId               String
+  organizationId       String
+  preferredProvider    String   @default("gemini")
+  openaiApiKeyEncrypted String?
+  elevenlabsAgentId    String?
+  voiceEnabled         Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, preferredProvider])
+  @@map("ai_user_settings")
 }
 
 model Member {
@@ -654,6 +675,7 @@ enum CampaignStatus {
 enum CampaignChannel {
   sms
   email
+  whatsapp
 }
 
 enum TrackedLinkStatus {

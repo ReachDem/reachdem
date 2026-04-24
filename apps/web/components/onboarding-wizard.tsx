@@ -629,7 +629,7 @@ export function OnboardingWizard({
               maxLength={6}
               pattern={REGEXP_ONLY_DIGITS}
               value={otpValue}
-              onChange={(value) => {
+              onChange={(value: string) => {
                 setOtpValue(value);
                 if (value.length === 6) {
                   void handleVerifyOtp(value);

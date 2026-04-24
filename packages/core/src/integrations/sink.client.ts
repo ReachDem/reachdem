@@ -75,15 +75,6 @@ export class SinkClient {
     let response: Response;
     const fullUrl = `${this.baseUrl}${path}`;
 
-    console.log("[SinkClient] Making request:", {
-      url: fullUrl,
-      method: init.method,
-      hasBody: !!init.body,
-      body: init.body,
-      baseUrl: this.baseUrl,
-      hasToken: !!this.token,
-    });
-
     try {
       response = await fetch(fullUrl, {
         ...init,
@@ -105,21 +96,18 @@ export class SinkClient {
     });
 
     if (!response.ok) {
-      let errorBody;
+      let errorBody = "";
       try {
         errorBody = await response.text();
-        console.error("[SinkClient] Error response body:", errorBody);
-      } catch (e) {
-        console.error("[SinkClient] Could not read error body");
+      } catch {
+        // ignore
       }
-
       throw new SinkUnavailableError(
-        `Sink API request failed with HTTP ${response.status}`
+        `Sink API request failed with HTTP ${response.status}: ${errorBody}`
       );
     }
 
     const payload = await response.json();
-    console.log("[SinkClient] Success payload:", payload);
 
     if (!schema) {
       return payload as T;

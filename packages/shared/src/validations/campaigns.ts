@@ -9,7 +9,7 @@ export const campaignStatusSchema = z.enum([
   "failed",
   "expired",
 ]);
-export const campaignChannelSchema = z.enum(["sms", "email"]);
+export const campaignChannelSchema = z.enum(["sms", "email", "whatsapp"]);
 export const audienceSourceTypeSchema = z.enum(["group", "segment"]);
 export const targetStatusSchema = z.enum([
   "pending",
@@ -61,7 +61,7 @@ export function parseCampaignContent(
   channel: z.infer<typeof campaignChannelSchema>,
   content: unknown
 ): SmsCampaignContent | EmailCampaignContent {
-  return channel === "sms"
+  return channel === "sms" || channel === "whatsapp"
     ? smsCampaignContentSchema.parse(content)
     : emailCampaignContentSchema.parse(content);
 }
@@ -77,7 +77,7 @@ export const createCampaignSchema = z
   })
   .superRefine((value, ctx) => {
     const schema =
-      value.channel === "sms"
+      value.channel === "sms" || value.channel === "whatsapp"
         ? smsCampaignContentSchema
         : emailCampaignContentSchema;
     const parsed = schema.safeParse(value.content);

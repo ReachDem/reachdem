@@ -16,7 +16,6 @@ import {
   Send,
   Server,
   Users,
-  type LucideIcon,
 } from "lucide-react";
 import {
   Card,
@@ -42,11 +41,11 @@ type ApiKeyResponse = {
 
 function SidebarLink({
   href,
-  icon: Icon,
+  icon,
   label,
 }: {
   href: string;
-  icon: LucideIcon;
+  icon: React.ReactNode;
   label: string;
 }) {
   return (
@@ -55,7 +54,7 @@ function SidebarLink({
       className="text-muted-foreground hover:bg-muted hover:text-foreground group flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors"
     >
       <div className="flex items-center gap-3">
-        <Icon className="h-4 w-4" />
+        {icon}
         {label}
       </div>
       <span className="text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
@@ -295,20 +294,32 @@ curl_close($ch);
               </Link>
               <SidebarLink
                 href="#endpoints"
-                icon={Server}
+                icon={<Server className="h-4 w-4" />}
                 label="Quick Endpoints"
               />
               <SidebarLink
                 href="#messages"
-                icon={MessageSquare}
+                icon={<MessageSquare className="h-4 w-4" />}
                 label="Messages"
               />
-              <SidebarLink href="#contacts" icon={Users} label="Contacts" />
-              <SidebarLink href="#campaigns" icon={Send} label="Campaigns" />
-              <SidebarLink href="#segments" icon={Filter} label="Segments" />
+              <SidebarLink
+                href="#contacts"
+                icon={<Users className="h-4 w-4" />}
+                label="Contacts"
+              />
+              <SidebarLink
+                href="#campaigns"
+                icon={<Send className="h-4 w-4" />}
+                label="Campaigns"
+              />
+              <SidebarLink
+                href="#segments"
+                icon={<Filter className="h-4 w-4" />}
+                label="Segments"
+              />
               <SidebarLink
                 href="#links"
-                icon={Link2}
+                icon={<Link2 className="h-4 w-4" />}
                 label="Links & Tracking"
               />
             </nav>

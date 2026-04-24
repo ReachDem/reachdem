@@ -20,6 +20,10 @@ type ResolvedContact = {
 };
 
 export class LaunchCampaignUseCase {
+  private static normalizeCampaignChannel(channel: string): "sms" | "email" {
+    return channel === "email" ? "email" : "sms";
+  }
+
   private static resolveMessageScheduledAt(
     campaignScheduledAt: Date | null
   ): string | undefined {
@@ -58,10 +62,11 @@ export class LaunchCampaignUseCase {
     });
 
     try {
+      const deliveryChannel = this.normalizeCampaignChannel(campaign.channel);
       const targets = await this.resolveAndCreateTargets(
         organizationId,
         campaignId,
-        campaign.channel
+        deliveryChannel
       );
 
       if (targets.length === 0) {
@@ -94,7 +99,7 @@ export class LaunchCampaignUseCase {
       const parsedCampaign = CampaignService.getCampaignContent(
         campaign as any
       );
-      const isEmailCampaign = (campaign.channel as "sms" | "email") === "email";
+      const isEmailCampaign = deliveryChannel === "email";
       const logCategory = isEmailCampaign ? "email" : "sms";
 
       for (const target of targets) {

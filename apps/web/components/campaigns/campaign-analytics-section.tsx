@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import {
   Card,
   CardContent,
@@ -23,7 +23,23 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Bar, BarChart, Cell, Label, Pie, PieChart, XAxis } from "recharts";
+import {
+  Bar as RechartsBar,
+  BarChart as RechartsBarChart,
+  Cell as RechartsCell,
+  Label as RechartsLabel,
+  Pie as RechartsPie,
+  PieChart as RechartsPieChart,
+  XAxis as RechartsXAxis,
+} from "recharts";
+
+const Bar = RechartsBar as unknown as ComponentType<any>;
+const BarChart = RechartsBarChart as unknown as ComponentType<any>;
+const Cell = RechartsCell as unknown as ComponentType<any>;
+const Label = RechartsLabel as unknown as ComponentType<any>;
+const Pie = RechartsPie as unknown as ComponentType<any>;
+const PieChart = RechartsPieChart as unknown as ComponentType<any>;
+const XAxis = RechartsXAxis as unknown as ComponentType<any>;
 
 interface DailyBucket {
   date: string;
@@ -570,7 +586,14 @@ export function CampaignAnalyticsSection({
                     ))}
                     {pieSegment === "total" ? (
                       <Label
-                        content={({ viewBox }) => {
+                        content={({
+                          viewBox,
+                        }: {
+                          viewBox?: {
+                            cx?: number;
+                            cy?: number;
+                          };
+                        }) => {
                           if (
                             !viewBox ||
                             !("cx" in viewBox) ||

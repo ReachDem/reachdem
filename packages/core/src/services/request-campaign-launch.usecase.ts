@@ -20,6 +20,10 @@ const URL_REGEX =
 export class RequestCampaignLaunchUseCase {
   private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
 
+  private static normalizeCampaignChannel(channel: string): "sms" | "email" {
+    return channel === "email" ? "email" : "sms";
+  }
+
   static async execute(
     organizationId: string,
     campaignId: string,
@@ -64,10 +68,12 @@ export class RequestCampaignLaunchUseCase {
       select: { id: true },
     });
 
+    const deliveryChannel = this.normalizeCampaignChannel(campaign.channel);
+
     const eligibleTargetCount = await this.countEligibleTargets(
       organizationId,
       campaignId,
-      campaign.channel
+      deliveryChannel
     );
 
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
@@ -80,7 +86,7 @@ export class RequestCampaignLaunchUseCase {
         smsQuotaUsed: organization.smsQuotaUsed,
         emailQuotaUsed: organization.emailQuotaUsed,
       },
-      campaign.channel
+      deliveryChannel
     );
 
     if (remainingIncluded != null) {
@@ -92,7 +98,7 @@ export class RequestCampaignLaunchUseCase {
     }
 
     const usageCostMinor = BillingCatalogService.getMessageUsageCostMinor(
-      campaign.channel,
+      deliveryChannel,
       eligibleTargetCount
     );
 
@@ -108,7 +114,7 @@ export class RequestCampaignLaunchUseCase {
 
     await prisma.$transaction(async (tx) => {
       const updateContent =
-        campaign.channel === "sms"
+        deliveryChannel === "sms"
           ? {
               ...(campaign.content as any),
               from:
@@ -130,7 +136,7 @@ export class RequestCampaignLaunchUseCase {
           creditBalance: {
             decrement: usageCostMinor,
           },
-          ...(campaign.channel === "sms"
+          ...(deliveryChannel === "sms"
             ? {
                 smsQuotaUsed: {
                   increment: eligibleTargetCount,
@@ -180,7 +186,7 @@ export class RequestCampaignLaunchUseCase {
     const content = campaign.content as any;
     let textContent = "";
     let htmlContent = "";
-    const channel = campaign.channel as "sms" | "email";
+    const channel = this.normalizeCampaignChannel(campaign.channel);
 
     // Extract text content based on channel
     if (channel === "sms" && content?.text) {

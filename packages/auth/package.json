@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@better-auth/core": "1.4.3",
+    "@reachdem/core": "workspace:*",
     "@reachdem/database": "workspace:*",
     "@reachdem/shared": "workspace:*",
-    "@reachdem/core": "workspace:*",
     "@reachdem/transactional": "workspace:*",
     "@react-email/components": "^1.0.8",
     "@react-email/render": "^2.0.4",
@@ -28,7 +28,8 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",
-    "@types/react": "^19.0.10",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "19.2.3",
     "typescript": "^5"
   }
 }

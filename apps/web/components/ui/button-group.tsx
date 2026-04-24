@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
+import type { ComponentPropsWithoutRef } from "react";
 
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -25,7 +26,7 @@ function ButtonGroup({
   className,
   orientation,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof buttonGroupVariants>) {
+}: ComponentPropsWithoutRef<"div"> & VariantProps<typeof buttonGroupVariants>) {
   return (
     <div
       role="group"
@@ -41,7 +42,7 @@ function ButtonGroupText({
   className,
   asChild = false,
   ...props
-}: React.ComponentProps<"div"> & {
+}: ComponentPropsWithoutRef<"div"> & {
   asChild?: boolean;
 }) {
   const Comp = asChild ? Slot.Root : "div";

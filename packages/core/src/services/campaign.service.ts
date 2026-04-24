@@ -36,7 +36,7 @@ export class CampaignService {
   }
 
   static getCampaignContent(campaign: {
-    channel: "sms" | "email";
+    channel: "sms" | "email" | "whatsapp";
     content: unknown;
   }): SmsCampaignContent | EmailCampaignContent {
     try {
@@ -47,7 +47,7 @@ export class CampaignService {
           ? (campaign.content as Record<string, unknown>)
           : {};
 
-      if (campaign.channel === "sms") {
+      if (campaign.channel === "sms" || campaign.channel === "whatsapp") {
         return {
           text: this.getSafeString(
             rawContent.text,

@@ -269,7 +269,7 @@ export function CampaignDetailsClient({
               Campaign Content Preview
             </h3>
 
-            {campaign.channel === "sms" ? (
+            {campaign.channel === "sms" || campaign.channel === "whatsapp" ? (
               <div className="flex justify-center py-10">
                 <div className="relative mx-auto h-[600px] w-[300px] overflow-hidden rounded-[2.5rem] border-[14px] border-gray-800 bg-gray-900 shadow-2xl shadow-xl">
                   {/* Notch */}

@@ -99,7 +99,7 @@ export type CampaignStatus =
   | "Failed"
   | "Expired"
   | (string & {});
-export type CampaignChannel = "SMS" | "Email";
+export type CampaignChannel = "SMS" | "Email" | "WhatsApp";
 export type CampaignUrl = string;
 export type AudienceName = string;
 
@@ -145,6 +145,15 @@ function getChannelBadge(type: CampaignChannel) {
       <Badge variant="outline" className={pillBadgeClassName}>
         <IconMessage className="size-3.5 text-green-600" />
         SMS
+      </Badge>
+    );
+  }
+
+  if (type === "WhatsApp") {
+    return (
+      <Badge variant="outline" className={pillBadgeClassName}>
+        <IconMessage className="size-3.5 text-emerald-600" />
+        WhatsApp
       </Badge>
     );
   }

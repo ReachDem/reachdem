@@ -83,7 +83,7 @@ export default async function Page() {
     id: string;
     header: string;
     description: string | null;
-    type: "SMS" | "Email";
+    type: "SMS" | "Email" | "WhatsApp";
     status: string;
     target: string;
     limit: string;
@@ -130,7 +130,12 @@ export default async function Page() {
             id: campaign.id,
             header: campaign.name,
             description: campaign.description,
-            type: campaign.channel === "sms" ? "SMS" : "Email",
+            type:
+              campaign.channel === "email"
+                ? "Email"
+                : campaign.channel === "whatsapp"
+                  ? "WhatsApp"
+                  : "SMS",
             status: getDashboardStatus(campaign, stats),
             target: (stats?.sentCount ?? 0).toLocaleString(),
             limit: (stats?.audienceSize ?? 0).toLocaleString(),

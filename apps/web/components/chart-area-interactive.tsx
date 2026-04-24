@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import {
+  Area as RechartsArea,
+  AreaChart as RechartsAreaChart,
+  CartesianGrid as RechartsCartesianGrid,
+  XAxis as RechartsXAxis,
+} from "recharts";
 
 import { ChartAreaSkeleton } from "@/components/skeletons/chart-area-skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -35,6 +40,12 @@ type ChartPoint = {
   sms: number;
   email: number;
 };
+
+const Area = RechartsArea as unknown as React.ComponentType<any>;
+const AreaChart = RechartsAreaChart as unknown as React.ComponentType<any>;
+const CartesianGrid =
+  RechartsCartesianGrid as unknown as React.ComponentType<any>;
+const XAxis = RechartsXAxis as unknown as React.ComponentType<any>;
 
 const chartConfig = {
   messages: {
@@ -211,7 +222,7 @@ export function ChartAreaInteractive() {
               axisLine={false}
               tickMargin={8}
               minTickGap={32}
-              tickFormatter={(value) => {
+              tickFormatter={(value: string) => {
                 const date = new Date(value);
                 return date.toLocaleDateString("en-US", {
                   month: "short",
@@ -224,7 +235,7 @@ export function ChartAreaInteractive() {
               content={
                 <ChartTooltipContent
                   labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
+                    return new Date(String(value)).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                     });

@@ -130,7 +130,7 @@ export async function getCampaignById(id: string): Promise<Campaign | null> {
 export async function createCampaign(data: {
   name: string;
   description: string | null;
-  channel: "sms" | "email";
+  channel: CreateCampaignDto["channel"];
   content: CreateCampaignDto["content"];
   audienceGroups: string[];
   audienceSegments: string[];
@@ -144,7 +144,7 @@ export async function createCampaign(data: {
 type CreateCampaignWithAudienceInput = {
   name: string;
   description: string | null;
-  channel: "sms" | "email";
+  channel: CreateCampaignDto["channel"];
   content: CreateCampaignDto["content"];
   audienceGroups: string[];
   audienceSegments: string[];

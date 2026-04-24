@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import Cropper from "react-easy-crop";
+import CropperComponent from "react-easy-crop";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Loader2 } from "lucide-react";
+
+const Cropper = CropperComponent as unknown as React.ComponentType<any>;
 
 export interface AvatarCropperDialogProps {
   open: boolean;

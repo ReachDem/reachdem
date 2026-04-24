@@ -67,18 +67,25 @@ export class CampaignStatsService {
     let uniqueClickCount = 0;
 
     for (const link of trackedLinks) {
-      const counters = await SinkClient.getCountersBySlug(link.slug);
+      let counters = { totalClicks: 0, uniqueClicks: 0 };
+      try {
+        counters = await SinkClient.getCountersBySlug(link.slug);
+      } catch {
+        // Sink API unavailable or returned an error for this slug — skip click sync
+      }
       clickCount += counters.totalClicks;
       uniqueClickCount += counters.uniqueClicks;
 
-      await prisma.trackedLink.update({
-        where: { id: link.id },
-        data: {
-          totalClicks: counters.totalClicks,
-          uniqueClicks: counters.uniqueClicks,
-          lastStatsSyncAt: new Date(),
-        },
-      });
+      if (counters.totalClicks > 0 || counters.uniqueClicks > 0) {
+        await prisma.trackedLink.update({
+          where: { id: link.id },
+          data: {
+            totalClicks: counters.totalClicks,
+            uniqueClicks: counters.uniqueClicks,
+            lastStatsSyncAt: new Date(),
+          },
+        });
+      }
     }
 
     const stats: CampaignStatsResponse = {

@@ -17,7 +17,7 @@ export default async function UnsubscribePage({
   let channelLabel = "message";
 
   if (payload) {
-    channelLabel = payload.channel === "sms" ? "SMS" : "email";
+    channelLabel = payload.channel === "email" ? "email" : "SMS";
 
     const updated = await ContactUnsubscribeService.updateChannelPreference({
       organizationId: payload.organizationId,

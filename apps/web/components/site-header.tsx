@@ -5,7 +5,9 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { SearchCommand } from "@/components/search-command";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { Bot, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { HermesDrawer } from "@/components/hermes/hermes-drawer";
 
 import Link from "next/link";
 import React from "react";
@@ -34,6 +36,7 @@ function formatBreadcrumbPart(part: string, groups: Group[]) {
 export function SiteHeader() {
   const pathname = usePathname();
   const parts = pathname?.split("/").filter(Boolean) || [];
+  const [aiOpen, setAiOpen] = React.useState(false);
 
   const groups = useGroupsStore((s) => s.groups);
   const addGroup = useGroupsStore((s) => s.addGroup);
@@ -101,8 +104,18 @@ export function SiteHeader() {
         {headerTitle}
         <div className="ml-auto flex items-center gap-2">
           <SearchCommand />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Open AI assistant"
+            onClick={() => setAiOpen(true)}
+          >
+            <Bot className="h-4 w-4" />
+          </Button>
           <ThemeToggle />
         </div>
+        <HermesDrawer open={aiOpen} onOpenChange={setAiOpen} />
       </div>
     </header>
   );

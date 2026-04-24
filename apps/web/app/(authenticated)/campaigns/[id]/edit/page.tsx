@@ -147,7 +147,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
             fontWeights: data.content?.fontWeights,
             fromName: data.content?.from,
           });
-        } else if (data.channel === "sms") {
+        } else if (data.channel === "sms" || data.channel === "whatsapp") {
           setSmsContent({
             text: data.content?.text || "",
             senderId: data.content?.senderId || data.content?.from,
