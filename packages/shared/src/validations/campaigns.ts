@@ -19,7 +19,7 @@ export const targetStatusSchema = z.enum([
 ]);
 
 export const smsCampaignContentSchema = z.object({
-  text: z.string().min(1, "SMS text is required").max(1600),
+  text: z.string().min(1, "SMS text is required").max(160),
   from: z
     .string()
     .min(1, "Sender ID is required")

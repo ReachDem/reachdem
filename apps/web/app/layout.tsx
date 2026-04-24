@@ -4,6 +4,7 @@ import "./globals.css";
 import "./fonts.css";
 import { Providers } from "@/components/providers";
 import { getThemeScript } from "@/lib/theme";
+import Script from "next/script";
 
 const neueMontreal = localFont({
   src: [
@@ -51,13 +52,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{ __html: themeScript }}
-          suppressHydrationWarning
-        />
-      </head>
+      <head />
       <body className={`${neueMontreal.variable} font-sans antialiased`}>
+        <Script id="theme-script" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
         <Providers>{children}</Providers>
       </body>
     </html>

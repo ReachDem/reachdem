@@ -4,6 +4,7 @@ import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { DashboardChecklistStep } from "@reachdem/shared";
+import { notifyAdminsOfValidationRequest } from "@/lib/admin-notify";
 
 // Compute step completions
 export async function getDashboardChecklistState() {
@@ -155,6 +156,13 @@ export async function submitSenderId(senderId: string) {
         senderId,
       },
     });
+
+    // Notify admins asynchronously
+    notifyAdminsOfValidationRequest(
+      "Sender ID",
+      `Organization ID: ${organizationId}\nUser ID: ${session.user.id}\nRequested Sender ID: ${senderId}`
+    );
+
     return { success: true };
   } catch (error: any) {
     if (error.code === "P2002") {

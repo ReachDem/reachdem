@@ -341,7 +341,7 @@ interface Campaign {
 }
 
 interface SmsCampaignContent {
-  text: string; // Max 1600 chars (allows for 10 SMS segments)
+  text: string; // Max 160 chars (allows for 10 SMS segments)
   from?: string; // Sender ID
 }
 

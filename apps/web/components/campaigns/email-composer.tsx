@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { EmailPreviewDialog } from "./email-preview-dialog";
 import { CodeEditorWithFormat } from "./code-editor-with-format";
 import { FontSelector } from "./font-selector";
-import { EmailSpamScoreCard } from "./email-spam-score-card";
 import { toast } from "sonner";
 import {
   fetchEmailSpamAnalysis,
@@ -410,11 +409,6 @@ export function EmailComposer({
           />
         </div>
       </div>
-
-      <EmailSpamScoreCard
-        analysis={spamAnalysis}
-        isAiToneLoading={isAiToneLoading}
-      />
 
       {/* Editor Content */}
       <div className="mt-2">

@@ -1004,7 +1004,7 @@ components:
         text:
           type: string
           minLength: 1
-          maxLength: 1600
+          maxLength: 160
         from:
           type: string
           minLength: 1
@@ -1529,7 +1529,7 @@ components:
         text:
           type: string
           minLength: 1
-          maxLength: 1600
+          maxLength: 160
         from:
           type: string
           minLength: 1

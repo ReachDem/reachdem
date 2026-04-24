@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { authClient, useSession } from "@reachdem/auth/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   IconApi,
   IconChartBar,
@@ -205,6 +205,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       />
                     ) : (
                       <Avatar className="size-8 rounded-md bg-white shadow">
+                        <AvatarImage
+                          src={activeOrg?.logo || undefined}
+                          alt={currentWorkspaceName}
+                        />
                         <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 font-bold text-white">
                           {orgInitial}
                         </AvatarFallback>
@@ -242,6 +246,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       className="cursor-pointer gap-2"
                     >
                       <Avatar className="size-6 rounded bg-gradient-to-br from-blue-500 to-cyan-400">
+                        <AvatarImage
+                          src={workspace.logo || undefined}
+                          alt={workspace.name || ""}
+                        />
                         <AvatarFallback className="rounded bg-gradient-to-br from-blue-500 to-cyan-400 text-xs font-bold text-white">
                           {wsInitial}
                         </AvatarFallback>

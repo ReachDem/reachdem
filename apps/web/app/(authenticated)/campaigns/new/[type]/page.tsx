@@ -213,8 +213,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         toast.error(error);
         return;
       }
-      if (smsContent.text.length > 1600) {
-        const error = "SMS message exceeds 1600 character limit";
+      if (smsContent.text.length > 160) {
+        const error = "SMS message exceeds 160 character limit";
         console.error("[Campaign] Validation error:", error);
         toast.error(error);
         return;
@@ -332,8 +332,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         toast.error(error);
         return;
       }
-      if (smsContent.text.length > 1600) {
-        const error = "SMS message exceeds 1600 character limit";
+      if (smsContent.text.length > 160) {
+        const error = "SMS message exceeds 160 character limit";
         console.error("[Campaign] Validation error:", error);
         toast.error(error);
         return;

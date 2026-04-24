@@ -216,7 +216,7 @@ img {
     <tbody>
       <tr>
         <td align="center" style="padding:0;">
-          <table class="container" align="center" width="600" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:600px;margin:0 auto;padding:16px;">
+          <table class="container" align="center" width="640" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:600px;margin:0 auto;padding:0;">
             <tbody>
               <tr>
                 <td style="padding:0;">
@@ -263,6 +263,7 @@ export function wrapContentInEmailStructure(
 ): string {
   // Extract images from HTML
   const imageRegex = /<img[^>]+src="([^">]+)"/g;
+
   const images: string[] = [];
   let match;
 
@@ -274,6 +275,24 @@ export function wrapContentInEmailStructure(
   const preloadLinks =
     uniqueImages.length > 0 ? generatePreloadLinks(uniqueImages) : "";
   const fontCSS = generateFontFaceCSS(fontFamily, fontWeights);
+
+  // If the content already looks like a full HTML document (contains <html> or <!doctype html>),
+  // do not wrap it again to prevent nested HTML tags
+  const lowercaseContent = htmlContent.trim().toLowerCase();
+  if (
+    lowercaseContent.startsWith("<!doctype html") ||
+    lowercaseContent.includes("<html")
+  ) {
+    const styleInjection = `\n${preloadLinks}\n<style>\n${fontCSS}\n</style>\n`;
+    if (lowercaseContent.includes("</head>")) {
+      return htmlContent.replace(/<\/head>/i, `${styleInjection}</head>`);
+    }
+    // Fallback if no <head> exists
+    return htmlContent.replace(
+      /(<html[^>]*>)/i,
+      `$1\n<head>${styleInjection}</head>`
+    );
+  }
 
   // Clean maily.to classes since we're using wrapper styles
   const processedContent = cleanMailyClasses(htmlContent);

@@ -24,8 +24,15 @@ function renderHTMLToIFrame(
     return;
   }
 
+  // If the HTML is already a full document, use it directly
+  const trimmedHtml = html.trim().toLowerCase();
+  const isFullHtml =
+    trimmedHtml.startsWith("<!doctype html") || trimmedHtml.includes("<html");
+
   // Use innerHTML instead of deprecated doc.write()
-  const fullHtml = `<!DOCTYPE html>
+  const fullHtml = isFullHtml
+    ? html
+    : `<!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8">

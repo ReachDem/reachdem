@@ -306,8 +306,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         toast.error("Please enter SMS message");
         return;
       }
-      if (smsContent.text.length > 1600) {
-        toast.error("SMS message exceeds 1600 character limit");
+      if (smsContent.text.length > 160) {
+        toast.error("SMS message exceeds 160 character limit");
         return;
       }
     }
@@ -475,8 +475,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         toast.error("Please enter SMS message");
         return;
       }
-      if (smsContent.text.length > 1600) {
-        toast.error("SMS message exceeds 1600 character limit");
+      if (smsContent.text.length > 160) {
+        toast.error("SMS message exceeds 160 character limit");
         return;
       }
     }

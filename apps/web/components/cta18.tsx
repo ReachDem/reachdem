@@ -21,8 +21,18 @@ const Cta18 = ({ className }: Cta18Props) => {
               demo. We’ll personally guide you on how to use the tool!
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button>Book a demo</Button>
-              <Button variant="outline">View resources</Button>
+              <Button asChild>
+                <a
+                  href="http://cal.com/belrick/reachdem-onboarding?"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Book a demo
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/resources">View resources</a>
+              </Button>
             </div>
           </div>
           <div className="relative ml-6 max-h-96 md:mt-8 md:ml-0">
