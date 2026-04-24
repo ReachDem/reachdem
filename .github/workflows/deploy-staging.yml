@@ -48,7 +48,7 @@ jobs:
     name: Deploy Web (staging)
     runs-on: ubuntu-latest
     environment: staging
-    if: ${{ secrets.VERCEL_TOKEN != '' && vars.VERCEL_PROJECT_ID_WEB != '' && vars.VERCEL_ORG_ID != '' }}
+    if: ${{ vars.VERCEL_PROJECT_ID_WEB != '' && vars.VERCEL_ORG_ID != '' }}
 
     steps:
       - name: Checkout
@@ -69,31 +69,53 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Pull Vercel environment
-        run: pnpm dlx vercel pull --cwd apps/web --yes --environment=preview --token="${VERCEL_TOKEN}"
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not configured for staging; skipping web deploy."
+            exit 0
+          fi
+          pnpm dlx vercel pull --cwd apps/web --yes --environment=preview --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_WEB }}
 
       - name: Build Vercel project
-        run: pnpm dlx vercel build --cwd apps/web --token="${VERCEL_TOKEN}"
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not configured for staging; skipping web build."
+            exit 0
+          fi
+          pnpm dlx vercel build --cwd apps/web --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_WEB }}
 
       - name: Deploy Vercel preview
-        run: pnpm dlx vercel deploy --cwd apps/web --prebuilt --token="${VERCEL_TOKEN}"
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not configured for staging; skipping web deploy."
+            exit 0
+          fi
+          pnpm dlx vercel deploy --cwd apps/web --prebuilt --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_WEB }}
 
       - name: Smoke test Evolution webhook route
-        if: ${{ vars.STAGING_APP_URL != '' && secrets.EVOLUTION_WEBHOOK_SECRET != '' }}
-        run: >
-          curl --fail --silent --show-error
-          -X POST
-          "${{ vars.STAGING_APP_URL }}/api/webhooks/evolution?secret=${{ secrets.EVOLUTION_WEBHOOK_SECRET }}"
-          -H "Content-Type: application/json"
-          -d '{"event":"PING","instance":"staging-smoke"}'
+        if: ${{ vars.STAGING_APP_URL != '' }}
+        run: |
+          if [ -z "$EVOLUTION_WEBHOOK_SECRET" ]; then
+            echo "EVOLUTION_WEBHOOK_SECRET is not configured for staging; skipping webhook smoke test."
+            exit 0
+          fi
+          curl --fail --silent --show-error \
+            -X POST \
+            "${STAGING_APP_URL}/api/webhooks/evolution?secret=${EVOLUTION_WEBHOOK_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"event":"PING","instance":"staging-smoke"}'
+        env:
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+          EVOLUTION_WEBHOOK_SECRET: ${{ secrets.EVOLUTION_WEBHOOK_SECRET }}

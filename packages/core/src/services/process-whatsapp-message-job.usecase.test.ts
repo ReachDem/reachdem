@@ -7,16 +7,9 @@ const mocked = vi.hoisted(() => ({
   createAttempt: vi.fn(),
   findCampaignTarget: vi.fn(),
   updateCampaignTargetMany: vi.fn(),
-  groupCampaignTarget: vi.fn(),
-  updateCampaign: vi.fn(),
-  invalidateStats: vi.fn(),
   log: vi.fn(),
   ensureSession: vi.fn(),
   markError: vi.fn(),
-  markConnecting: vi.fn(),
-  saveQrCode: vi.fn(),
-  createInstance: vi.fn(),
-  connectInstance: vi.fn(),
   sendText: vi.fn(),
 }));
 
@@ -33,10 +26,6 @@ vi.mock("@reachdem/database", () => ({
     campaignTarget: {
       findFirst: mocked.findCampaignTarget,
       updateMany: mocked.updateCampaignTargetMany,
-      groupBy: mocked.groupCampaignTarget,
-    },
-    campaign: {
-      update: mocked.updateCampaign,
     },
   },
 }));
@@ -47,26 +36,16 @@ vi.mock("./activity-logger.service", () => ({
   },
 }));
 
-vi.mock("./campaign-stats.service", () => ({
-  CampaignStatsService: {
-    invalidate: mocked.invalidateStats,
-  },
-}));
-
 vi.mock("./organization-whatsapp-session.service", () => ({
   OrganizationWhatsAppSessionService: {
     ensureSession: mocked.ensureSession,
     markError: mocked.markError,
-    markConnecting: mocked.markConnecting,
-    saveQrCode: mocked.saveQrCode,
   },
 }));
 
 vi.mock("../adapters/whatsapp/evolution-whatsapp.adapter", () => ({
   EvolutionWhatsAppAdapter: class {
     providerName = "evolution";
-    createInstance = mocked.createInstance;
-    connectInstance = mocked.connectInstance;
     sendText = mocked.sendText;
   },
 }));
@@ -92,20 +71,9 @@ describe("ProcessWhatsAppMessageJobUseCase", () => {
     mocked.updateMany.mockResolvedValue({ count: 1 });
     mocked.findCampaignTarget.mockResolvedValue(null);
     mocked.updateCampaignTargetMany.mockResolvedValue({ count: 0 });
-    mocked.groupCampaignTarget.mockResolvedValue([]);
-    mocked.updateCampaign.mockResolvedValue(undefined);
-    mocked.invalidateStats.mockResolvedValue(undefined);
     mocked.ensureSession.mockResolvedValue({
       instanceName: "staging-reachdem-org-org_1",
     });
-    mocked.createInstance.mockResolvedValue(undefined);
-    mocked.connectInstance.mockResolvedValue({
-      pairingCode: null,
-      qrCode: "qr-code",
-      attempts: 1,
-    });
-    mocked.markConnecting.mockResolvedValue(undefined);
-    mocked.saveQrCode.mockResolvedValue(undefined);
     mocked.createAttempt.mockResolvedValue(undefined);
     mocked.log.mockResolvedValue(undefined);
   });
@@ -131,8 +99,6 @@ describe("ProcessWhatsAppMessageJobUseCase", () => {
     );
 
     expect(outcome).toBe("sent");
-    expect(mocked.markConnecting).toHaveBeenCalledWith("org_1");
-    expect(mocked.saveQrCode).toHaveBeenCalledWith("org_1", "qr-code");
     expect(mocked.createAttempt).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

@@ -1,7 +1,6 @@
 import { prisma } from "@reachdem/database";
 import type { WhatsAppExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
-import { CampaignStatsService } from "./campaign-stats.service";
 import { EvolutionWhatsAppAdapter } from "../adapters/whatsapp/evolution-whatsapp.adapter";
 import { OrganizationWhatsAppSessionService } from "./organization-whatsapp-session.service";
 import { personalizeTemplate } from "../utils/message-personalization";
@@ -76,24 +75,6 @@ export class ProcessWhatsAppMessageJobUseCase {
       );
       const adapter = new EvolutionWhatsAppAdapter();
 
-      await adapter
-        .createInstance({
-          instanceName: session.instanceName,
-        })
-        .catch(() => undefined);
-
-      const connectResult = await adapter.connectInstance(session.instanceName);
-      await OrganizationWhatsAppSessionService.markConnecting(
-        job.organization_id
-      );
-
-      if (connectResult.qrCode) {
-        await OrganizationWhatsAppSessionService.saveQrCode(
-          job.organization_id,
-          connectResult.qrCode
-        );
-      }
-
       const campaignTarget = await prisma.campaignTarget.findFirst({
         where: {
           messageId: message.id,
@@ -162,8 +143,6 @@ export class ProcessWhatsAppMessageJobUseCase {
         });
 
         await this.markCampaignTarget(message.id, "sent");
-        await this.finalizeCampaignIfReady(message.campaignId);
-        await CampaignStatsService.invalidate(message.campaignId);
 
         return "sent";
       }
@@ -209,8 +188,6 @@ export class ProcessWhatsAppMessageJobUseCase {
       });
 
       await this.markCampaignTarget(message.id, "failed");
-      await this.finalizeCampaignIfReady(message.campaignId);
-      await CampaignStatsService.invalidate(message.campaignId);
 
       return "failed";
     } catch (error) {
@@ -241,39 +218,6 @@ export class ProcessWhatsAppMessageJobUseCase {
     await prisma.campaignTarget.updateMany({
       where: { messageId },
       data: { status },
-    });
-  }
-
-  private static async finalizeCampaignIfReady(
-    campaignId: string | null
-  ): Promise<void> {
-    if (!campaignId) return;
-
-    const groupedStatuses = await prisma.campaignTarget.groupBy({
-      by: ["status"],
-      where: { campaignId },
-      _count: { _all: true },
-    });
-
-    const counts = new Map(
-      groupedStatuses.map((item) => [item.status, item._count._all])
-    );
-    const pendingCount = counts.get("pending") ?? 0;
-    if (pendingCount > 0) return;
-
-    const sentCount = counts.get("sent") ?? 0;
-    const unsuccessfulCount =
-      (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);
-    const finalStatus =
-      unsuccessfulCount === 0
-        ? "completed"
-        : sentCount === 0
-          ? "failed"
-          : "partial";
-
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: finalStatus },
     });
   }
 }

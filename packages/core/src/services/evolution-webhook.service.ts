@@ -157,7 +157,7 @@ export class EvolutionWebhookService {
       process.env.EVOLUTION_WEBHOOK_SECRET?.trim() ?? null
     );
     if (!expected) {
-      return true;
+      return false;
     }
 
     return (

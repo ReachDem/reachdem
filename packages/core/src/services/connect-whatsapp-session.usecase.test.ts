@@ -7,6 +7,7 @@ const mocked = vi.hoisted(() => ({
   markConnecting: vi.fn(),
   saveQrCode: vi.fn(),
   createInstance: vi.fn(),
+  instanceExists: vi.fn(),
   configureWebhook: vi.fn(),
   connectInstance: vi.fn(),
 }));
@@ -30,6 +31,7 @@ vi.mock("../adapters/whatsapp/evolution-whatsapp.adapter", () => ({
   EvolutionWhatsAppAdapter: class {
     providerName = "evolution";
     createInstance = mocked.createInstance;
+    instanceExists = mocked.instanceExists;
     configureWebhook = mocked.configureWebhook;
     connectInstance = mocked.connectInstance;
   },
@@ -77,6 +79,7 @@ describe("ConnectWhatsAppSessionUseCase", () => {
       qrCode: "qr-code",
       attempts: 1,
     });
+    mocked.instanceExists.mockResolvedValue(false);
     mocked.createInstance.mockResolvedValue(undefined);
     mocked.configureWebhook.mockResolvedValue(undefined);
     mocked.markConnecting.mockResolvedValue(undefined);

@@ -14,7 +14,13 @@ export const GET = withWorkspace(async ({ organizationId }) => {
         organizationId
       );
 
-    if (session && session.status === "connecting") {
+    const shouldSyncFromEvolution =
+      session &&
+      (session.status === "connecting" ||
+        ((session.status === "connected" || session.status === "created") &&
+          !session.phoneNumber));
+
+    if (shouldSyncFromEvolution) {
       try {
         const adapter = new EvolutionWhatsAppAdapter();
         const connection = await adapter.getConnectionState(

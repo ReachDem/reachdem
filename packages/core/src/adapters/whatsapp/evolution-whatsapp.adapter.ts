@@ -244,10 +244,114 @@ export class EvolutionWhatsAppAdapter implements WhatsAppSender {
       evolutionConnectionStateSchema
     );
 
+    const normalizedState = response.instance.state?.toLowerCase() ?? null;
+    let phoneNumber: string | null = null;
+
+    if (normalizedState === "open" || normalizedState === "connected") {
+      try {
+        const payload = await this.request(
+          `/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`,
+          {
+            method: "GET",
+          }
+        );
+        phoneNumber = this.extractPhoneNumberFromPayload(instanceName, payload);
+      } catch {
+        phoneNumber = null;
+      }
+    }
+
     return {
       state: response.instance.state ?? null,
-      phoneNumber: null,
+      phoneNumber,
     };
+  }
+
+  private extractPhoneNumberFromPayload(
+    instanceName: string,
+    payload: unknown
+  ): string | null {
+    const unwrap = (value: unknown): unknown[] => {
+      if (Array.isArray(value)) {
+        return value;
+      }
+
+      if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        if (Array.isArray(record.response)) {
+          return record.response;
+        }
+        if (Array.isArray(record.instances)) {
+          return record.instances;
+        }
+      }
+
+      return [];
+    };
+
+    const instances = unwrap(payload);
+    const match = instances.find((item) => {
+      if (!item || typeof item !== "object") {
+        return false;
+      }
+
+      const record = item as Record<string, unknown>;
+      const nestedInstance =
+        record.instance && typeof record.instance === "object"
+          ? (record.instance as Record<string, unknown>)
+          : null;
+
+      const nestedName =
+        typeof nestedInstance?.instanceName === "string"
+          ? nestedInstance.instanceName
+          : null;
+      const flatName =
+        typeof record.instanceName === "string"
+          ? record.instanceName
+          : typeof record.name === "string"
+            ? record.name
+            : null;
+
+      return nestedName === instanceName || flatName === instanceName;
+    });
+
+    if (!match || typeof match !== "object") {
+      return null;
+    }
+
+    const record = match as Record<string, unknown>;
+    const nestedInstance =
+      record.instance && typeof record.instance === "object"
+        ? (record.instance as Record<string, unknown>)
+        : null;
+
+    const directNumber =
+      (typeof nestedInstance?.number === "string"
+        ? nestedInstance.number
+        : null) ?? (typeof record.number === "string" ? record.number : null);
+    if (directNumber) {
+      return directNumber.startsWith("+") ? directNumber : `+${directNumber}`;
+    }
+
+    const owner =
+      (typeof nestedInstance?.owner === "string"
+        ? nestedInstance.owner
+        : null) ??
+      (typeof nestedInstance?.ownerJid === "string"
+        ? nestedInstance.ownerJid
+        : null) ??
+      (typeof record.owner === "string" ? record.owner : null) ??
+      (typeof record.ownerJid === "string" ? record.ownerJid : null);
+    if (!owner) {
+      return null;
+    }
+
+    const numericOwner = owner.split("@")[0]?.replace(/\D/g, "") ?? "";
+    if (!numericOwner) {
+      return null;
+    }
+
+    return `+${numericOwner}`;
   }
 
   async configureWebhook(input: {

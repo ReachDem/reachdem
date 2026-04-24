@@ -76,6 +76,19 @@ describe("EvolutionWebhookService", () => {
     ).toBe(false);
   });
 
+  it("rejects requests when no webhook secret is configured", () => {
+    delete process.env.EVOLUTION_WEBHOOK_SECRET;
+
+    expect(
+      EvolutionWebhookService.isAuthorized({
+        rawSecret: null,
+        headerSecret: null,
+        bearerToken: null,
+        queryToken: null,
+      })
+    ).toBe(false);
+  });
+
   it("stores QR codes from QRCODE_UPDATED events", async () => {
     const outcome = await EvolutionWebhookService.process({
       event: "QRCODE_UPDATED",
