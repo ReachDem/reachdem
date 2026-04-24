@@ -36,6 +36,8 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @reachdem/database exec prisma generate --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma
 
       - name: Build shared package
         run: pnpm --filter @reachdem/shared build
@@ -75,6 +77,8 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @reachdem/database exec prisma generate --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma
 
       - name: Run workers test suite
         run: pnpm --filter @reachdem/workers test
