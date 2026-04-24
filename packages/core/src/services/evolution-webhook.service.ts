@@ -144,7 +144,7 @@ export class EvolutionWebhookService {
       return null;
     }
 
-    return trimmed.split("/")[0] ?? null;
+    return trimmed;
   }
 
   static isAuthorized(args: {
