@@ -76,6 +76,28 @@ describe("EvolutionWebhookService", () => {
     ).toBe(false);
   });
 
+  it("matches the full secret value including any slashes", () => {
+    process.env.EVOLUTION_WEBHOOK_SECRET = "webhook/secret";
+
+    expect(
+      EvolutionWebhookService.isAuthorized({
+        rawSecret: null,
+        headerSecret: "webhook/secret",
+        bearerToken: null,
+        queryToken: null,
+      })
+    ).toBe(true);
+
+    expect(
+      EvolutionWebhookService.isAuthorized({
+        rawSecret: null,
+        headerSecret: "webhook",
+        bearerToken: null,
+        queryToken: null,
+      })
+    ).toBe(false);
+  });
+
   it("rejects requests when no webhook secret is configured", () => {
     delete process.env.EVOLUTION_WEBHOOK_SECRET;
 
