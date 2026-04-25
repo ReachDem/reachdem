@@ -16,6 +16,7 @@ export async function publishWhatsAppJob(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(job),
+    signal: AbortSignal.timeout(5000),
   });
 
   if (!response.ok) {

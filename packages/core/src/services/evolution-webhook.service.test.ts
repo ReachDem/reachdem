@@ -4,6 +4,8 @@ const mocked = vi.hoisted(() => ({
   findSession: vi.fn(),
   findMessage: vi.fn(),
   updateMessages: vi.fn(),
+  updateCampaignTargets: vi.fn(),
+  transaction: vi.fn(),
   saveQrCode: vi.fn(),
   markConnected: vi.fn(),
   markDisconnected: vi.fn(),
@@ -20,6 +22,10 @@ vi.mock("@reachdem/database", () => ({
       findFirst: mocked.findMessage,
       updateMany: mocked.updateMessages,
     },
+    campaignTarget: {
+      updateMany: mocked.updateCampaignTargets,
+    },
+    $transaction: mocked.transaction,
   },
 }));
 
@@ -54,6 +60,10 @@ describe("EvolutionWebhookService", () => {
       correlationId: "corr_1",
     });
     mocked.updateMessages.mockResolvedValue({ count: 1 });
+    mocked.updateCampaignTargets.mockResolvedValue({ count: 1 });
+    mocked.transaction.mockImplementation((operations) =>
+      Promise.all(operations)
+    );
   });
 
   it("authorizes requests using the configured secret", () => {
@@ -165,6 +175,14 @@ describe("EvolutionWebhookService", () => {
         organizationId: "org_1",
         channel: "whatsapp",
         providerMessageId: "provider-msg-1",
+      },
+      data: {
+        status: "sent",
+      },
+    });
+    expect(mocked.updateCampaignTargets).toHaveBeenCalledWith({
+      where: {
+        messageId: "msg_1",
       },
       data: {
         status: "sent",

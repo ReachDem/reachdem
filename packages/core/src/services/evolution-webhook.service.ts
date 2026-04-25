@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@reachdem/database";
 import { ActivityLogger } from "./activity-logger.service";
 import { OrganizationWhatsAppSessionService } from "./organization-whatsapp-session.service";
@@ -160,11 +161,26 @@ export class EvolutionWebhookService {
       return false;
     }
 
+    const expectedBuffer = Buffer.from(expected);
+    const check = (value: string | null): boolean => {
+      const normalized = this.normalizeSecret(value);
+      if (!normalized) {
+        return false;
+      }
+
+      const valueBuffer = Buffer.from(normalized);
+      if (valueBuffer.length !== expectedBuffer.length) {
+        return false;
+      }
+
+      return timingSafeEqual(valueBuffer, expectedBuffer);
+    };
+
     return (
-      this.normalizeSecret(args.rawSecret) === expected ||
-      this.normalizeSecret(args.headerSecret) === expected ||
-      this.normalizeSecret(args.bearerToken) === expected ||
-      this.normalizeSecret(args.queryToken) === expected
+      check(args.rawSecret) ||
+      check(args.headerSecret) ||
+      check(args.bearerToken) ||
+      check(args.queryToken)
     );
   }
 
@@ -260,16 +276,30 @@ export class EvolutionWebhookService {
           },
         });
 
-        await prisma.message.updateMany({
-          where: {
-            organizationId: session.organizationId,
-            channel: "whatsapp",
-            providerMessageId,
-          },
-          data: {
-            status: normalizedStatus,
-          },
-        });
+        await prisma.$transaction([
+          prisma.message.updateMany({
+            where: {
+              organizationId: session.organizationId,
+              channel: "whatsapp",
+              providerMessageId,
+            },
+            data: {
+              status: normalizedStatus,
+            },
+          }),
+          ...(message
+            ? [
+                prisma.campaignTarget.updateMany({
+                  where: {
+                    messageId: message.id,
+                  },
+                  data: {
+                    status: normalizedStatus,
+                  },
+                }),
+              ]
+            : []),
+        ]);
 
         await ActivityLogger.log({
           organizationId: session.organizationId,

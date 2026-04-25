@@ -7,6 +7,7 @@ const mocked = vi.hoisted(() => ({
   createAttempt: vi.fn(),
   findCampaignTarget: vi.fn(),
   updateCampaignTargetMany: vi.fn(),
+  transaction: vi.fn(),
   log: vi.fn(),
   ensureSession: vi.fn(),
   markError: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@reachdem/database", () => ({
       findFirst: mocked.findCampaignTarget,
       updateMany: mocked.updateCampaignTargetMany,
     },
+    $transaction: mocked.transaction,
   },
 }));
 
@@ -75,6 +77,9 @@ describe("ProcessWhatsAppMessageJobUseCase", () => {
       instanceName: "staging-reachdem-org-org_1",
     });
     mocked.createAttempt.mockResolvedValue(undefined);
+    mocked.transaction.mockImplementation((operations) =>
+      Promise.all(operations)
+    );
     mocked.log.mockResolvedValue(undefined);
   });
 

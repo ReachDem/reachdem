@@ -104,29 +104,30 @@ export class ProcessWhatsAppMessageJobUseCase {
         from: message.from,
       });
 
-      await prisma.messageAttempt.create({
-        data: {
-          messageId: message.id,
-          organizationId: job.organization_id,
-          provider: adapter.providerName,
-          attemptNo: message.attempts.length + 1,
-          status: result.success ? "sent" : "failed",
-          providerMessageId: result.success ? result.providerMessageId : null,
-          errorCode: result.success ? null : result.errorCode,
-          errorMessage: result.success ? null : result.errorMessage,
-          durationMs: result.durationMs,
-        },
-      });
-
       if (result.success) {
-        await prisma.message.update({
-          where: { id: message.id },
-          data: {
-            status: "sent",
-            providerSelected: adapter.providerName,
-            providerMessageId: result.providerMessageId,
-          },
-        });
+        await prisma.$transaction([
+          prisma.messageAttempt.create({
+            data: {
+              messageId: message.id,
+              organizationId: job.organization_id,
+              provider: adapter.providerName,
+              attemptNo: message.attempts.length + 1,
+              status: "sent",
+              providerMessageId: result.providerMessageId,
+              errorCode: null,
+              errorMessage: null,
+              durationMs: result.durationMs,
+            },
+          }),
+          prisma.message.update({
+            where: { id: message.id },
+            data: {
+              status: "sent",
+              providerSelected: adapter.providerName,
+              providerMessageId: result.providerMessageId,
+            },
+          }),
+        ]);
 
         await ActivityLogger.log({
           organizationId: job.organization_id,
@@ -148,13 +149,28 @@ export class ProcessWhatsAppMessageJobUseCase {
       }
 
       if (job.delivery_cycle < 3 && result.retryable) {
-        await prisma.message.update({
-          where: { id: message.id },
-          data: {
-            status: "queued",
-            providerSelected: adapter.providerName,
-          },
-        });
+        await prisma.$transaction([
+          prisma.messageAttempt.create({
+            data: {
+              messageId: message.id,
+              organizationId: job.organization_id,
+              provider: adapter.providerName,
+              attemptNo: message.attempts.length + 1,
+              status: "failed",
+              providerMessageId: null,
+              errorCode: result.errorCode,
+              errorMessage: result.errorMessage,
+              durationMs: result.durationMs,
+            },
+          }),
+          prisma.message.update({
+            where: { id: message.id },
+            data: {
+              status: "queued",
+              providerSelected: adapter.providerName,
+            },
+          }),
+        ]);
 
         await options.republish({
           ...job,
@@ -164,13 +180,28 @@ export class ProcessWhatsAppMessageJobUseCase {
         return "requeued";
       }
 
-      await prisma.message.update({
-        where: { id: message.id },
-        data: {
-          status: "failed",
-          providerSelected: adapter.providerName,
-        },
-      });
+      await prisma.$transaction([
+        prisma.messageAttempt.create({
+          data: {
+            messageId: message.id,
+            organizationId: job.organization_id,
+            provider: adapter.providerName,
+            attemptNo: message.attempts.length + 1,
+            status: "failed",
+            providerMessageId: null,
+            errorCode: result.errorCode,
+            errorMessage: result.errorMessage,
+            durationMs: result.durationMs,
+          },
+        }),
+        prisma.message.update({
+          where: { id: message.id },
+          data: {
+            status: "failed",
+            providerSelected: adapter.providerName,
+          },
+        }),
+      ]);
 
       await ActivityLogger.log({
         organizationId: job.organization_id,

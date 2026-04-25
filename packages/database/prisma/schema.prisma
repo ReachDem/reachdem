@@ -565,6 +565,7 @@ model Message {
   @@index([organizationId, campaignId])
   @@index([organizationId, apiKeyId])
   @@index([organizationId, status])
+  @@index([organizationId, providerMessageId])
   @@index([organizationId, channel, status, scheduledAt])
   @@map("message")
 }
