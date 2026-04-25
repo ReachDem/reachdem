@@ -21,6 +21,7 @@ const mockedFns = vi.hoisted(() => ({
   claimScheduledMessagesMock: vi.fn(),
   revertScheduledMessageClaimMock: vi.fn(),
   sendMailMock: vi.fn(),
+  deferredAuthFetchMock: vi.fn(),
 }));
 
 vi.mock("@reachdem/core", () => ({
@@ -115,6 +116,21 @@ describe("Worker queue and scheduled flows", () => {
       accepted: ["dest@example.com"],
       rejected: [],
     });
+    mockedFns.deferredAuthFetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          processed: 0,
+          sent: 0,
+          failed: 0,
+          skipped: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }
+      )
+    );
+    vi.stubGlobal("fetch", mockedFns.deferredAuthFetchMock);
     mockedFns.claimScheduledCampaignsMock.mockResolvedValue({
       updated: 1,
       items: [
@@ -395,5 +411,18 @@ describe("Worker queue and scheduled flows", () => {
       channel: "email",
       delivery_cycle: 1,
     });
+    expect(mockedFns.deferredAuthFetchMock).toHaveBeenCalledWith(
+      new URL("/api/internal/auth/deferred-emails/process", env.API_BASE_URL),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-internal-secret": "secret",
+        }),
+        body: JSON.stringify({
+          until: "2026-03-14T10:00:00.000Z",
+          limit: 50,
+        }),
+      })
+    );
   });
 });
