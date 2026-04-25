@@ -294,12 +294,12 @@ export function AiMappingTester() {
           <div className="mt-2 flex shrink-0 items-end gap-4">
             <div className="flex-1 space-y-2">
               <label htmlFor="file-upload" className="text-sm font-medium">
-                Load a CSV or Excel file to preview data mapping
+                Load a CSV, Excel, or VCF file to preview data mapping
               </label>
               <input
                 id="file-upload"
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.vcf"
                 onChange={handleFileChange}
                 className="border-input bg-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               />

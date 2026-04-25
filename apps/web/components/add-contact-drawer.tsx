@@ -44,7 +44,9 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
         name: formData.get("name"),
         phoneE164: formData.get("phone") || undefined,
         email: formData.get("email") || undefined,
-        gender: formData.get("gender") || undefined,
+        gender: formData.get("gender")
+          ? String(formData.get("gender")).toUpperCase()
+          : undefined,
         birthdate: formData.get("birthdate") || undefined,
         enterprise: formData.get("enterprise") || undefined,
         work: formData.get("work") || undefined,
@@ -59,7 +61,15 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error || "Failed to add contact");
+        let errorMessage = "Failed to add contact";
+        if (json.error) {
+          if (Array.isArray(json.error)) {
+            errorMessage = json.error.map((e: any) => e.message).join(", ");
+          } else if (typeof json.error === "string") {
+            errorMessage = json.error;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       addContact(json.data);

@@ -51,5 +51,9 @@ export function requireWhatsAppWorkerEnv(env: Env): void {
 }
 
 export function requireScheduledWorkerEnv(env: Env): void {
-  requireKeys("scheduled", env, ["ENVIRONMENT"]);
+  requireKeys("scheduled", env, [
+    "ENVIRONMENT",
+    "API_BASE_URL",
+    "INTERNAL_API_SECRET",
+  ]);
 }

@@ -29,6 +29,42 @@ const STEP_TO_PATH: Record<
   dashboard_checklist: "/dashboard",
 };
 
+function determineNextStep(
+  isEmailVerified: boolean,
+  onboardingState: OnboardingStateDTO | null,
+  defaultOrganizationId: string | null
+): OnboardingCurrentStep {
+  if (!isEmailVerified) {
+    return "verify_email";
+  }
+
+  if (!onboardingState) {
+    // Legacy user fallback
+    return defaultOrganizationId ? "dashboard_checklist" : "workspace";
+  }
+
+  if (onboardingState.status === "completed") {
+    return "dashboard_checklist";
+  }
+
+  const currentStep = onboardingState.currentStep;
+  if (currentStep === "verify_email" && isEmailVerified) {
+    return "workspace";
+  }
+
+  return currentStep || "workspace";
+}
+
+function determineNextPath(nextStep: OnboardingCurrentStep): string {
+  if (nextStep === "register") return "/register";
+  if (nextStep === "verify_email") return "/verify-email";
+  return (
+    STEP_TO_PATH[
+      nextStep as Exclude<OnboardingCurrentStep, "register" | "verify_email">
+    ] || "/dashboard"
+  );
+}
+
 export async function getAuthFlowState(): Promise<AuthFlowState> {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -58,41 +94,21 @@ export async function getAuthFlowState(): Promise<AuthFlowState> {
   const isEmailVerified = Boolean(session.user.emailVerified);
   const onboardingState = dbUser?.onboardingState as OnboardingStateDTO | null;
 
-  let nextStep: OnboardingCurrentStep;
+  const nextStep = determineNextStep(
+    isEmailVerified,
+    onboardingState,
+    defaultOrganizationId
+  );
+  const nextPath = determineNextPath(nextStep);
 
-  if (!isEmailVerified) {
-    nextStep = "verify_email";
-  } else if (!onboardingState) {
-    // Legacy user fallback: If user has defaultOrganizationId but no OnboardingState, treat as completed
-    if (defaultOrganizationId) {
-      nextStep = "dashboard_checklist";
-    } else {
-      nextStep = "workspace";
-    }
-  } else if (onboardingState.status === "completed") {
-    nextStep = "dashboard_checklist";
-  } else {
-    // Rely on currentStep from OnboardingState if valid, or derive from status
-    nextStep = onboardingState.currentStep || "workspace";
-  }
-
-  const nextPath =
-    nextStep === "register"
-      ? "/register"
-      : nextStep === "verify_email"
-        ? "/verify-email"
-        : STEP_TO_PATH[nextStep] || "/dashboard";
-
-  const hasCompletedSetup = nextStep === "dashboard_checklist";
-  const hasActiveOrganization = Boolean(session.session?.activeOrganizationId);
   const isReady = nextStep === "dashboard_checklist";
 
   return {
     session,
     hasSession: true,
     isEmailVerified,
-    hasCompletedSetup,
-    hasActiveOrganization,
+    hasCompletedSetup: isReady,
+    hasActiveOrganization: Boolean(session.session?.activeOrganizationId),
     isReady,
     defaultOrganizationId,
     nextStep,

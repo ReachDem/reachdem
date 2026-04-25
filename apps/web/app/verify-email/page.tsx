@@ -34,6 +34,12 @@ export default function VerifyEmailPage() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
+  useEffect(() => {
+    if (sessionData?.user?.emailVerified) {
+      router.push("/continue-setup");
+    }
+  }, [sessionData, router]);
+
   if (isPending) {
     return (
       <div className="flex min-h-svh items-center justify-center">
@@ -93,7 +99,7 @@ export default function VerifyEmailPage() {
     setOtpError(null);
     const result = await sendVerificationOtp(email);
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setOtpError(result.error);
     } else {
       setResendCooldown(60);

@@ -6,6 +6,7 @@ import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { nanoid } from "nanoid";
 import { ALLOWED_KYB_DOC_TYPES, ALLOWED_KYB_IMAGE_TYPES } from "@/lib/kyb";
+import { notifyAdminsOfValidationRequest } from "@/lib/admin-notify";
 
 export async function generateKybUploadUrl(
   docType: "id" | "business",
@@ -96,6 +97,12 @@ export async function submitKybVerification(data: {
         workspaceVerificationStatus: "pending",
       },
     });
+
+    // Notify admins
+    notifyAdminsOfValidationRequest(
+      "Organization",
+      `Organization ID: ${organizationId}\nUser ID: ${session.user.id}\nWebsite URL: ${data.websiteUrl}`
+    );
 
     return { success: true };
   } catch (error) {

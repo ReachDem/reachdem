@@ -44,7 +44,7 @@ export function buildEmailCampaignContent(
   content: EmailContent,
   fallbackSubject?: string
 ) {
-  return {
+  const result = {
     subject:
       content.subject.trim() || fallbackSubject?.trim() || "Untitled Email",
     html: content.body || "<p>Empty email</p>",
@@ -54,19 +54,21 @@ export function buildEmailCampaignContent(
     fontFamily: content.fontFamily,
     fontWeights: content.fontWeights,
   };
+  return JSON.parse(JSON.stringify(result));
 }
 
 export function buildSmsCampaignContent(content: SmsContent) {
-  return {
+  const result = {
     text: content.text || "Empty SMS",
     from: content.senderId || undefined,
     senderId: content.senderId,
   };
+  return JSON.parse(JSON.stringify(result));
 }
 
 export function optionalTrimmedString(value: string) {
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function buildScheduledDateTime(date: Date, time: string) {

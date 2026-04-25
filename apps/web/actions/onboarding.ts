@@ -10,6 +10,34 @@ import { ReachDemRole, AcquisitionSource } from "@reachdem/shared";
 import { PlatformBillingSettingsService } from "@reachdem/core";
 import { getAuthFlowState } from "../lib/auth-flow";
 
+// Helper partagé pour récupérer la session et les headers
+async function requireAuthSession() {
+  const reqHeaders = await headers();
+  const session = await auth.api.getSession({ headers: reqHeaders });
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+  return { user: session.user, reqHeaders };
+}
+
+async function withAuthAction<T>(
+  action: (context: {
+    user: { id: string; emailVerified: boolean };
+    reqHeaders: Headers;
+  }) => Promise<T>
+): Promise<T | { error: string; success?: false }> {
+  try {
+    const context = await requireAuthSession();
+    return await action(context);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return { error: "Unauthorized", success: false };
+    }
+    console.error("Action error:", error);
+    return { error: "An error occurred.", success: false };
+  }
+}
+
 const legacyBootstrapSchema = z.object({
   workspaceName: z.string().min(1, "Workspace name is required"),
   role: z.enum([
@@ -46,15 +74,8 @@ export async function completeRegistrationConsent(data: {
   firstName: string;
   lastName: string;
 }) {
-  try {
-    const requestHeaders = await headers();
-    const session = await auth.api.getSession({ headers: requestHeaders });
-
-    if (!session?.user?.id) {
-      return { error: "Unauthorized" };
-    }
-
-    const userId = session.user.id;
+  return withAuthAction(async ({ user }) => {
+    const userId = user.id;
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
@@ -72,17 +93,14 @@ export async function completeRegistrationConsent(data: {
         where: { userId },
         create: {
           userId,
-          currentStep: "verify_email", // Default start
+          currentStep: user.emailVerified ? "workspace" : "verify_email", // Skip OTP if already verified via Google
         },
         update: {},
       });
     });
 
     return { success: true };
-  } catch (error) {
-    console.error("completeRegistrationConsent failed", error);
-    return { error: "An error occurred." };
-  }
+  });
 }
 
 export async function sendVerificationOtp(email: string) {
@@ -105,27 +123,26 @@ export async function sendVerificationOtp(email: string) {
 // verifyOtp is usually client-side using authClient.emailOtp.verifyEmail.
 // But here is a wrapper if needed specifically for onboarding state transition
 export async function verifyOtpCompletion() {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user?.id) return { error: "Unauthorized" };
-
+  return withAuthAction(async ({ user }) => {
     const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: user.id },
       select: { emailVerified: true },
     });
 
     if (dbUser?.emailVerified) {
-      await prisma.onboardingState.update({
-        where: { userId: session.user.id },
-        data: { currentStep: "workspace" },
+      await prisma.onboardingState.upsert({
+        where: { userId: user.id },
+        update: { currentStep: "workspace" },
+        create: {
+          userId: user.id,
+          currentStep: "workspace",
+        },
       });
       return { success: true };
     }
 
     return { error: "Email not verified yet." };
-  } catch (error) {
-    return { error: "Failed to verify completion" };
-  }
+  });
 }
 
 export async function resendVerificationLink(email: string) {
@@ -154,18 +171,14 @@ const workspaceSchema = z.object({
 export async function createWorkspace(
   payload: z.infer<typeof workspaceSchema>
 ) {
-  try {
+  return withAuthAction(async ({ user, reqHeaders }) => {
     const validatedData = workspaceSchema.parse(payload);
-    const requestHeaders = await headers();
-    const session = await auth.api.getSession({ headers: requestHeaders });
-
-    if (!session?.user?.id) return { error: "Unauthorized" };
 
     const slug = await generateUniqueOrganizationSlug(
       validatedData.workspaceName
     );
     const organization = await auth.api.createOrganization({
-      headers: requestHeaders,
+      headers: reqHeaders,
       body: {
         name: validatedData.workspaceName,
         slug,
@@ -186,13 +199,19 @@ export async function createWorkspace(
       });
 
       await tx.user.update({
-        where: { id: session.user.id },
+        where: { id: user.id },
         data: { defaultOrganizationId: organization.id },
       });
 
-      await tx.onboardingState.update({
-        where: { userId: session.user.id },
-        data: {
+      await tx.onboardingState.upsert({
+        where: { userId: user.id },
+        update: {
+          organizationId: organization.id,
+          currentStep: "profile",
+          step1CompletedAt: new Date(),
+        },
+        create: {
+          userId: user.id,
           organizationId: organization.id,
           currentStep: "profile",
           step1CompletedAt: new Date(),
@@ -203,7 +222,7 @@ export async function createWorkspace(
     try {
       await ensureDefaultApiKeyForOrganization({
         organizationId: organization.id,
-        createdBy: session.user.id,
+        createdBy: user.id,
       });
     } catch (apiKeyError) {
       console.error(
@@ -213,21 +232,20 @@ export async function createWorkspace(
     }
 
     return { success: true, organizationId: organization.id };
-  } catch (error) {
-    console.error(error);
-    return { error: "An error occurred during creation." };
-  }
+  });
 }
 
 export async function savePrimaryRole(role: ReachDemRole) {
-  try {
-    const requestHeaders = await headers();
-    const session = await auth.api.getSession({ headers: requestHeaders });
-    if (!session?.user?.id) return { error: "Unauthorized" };
-
-    await prisma.onboardingState.update({
-      where: { userId: session.user.id },
-      data: {
+  return withAuthAction(async ({ user }) => {
+    await prisma.onboardingState.upsert({
+      where: { userId: user.id },
+      update: {
+        role,
+        currentStep: "acquisition",
+        step2CompletedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         role,
         currentStep: "acquisition",
         step2CompletedAt: new Date(),
@@ -235,23 +253,24 @@ export async function savePrimaryRole(role: ReachDemRole) {
     });
 
     return { success: true };
-  } catch (error) {
-    return { error: "Error" };
-  }
+  });
 }
 
 export async function saveAcquisitionSource(
   source: AcquisitionSource,
   otherText?: string
 ) {
-  try {
-    const requestHeaders = await headers();
-    const session = await auth.api.getSession({ headers: requestHeaders });
-    if (!session?.user?.id) return { error: "Unauthorized" };
-
-    await prisma.onboardingState.update({
-      where: { userId: session.user.id },
-      data: {
+  return withAuthAction(async ({ user }) => {
+    await prisma.onboardingState.upsert({
+      where: { userId: user.id },
+      update: {
+        acquisitionSource: source,
+        acquisitionOther: otherText || null,
+        currentStep: "transition",
+        step3CompletedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         acquisitionSource: source,
         acquisitionOther: otherText || null,
         currentStep: "transition",
@@ -260,20 +279,20 @@ export async function saveAcquisitionSource(
     });
 
     return { success: true };
-  } catch (error) {
-    return { error: "Error" };
-  }
+  });
 }
 
 export async function completeOnboarding() {
-  try {
-    const requestHeaders = await headers();
-    const session = await auth.api.getSession({ headers: requestHeaders });
-    if (!session?.user?.id) return { error: "Unauthorized" };
-
-    await prisma.onboardingState.update({
-      where: { userId: session.user.id },
-      data: {
+  return withAuthAction(async ({ user }) => {
+    await prisma.onboardingState.upsert({
+      where: { userId: user.id },
+      update: {
+        status: "completed",
+        currentStep: "dashboard_checklist",
+        completedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
         status: "completed",
         currentStep: "dashboard_checklist",
         completedAt: new Date(),
@@ -281,9 +300,7 @@ export async function completeOnboarding() {
     });
 
     return { success: true };
-  } catch (error) {
-    return { error: "Error" };
-  }
+  });
 }
 
 export async function resumeOnboarding() {
@@ -297,33 +314,30 @@ export async function bootstrapWorkspace(
   try {
     const validatedData = legacyBootstrapSchema.parse(payload);
 
+    // 1. Create Workspace
     const workspaceResult = await createWorkspace({
       companyName: validatedData.workspaceName,
       workspaceName: validatedData.workspaceName,
       country: "Cameroon",
     });
+    if ("error" in workspaceResult) return { error: workspaceResult.error };
 
-    if (workspaceResult.error) {
-      return { error: workspaceResult.error };
-    }
-
+    // 2. Save Role
     const roleResult = await savePrimaryRole(
       mapLegacyRoleToReachDemRole(validatedData.role)
     );
+    if ("error" in roleResult) return { error: roleResult.error };
 
-    if (roleResult.error) {
-      return { error: roleResult.error };
-    }
-
+    // 3. Complete Onboarding
     const completionResult = await completeOnboarding();
-
-    if (completionResult.error) {
-      return { error: completionResult.error };
-    }
+    if ("error" in completionResult) return { error: completionResult.error };
 
     return {
       success: true,
-      organizationId: workspaceResult.organizationId,
+      organizationId:
+        "organizationId" in workspaceResult
+          ? workspaceResult.organizationId
+          : undefined,
     };
   } catch (error) {
     console.error("bootstrapWorkspace failed", error);

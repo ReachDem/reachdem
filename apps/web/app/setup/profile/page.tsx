@@ -58,7 +58,7 @@ export default function ProfileSetupPage() {
 
     const result = await savePrimaryRole(role);
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setError(result.error);
       setIsSubmitting(false);
       return;

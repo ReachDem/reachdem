@@ -260,7 +260,7 @@ export function SmsComposerNew({
   };
 
   const characterCount = (value.text || "").length;
-  const maxCharacters = 1600;
+  const maxCharacters = 160;
   const segmentSize = 160;
   const segments = Math.ceil(characterCount / segmentSize);
   const isOverLimit = characterCount > maxCharacters;

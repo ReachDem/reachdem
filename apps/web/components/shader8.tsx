@@ -2,7 +2,7 @@
 
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber";
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { cn } from "@/lib/utils";
@@ -377,6 +377,27 @@ interface Shader8Props {
 
 const Shader8 = ({ className }: Shader8Props) => {
   const uniformsRef = useRef<PingPongUniforms | null>(null);
+  const [useInteractiveCanvas, setUseInteractiveCanvas] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const hasFinePointer = window.matchMedia(
+      "(hover: hover) and (pointer: fine)"
+    ).matches;
+    const isLargeViewport = window.innerWidth >= 1024;
+
+    // Avoid rendering the WebGL background on mobile/touch devices where
+    // opening the virtual keyboard can make the page unstable.
+    setUseInteractiveCanvas(
+      !prefersReducedMotion && hasFinePointer && isLargeViewport
+    );
+  }, []);
 
   const handlePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -402,9 +423,16 @@ const Shader8 = ({ className }: Shader8Props) => {
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
-      <Canvas>
-        <PingPongScene uniformsRef={uniformsRef} />
-      </Canvas>
+      {useInteractiveCanvas ? (
+        <Canvas
+          dpr={[1, 1.5]}
+          gl={{ antialias: false, powerPreference: "low-power" }}
+        >
+          <PingPongScene uniformsRef={uniformsRef} />
+        </Canvas>
+      ) : (
+        <div className="h-full w-full bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.18),_transparent_32%),radial-gradient(circle_at_bottom,_rgba(15,23,42,0.2),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,0.92),_rgba(248,250,252,0.98))]" />
+      )}
     </section>
   );
 };

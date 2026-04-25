@@ -50,7 +50,7 @@ export default function AcquisitionSetupPage() {
       source === "other" ? otherText : undefined
     );
 
-    if (result.error) {
+    if (!result.success && "error" in result && result.error) {
       setError(result.error);
       setIsSubmitting(false);
       return;
