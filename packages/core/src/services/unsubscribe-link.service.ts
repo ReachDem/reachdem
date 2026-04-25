@@ -1,12 +1,12 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@reachdem/database";
-import type { MessageChannel } from "@reachdem/shared";
+type UnsubscribeChannel = "sms" | "email";
 import { TrackedLinkService } from "./tracked-link.service";
 
 interface UnsubscribeTokenPayload {
   organizationId: string;
   contactId: string;
-  channel: MessageChannel;
+  channel: UnsubscribeChannel;
   messageId?: string | null;
 }
 
@@ -85,7 +85,7 @@ export class UnsubscribeLinkService {
     organizationId: string;
     contactId: string;
     messageId: string;
-    channel: MessageChannel;
+    channel: UnsubscribeChannel;
   }): Promise<string> {
     const token = this.createToken({
       organizationId: params.organizationId,

@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import {
+  Area as RechartsArea,
+  AreaChart as RechartsAreaChart,
+  CartesianGrid as RechartsCartesianGrid,
+  XAxis as RechartsXAxis,
+} from "recharts";
 
 import { ChartAreaSkeleton } from "@/components/skeletons/chart-area-skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -16,8 +21,8 @@ import {
 import {
   type ChartConfig,
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
+  ChartTooltip as BaseChartTooltip,
+  ChartTooltipContent as BaseChartTooltipContent,
 } from "@/components/ui/chart";
 import {
   Select,
@@ -29,6 +34,15 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const description = "ReachDem messaging activity chart";
+
+const Area = RechartsArea as unknown as React.ComponentType<any>;
+const AreaChart = RechartsAreaChart as unknown as React.ComponentType<any>;
+const CartesianGrid =
+  RechartsCartesianGrid as unknown as React.ComponentType<any>;
+const ChartTooltip = BaseChartTooltip as unknown as React.ComponentType<any>;
+const ChartTooltipContent =
+  BaseChartTooltipContent as unknown as React.ComponentType<any>;
+const XAxis = RechartsXAxis as unknown as React.ComponentType<any>;
 
 type ChartPoint = {
   date: string;
@@ -211,7 +225,7 @@ export function ChartAreaInteractive() {
               axisLine={false}
               tickMargin={8}
               minTickGap={32}
-              tickFormatter={(value) => {
+              tickFormatter={(value: string | number) => {
                 const date = new Date(value);
                 return date.toLocaleDateString("en-US", {
                   month: "short",
@@ -223,7 +237,7 @@ export function ChartAreaInteractive() {
               cursor={false}
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value) => {
+                  labelFormatter={(value: string | number) => {
                     return new Date(value).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",

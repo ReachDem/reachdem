@@ -1,10 +1,15 @@
 import { prisma } from "@reachdem/database";
-import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
+import type {
+  EmailExecutionJob,
+  SmsExecutionJob,
+  WhatsAppExecutionJob,
+} from "@reachdem/shared";
 import { createHash } from "crypto";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignService } from "./campaign.service";
 import { EnqueueEmailUseCase } from "./enqueue-email.usecase";
 import { EnqueueSmsUseCase } from "./enqueue-sms.usecase";
+import { EnqueueWhatsAppUseCase } from "./enqueue-whatsapp.usecase";
 import { SegmentService } from "./segment.service";
 import {
   CampaignInvalidStatusError,
@@ -36,7 +41,8 @@ export class LaunchCampaignUseCase {
     organizationId: string,
     campaignId: string,
     publishSmsJob: (job: SmsExecutionJob) => Promise<void>,
-    publishEmailJob: (job: EmailExecutionJob) => Promise<void>
+    publishEmailJob: (job: EmailExecutionJob) => Promise<void>,
+    publishWhatsAppJob: (job: WhatsAppExecutionJob) => Promise<void>
   ): Promise<void> {
     const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
@@ -74,7 +80,7 @@ export class LaunchCampaignUseCase {
           organizationId,
           actorType: "system",
           actorId: "system",
-          category: "sms",
+          category: campaign.channel,
           action: "updated",
           resourceType: "campaign",
           resourceId: campaignId,
@@ -94,8 +100,10 @@ export class LaunchCampaignUseCase {
       const parsedCampaign = CampaignService.getCampaignContent(
         campaign as any
       );
-      const isEmailCampaign = (campaign.channel as "sms" | "email") === "email";
-      const logCategory = isEmailCampaign ? "email" : "sms";
+      const campaignChannel = campaign.channel as "sms" | "email" | "whatsapp";
+      const isEmailCampaign = campaignChannel === "email";
+      const isWhatsAppCampaign = campaignChannel === "whatsapp";
+      const logCategory = campaignChannel;
 
       for (const target of targets) {
         if (target.status !== "pending") continue;
@@ -105,39 +113,55 @@ export class LaunchCampaignUseCase {
           const scheduledAt = this.resolveMessageScheduledAt(
             campaign.scheduledAt
           );
-          const messageResponse = await (!isEmailCampaign
-            ? EnqueueSmsUseCase.execute(
+          const messageResponse = await (isWhatsAppCampaign
+            ? EnqueueWhatsAppUseCase.execute(
                 organizationId,
                 {
+                  to: target.contact.phoneE164!,
+                  text: "text" in parsedCampaign ? parsedCampaign.text : "",
                   from:
                     ("text" in parsedCampaign
                       ? parsedCampaign.from
-                      : undefined) ?? "ReachDem",
-                  to: target.contact.phoneE164!,
-                  text: "text" in parsedCampaign ? parsedCampaign.text : "",
+                      : undefined) ?? "ReachDem WhatsApp",
                   idempotency_key: idempotencyKey,
                   campaignId,
                   scheduledAt,
                 },
-                publishSmsJob
+                publishWhatsAppJob
               )
-            : EnqueueEmailUseCase.execute(
-                organizationId,
-                {
-                  to: target.contact.email!,
-                  subject:
-                    "subject" in parsedCampaign ? parsedCampaign.subject : "",
-                  html: "html" in parsedCampaign ? parsedCampaign.html : "",
-                  from:
-                    ("subject" in parsedCampaign
-                      ? parsedCampaign.from
-                      : undefined) ?? "ReachDem",
-                  idempotency_key: idempotencyKey,
-                  campaignId,
-                  scheduledAt,
-                },
-                publishEmailJob
-              ));
+            : !isEmailCampaign
+              ? EnqueueSmsUseCase.execute(
+                  organizationId,
+                  {
+                    from:
+                      ("text" in parsedCampaign
+                        ? parsedCampaign.from
+                        : undefined) ?? "ReachDem",
+                    to: target.contact.phoneE164!,
+                    text: "text" in parsedCampaign ? parsedCampaign.text : "",
+                    idempotency_key: idempotencyKey,
+                    campaignId,
+                    scheduledAt,
+                  },
+                  publishSmsJob
+                )
+              : EnqueueEmailUseCase.execute(
+                  organizationId,
+                  {
+                    to: target.contact.email!,
+                    subject:
+                      "subject" in parsedCampaign ? parsedCampaign.subject : "",
+                    html: "html" in parsedCampaign ? parsedCampaign.html : "",
+                    from:
+                      ("subject" in parsedCampaign
+                        ? parsedCampaign.from
+                        : undefined) ?? "ReachDem",
+                    idempotency_key: idempotencyKey,
+                    campaignId,
+                    scheduledAt,
+                  },
+                  publishEmailJob
+                ));
 
           await prisma.campaignTarget.update({
             where: { id: target.id },
@@ -216,7 +240,7 @@ export class LaunchCampaignUseCase {
         organizationId,
         actorType: "system",
         actorId: "system",
-        category: "sms",
+        category: campaign.channel,
         action: "send_failed",
         resourceType: "campaign",
         resourceId: campaignId,
@@ -234,7 +258,7 @@ export class LaunchCampaignUseCase {
   private static async resolveAndCreateTargets(
     organizationId: string,
     campaignId: string,
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ) {
     const audiences = await CampaignService.getAudiences(
       organizationId,
@@ -251,7 +275,7 @@ export class LaunchCampaignUseCase {
             memberships: {
               some: { groupId: audience.sourceId },
             },
-            ...(channel === "sms"
+            ...(channel === "sms" || channel === "whatsapp"
               ? { phoneE164: { not: null } }
               : { email: { not: null } }),
           },
@@ -281,7 +305,11 @@ export class LaunchCampaignUseCase {
         organizationId,
         contactId: contact.id,
         resolvedTo: createHash("sha256")
-          .update(channel === "sms" ? contact.phoneE164! : contact.email!)
+          .update(
+            channel === "sms" || channel === "whatsapp"
+              ? contact.phoneE164!
+              : contact.email!
+          )
           .digest("hex"),
         status: "pending" as const,
       })
@@ -313,7 +341,7 @@ export class LaunchCampaignUseCase {
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
     }>,
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ): void {
     for (const contact of contacts) {
       if (
@@ -340,9 +368,9 @@ export class LaunchCampaignUseCase {
       hasValidNumber?: boolean | null;
       hasEmailableAddress?: boolean | null;
     },
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ): boolean {
-    if (channel === "sms") {
+    if (channel === "sms" || channel === "whatsapp") {
       if (!contact.phoneE164) return false;
       return contact.hasValidNumber !== false;
     }
@@ -355,7 +383,7 @@ export class LaunchCampaignUseCase {
     uniqueContacts: Map<string, ResolvedContact>,
     organizationId: string,
     segmentId: string,
-    channel: "sms" | "email"
+    channel: "sms" | "email" | "whatsapp"
   ): Promise<void> {
     const segment = await SegmentService.getSegmentById(
       organizationId,

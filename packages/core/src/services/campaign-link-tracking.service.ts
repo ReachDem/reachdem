@@ -9,7 +9,7 @@ export class CampaignLinkTrackingService {
     organizationId: string,
     campaign: {
       id: string;
-      channel: "sms" | "email";
+      channel: "sms" | "email" | "whatsapp";
       content: unknown;
     }
   ): Promise<void> {
@@ -17,7 +17,10 @@ export class CampaignLinkTrackingService {
     const channel = campaign.channel;
 
     const textContent =
-      channel === "sms" && typeof content.text === "string" ? content.text : "";
+      (channel === "sms" || channel === "whatsapp") &&
+      typeof content.text === "string"
+        ? content.text
+        : "";
     const htmlContent =
       channel === "email" && typeof content.html === "string"
         ? content.html
@@ -75,7 +78,7 @@ export class CampaignLinkTrackingService {
       where: { id: campaign.id },
       data: {
         content:
-          channel === "sms"
+          channel === "sms" || channel === "whatsapp"
             ? {
                 ...content,
                 text: updatedContent,

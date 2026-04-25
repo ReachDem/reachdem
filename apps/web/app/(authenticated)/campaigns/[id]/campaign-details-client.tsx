@@ -111,7 +111,11 @@ export function CampaignDetailsClient({
 
   const smsPreviewSender =
     campaign.content && "text" in campaign.content
-      ? campaign.content.senderId || campaign.content.from || "Message"
+      ? ("senderId" in campaign.content
+          ? campaign.content.senderId
+          : campaign.content.from) ||
+        campaign.content.from ||
+        "Message"
       : "Message";
 
   const smsPreviewText =

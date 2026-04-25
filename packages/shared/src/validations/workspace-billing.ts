@@ -12,8 +12,9 @@ export const topUpConfigSchema = z.object({
 
 export const usagePricingSchema = z.object({
   currency: z.string(),
-  smsUnitAmountMinor: z.number().int().positive(),
-  emailUnitAmountMinor: z.number().int().positive(),
+  smsUnitAmountMinor: z.number().int().nonnegative(),
+  emailUnitAmountMinor: z.number().int().nonnegative(),
+  whatsappUnitAmountMinor: z.number().int().nonnegative(),
   freeTrialSmsLimit: z.number().int().nonnegative(),
   freeTrialBalanceMinor: z.number().int().nonnegative(),
 });

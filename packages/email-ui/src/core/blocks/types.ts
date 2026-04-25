@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { Editor, Range } from "@tiptap/core";
 
 export interface CommandProps {
@@ -9,9 +10,9 @@ export type BlockItem = {
   title: string;
   description?: string;
   searchTerms: string[];
-  icon?: JSX.Element;
-  render?: (editor: Editor) => JSX.Element | null | true;
-  preview?: string | ((editor: Editor) => JSX.Element | null);
+  icon?: ReactElement;
+  render?: (editor: Editor) => ReactElement | null | true;
+  preview?: string | ((editor: Editor) => ReactElement | null);
 } & (
   | {
       command: (options: CommandProps) => void;

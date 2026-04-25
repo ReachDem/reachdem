@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  whatsapp-core:
+    name: WhatsApp Core Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @reachdem/database exec prisma generate --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma
+
+      - name: Build shared package
+        run: pnpm --filter @reachdem/shared build
+
+      - name: Build email UI package
+        run: pnpm --filter @reachdem/email-ui build
+
+      - name: Run targeted WhatsApp tests
+        run: >
+          pnpm exec vitest run
+          packages/core/src/services/connect-whatsapp-session.usecase.test.ts
+          packages/core/src/services/evolution-webhook.service.test.ts
+          packages/core/src/services/process-whatsapp-message-job.usecase.test.ts
+          packages/core/src/services/process-campaign-launch-job.usecase.test.ts
+
+  workers:
+    name: Workers Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @reachdem/database exec prisma generate --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma
+
+      - name: Run workers test suite
+        run: pnpm --filter @reachdem/workers test
