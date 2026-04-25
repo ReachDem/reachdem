@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import {
   Card,
   CardContent,
@@ -18,12 +18,20 @@ import {
 } from "@/components/ui/select";
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
+  ChartLegend as BaseChartLegend,
+  ChartLegendContent as BaseChartLegendContent,
+  ChartTooltip as BaseChartTooltip,
+  ChartTooltipContent as BaseChartTooltipContent,
 } from "@/components/ui/chart";
-import { Bar, BarChart, Cell, Label, Pie, PieChart, XAxis } from "recharts";
+import {
+  Bar as RechartsBar,
+  BarChart as RechartsBarChart,
+  Cell as RechartsCell,
+  Label as RechartsLabel,
+  Pie as RechartsPie,
+  PieChart as RechartsPieChart,
+  XAxis as RechartsXAxis,
+} from "recharts";
 
 interface DailyBucket {
   date: string;
@@ -82,6 +90,20 @@ const COLORS = [
   "var(--color-chart-4)",
   "var(--color-chart-5)",
 ];
+
+const Bar = RechartsBar as unknown as ComponentType<any>;
+const BarChart = RechartsBarChart as unknown as ComponentType<any>;
+const Cell = RechartsCell as unknown as ComponentType<any>;
+const ChartLegend = BaseChartLegend as unknown as ComponentType<any>;
+const ChartLegendContent =
+  BaseChartLegendContent as unknown as ComponentType<any>;
+const ChartTooltip = BaseChartTooltip as unknown as ComponentType<any>;
+const ChartTooltipContent =
+  BaseChartTooltipContent as unknown as ComponentType<any>;
+const Label = RechartsLabel as unknown as ComponentType<any>;
+const Pie = RechartsPie as unknown as ComponentType<any>;
+const PieChart = RechartsPieChart as unknown as ComponentType<any>;
+const XAxis = RechartsXAxis as unknown as ComponentType<any>;
 
 function formatChartDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);
@@ -570,32 +592,39 @@ export function CampaignAnalyticsSection({
                     ))}
                     {pieSegment === "total" ? (
                       <Label
-                        content={({ viewBox }) => {
+                        content={({
+                          viewBox,
+                        }: {
+                          viewBox?: Record<string, unknown>;
+                        }) => {
                           if (
                             !viewBox ||
                             !("cx" in viewBox) ||
-                            !("cy" in viewBox)
+                            !("cy" in viewBox) ||
+                            typeof viewBox.cx !== "number" ||
+                            typeof viewBox.cy !== "number"
                           ) {
                             return null;
                           }
+                          const { cx, cy } = viewBox;
                           return (
                             <text
-                              x={viewBox.cx}
-                              y={viewBox.cy}
+                              x={cx}
+                              y={cy}
                               textAnchor="middle"
                               dominantBaseline="middle"
                             >
                               <tspan
-                                x={viewBox.cx}
-                                y={viewBox.cy}
+                                x={cx}
+                                y={cy}
                                 className="fill-foreground text-3xl font-bold"
                               >
                                 {selectedVisitors?.total.toLocaleString() ??
                                   "0"}
                               </tspan>
                               <tspan
-                                x={viewBox.cx}
-                                y={(viewBox.cy || 0) + 24}
+                                x={cx}
+                                y={cy + 24}
                                 className="fill-muted-foreground text-sm"
                               >
                                 Visitors

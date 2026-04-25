@@ -45,5 +45,11 @@
     "**/*.{ts,tsx,js,jsx,md,json,css}": [
       "node ./node_modules/prettier/bin/prettier.cjs --write"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.0.0",
+      "react-dom": "19.0.0"
+    }
   }
 }

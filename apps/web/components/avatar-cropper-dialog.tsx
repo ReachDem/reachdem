@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Loader2 } from "lucide-react";
 
+const EasyCropper = Cropper as unknown as React.ComponentType<any>;
+
 export interface AvatarCropperDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,7 +71,7 @@ export function AvatarCropperDialog({
         {imageSrc ? (
           <div className="space-y-6">
             <div className="relative h-64 w-full shrink-0 overflow-hidden rounded-lg bg-black/10">
-              <Cropper
+              <EasyCropper
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
