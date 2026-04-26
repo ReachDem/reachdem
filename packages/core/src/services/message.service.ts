@@ -89,6 +89,7 @@ export class MessageService {
     until: Date;
     smsLimit: number;
     emailLimit: number;
+    whatsappLimit: number;
   }) {
     const smsMessages = await prisma.message.findMany({
       where: {
@@ -126,7 +127,29 @@ export class MessageService {
       },
     });
 
-    const selectedMessages = [...smsMessages, ...emailMessages];
+    const whatsappMessages = await prisma.message.findMany({
+      where: {
+        status: "scheduled",
+        channel: "whatsapp",
+        scheduledAt: {
+          not: null,
+          lte: input.until,
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+      take: input.whatsappLimit,
+      select: {
+        id: true,
+        organizationId: true,
+        channel: true,
+      },
+    });
+
+    const selectedMessages = [
+      ...smsMessages,
+      ...emailMessages,
+      ...whatsappMessages,
+    ];
     const claimed: typeof selectedMessages = [];
 
     for (const message of selectedMessages) {

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EmailExecutionJob, SmsExecutionJob } from "@reachdem/shared";
+import type {
+  EmailExecutionJob,
+  SmsExecutionJob,
+  WhatsAppExecutionJob,
+} from "@reachdem/shared";
 import type {
   Env,
   MessageBatch,
@@ -11,7 +15,13 @@ const mockedFns = vi.hoisted(() => ({
   processCampaignLaunchExecuteMock: vi.fn(),
   processSmsExecuteMock: vi.fn(),
   processEmailExecuteMock: vi.fn(),
+  processWhatsAppExecuteMock: vi.fn(),
+  claimScheduledCampaignsMock: vi.fn(),
+  revertScheduledCampaignClaimMock: vi.fn(),
+  claimScheduledMessagesMock: vi.fn(),
+  revertScheduledMessageClaimMock: vi.fn(),
   sendMailMock: vi.fn(),
+  deferredAuthFetchMock: vi.fn(),
 }));
 
 vi.mock("@reachdem/core", () => ({
@@ -23,6 +33,17 @@ vi.mock("@reachdem/core", () => ({
   },
   ProcessEmailMessageJobUseCase: {
     execute: mockedFns.processEmailExecuteMock,
+  },
+  ProcessWhatsAppMessageJobUseCase: {
+    execute: mockedFns.processWhatsAppExecuteMock,
+  },
+  CampaignService: {
+    claimScheduledCampaigns: mockedFns.claimScheduledCampaignsMock,
+    revertScheduledCampaignClaim: mockedFns.revertScheduledCampaignClaimMock,
+  },
+  MessageService: {
+    claimScheduledMessages: mockedFns.claimScheduledMessagesMock,
+    revertScheduledMessageClaim: mockedFns.revertScheduledMessageClaimMock,
   },
 }));
 
@@ -39,6 +60,7 @@ import worker from "../src/index";
 import { handleCampaignLaunchBatch } from "../src/campaign-launch";
 import { handleSmsBatch } from "../src/queue-sms";
 import { handleEmailBatch } from "../src/queue-email";
+import { handleWhatsAppBatch } from "../src/queue-whatsapp";
 import { handleScheduled } from "../src/scheduled";
 
 function createEnv(): Env {
@@ -52,9 +74,14 @@ function createEnv(): Env {
     EMAIL_QUEUE: {
       send: vi.fn().mockResolvedValue(undefined),
     },
+    WHATSAPP_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
     ENVIRONMENT: "test",
     API_BASE_URL: "http://localhost:3000",
     INTERNAL_API_SECRET: "secret",
+    ALIBABA_ACCESS_KEY_ID: "alibaba-key",
+    ALIBABA_ACCESS_KEY_SECRET: "alibaba-secret",
     SMTP_HOST: "smtp.example.com",
     SMTP_PORT: "465",
     SMTP_USER: "user@example.com",
@@ -62,6 +89,11 @@ function createEnv(): Env {
     SMTP_SECURE: "true",
     SENDER_EMAIL: "sender@example.com",
     SENDER_NAME: "ReachDem Notifications",
+    AVLYTEXT_API_KEY: "avly-key",
+    MBOA_SMS_USERID: "mboa-user",
+    MBOA_SMS_API_PASSWORD: "mboa-password",
+    EVOLUTION_API_BASE_URL: "http://localhost:8080",
+    EVOLUTION_API_KEY: "evolution-key",
   };
 }
 
@@ -83,6 +115,46 @@ describe("Worker queue and scheduled flows", () => {
       messageId: "smtp-message-id",
       accepted: ["dest@example.com"],
       rejected: [],
+    });
+    mockedFns.deferredAuthFetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          processed: 0,
+          sent: 0,
+          failed: 0,
+          skipped: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }
+      )
+    );
+    vi.stubGlobal("fetch", mockedFns.deferredAuthFetchMock);
+    mockedFns.claimScheduledCampaignsMock.mockResolvedValue({
+      updated: 1,
+      items: [
+        {
+          id: "campaign_sched_1",
+          organizationId: "org_1",
+          scheduledAt: new Date("2026-03-14T10:00:00.000Z"),
+        },
+      ],
+    });
+    mockedFns.claimScheduledMessagesMock.mockResolvedValue({
+      updated: 2,
+      items: [
+        {
+          id: "msg_sched_sms_1",
+          organizationId: "org_1",
+          channel: "sms",
+        },
+        {
+          id: "msg_sched_email_1",
+          organizationId: "org_1",
+          channel: "email",
+        },
+      ],
     });
   });
 
@@ -107,6 +179,29 @@ describe("Worker queue and scheduled flows", () => {
 
     expect(response.status).toBe(200);
     expect(env.SMS_QUEUE.send).toHaveBeenCalledWith(job);
+  });
+
+  it("queues a WhatsApp job through the worker fetch endpoint", async () => {
+    const env = createEnv();
+    const job: WhatsAppExecutionJob = {
+      message_id: "msg_wa_1",
+      organization_id: "org_1",
+      channel: "whatsapp",
+      delivery_cycle: 1,
+    };
+
+    const response = await worker.fetch(
+      new Request("http://localhost/queue/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job),
+      }),
+      env,
+      { waitUntil: vi.fn() }
+    );
+
+    expect(response.status).toBe(200);
+    expect(env.WHATSAPP_QUEUE.send).toHaveBeenCalledWith(job);
   });
 
   it("queues a campaign launch job through the worker fetch endpoint", async () => {
@@ -236,6 +331,35 @@ describe("Worker queue and scheduled flows", () => {
     expect(envelope.retry).not.toHaveBeenCalled();
   });
 
+  it("processes a WhatsApp queue message and acknowledges it", async () => {
+    const env = createEnv();
+    const job: WhatsAppExecutionJob = {
+      message_id: "msg_wa_2",
+      organization_id: "org_1",
+      channel: "whatsapp",
+      delivery_cycle: 1,
+    };
+    const envelope = createEnvelope(job);
+    const batch: MessageBatch<WhatsAppExecutionJob> = {
+      queue: "reachdem-whatsapp-queue",
+      messages: [envelope],
+    };
+
+    mockedFns.processWhatsAppExecuteMock.mockResolvedValueOnce("sent");
+
+    await handleWhatsAppBatch(batch, env);
+
+    expect(mockedFns.processWhatsAppExecuteMock).toHaveBeenCalledTimes(1);
+    expect(mockedFns.processWhatsAppExecuteMock).toHaveBeenCalledWith(
+      job,
+      expect.objectContaining({
+        republish: expect.any(Function),
+      })
+    );
+    expect(envelope.ack).toHaveBeenCalledTimes(1);
+    expect(envelope.retry).not.toHaveBeenCalled();
+  });
+
   it("retries an email queue message on technical failure", async () => {
     const env = createEnv();
     const job: EmailExecutionJob = {
@@ -260,53 +384,45 @@ describe("Worker queue and scheduled flows", () => {
     expect(envelope.retry).toHaveBeenCalledTimes(1);
   });
 
-  it("scheduled handler claims scheduled messages and queues SMS and email jobs", async () => {
+  it("scheduled handler claims scheduled campaigns and messages from core services", async () => {
     const env = createEnv();
     const controller: ScheduledController = {
       cron: "* * * * *",
       scheduledTime: Date.parse("2026-03-14T10:00:00.000Z"),
     };
 
-    const fetchMock = vi.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          updated: 2,
-          items: [
-            {
-              id: "msg_scheduled_sms",
-              organizationId: "org_1",
-              channel: "sms",
-            },
-            {
-              id: "msg_scheduled_email",
-              organizationId: "org_1",
-              channel: "email",
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      )
-    );
-
-    vi.stubGlobal("fetch", fetchMock);
-
     await handleScheduled(controller, env);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockedFns.claimScheduledCampaignsMock).toHaveBeenCalledTimes(1);
+    expect(mockedFns.claimScheduledMessagesMock).toHaveBeenCalledTimes(1);
+    expect(env.CAMPAIGN_LAUNCH_QUEUE.send).toHaveBeenCalledWith({
+      campaign_id: "campaign_sched_1",
+      organization_id: "org_1",
+    });
     expect(env.SMS_QUEUE.send).toHaveBeenCalledWith({
-      message_id: "msg_scheduled_sms",
+      message_id: "msg_sched_sms_1",
       organization_id: "org_1",
       channel: "sms",
       delivery_cycle: 1,
     });
     expect(env.EMAIL_QUEUE.send).toHaveBeenCalledWith({
-      message_id: "msg_scheduled_email",
+      message_id: "msg_sched_email_1",
       organization_id: "org_1",
       channel: "email",
       delivery_cycle: 1,
     });
+    expect(mockedFns.deferredAuthFetchMock).toHaveBeenCalledWith(
+      new URL("/api/internal/auth/deferred-emails/process", env.API_BASE_URL),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-internal-secret": "secret",
+        }),
+        body: JSON.stringify({
+          until: "2026-03-14T10:00:00.000Z",
+          limit: 50,
+        }),
+      })
+    );
   });
 });

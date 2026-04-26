@@ -1,3 +1,4 @@
+"use client";
 import { createAuthClient } from "better-auth/react";
 import { organizationClient, emailOTPClient } from "better-auth/client/plugins";
 import { ac, owner, admin, member } from "./permissions";

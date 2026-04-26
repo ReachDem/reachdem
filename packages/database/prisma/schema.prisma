@@ -133,6 +133,7 @@ model Organization {
   workspaceVerificationStatus WorkspaceVerificationStatus @default(not_submitted)
   workspaceVerifiedAt         DateTime?
   senderId                    String?                     @unique
+  whatsappBetaEnabled         Boolean                    @default(false)
   websiteUrl                  String?
   idDocumentKey               String?
   businessDocumentKey         String?
@@ -151,6 +152,7 @@ model Organization {
   campaigns           Campaign[]
   trackedLinks        TrackedLink[]
   emailDeliveryEvents EmailDeliveryEvent[]
+  whatsappSessions   OrganizationWhatsAppSession[]
   paymentSessions     PaymentSession[]
   paymentTransactions PaymentTransaction[]
   feedbacks           Feedback[]
@@ -506,6 +508,7 @@ enum SmsProvider {
 enum MessageChannel {
   sms
   email
+  whatsapp
 }
 
 enum MessageStatus {
@@ -514,6 +517,14 @@ enum MessageStatus {
   sending
   sent
   failed
+}
+
+enum OrganizationWhatsAppSessionStatus {
+  created
+  connecting
+  connected
+  disconnected
+  error
 }
 
 enum AttemptStatus {
@@ -561,6 +572,7 @@ model Message {
   html             String?
   status           MessageStatus  @default(queued)
   providerSelected String? // Name of the winning provider
+  providerMessageId String?
   correlationId    String         @default(uuid())
   idempotencyKey   String
   scheduledAt      DateTime?
@@ -578,8 +590,29 @@ model Message {
   @@index([organizationId, campaignId])
   @@index([organizationId, apiKeyId])
   @@index([organizationId, status])
+  @@index([organizationId, providerMessageId])
   @@index([organizationId, channel, status, scheduledAt])
   @@map("message")
+}
+
+model OrganizationWhatsAppSession {
+  id             String                           @id @default(uuid())
+  organizationId String
+  provider       String                           @default("evolution")
+  instanceName   String                           @unique
+  status         OrganizationWhatsAppSessionStatus @default(created)
+  phoneNumber    String?
+  connectedAt    DateTime?
+  lastQrCode     String?
+  lastError      String?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@index([organizationId, status])
+  @@map("organization_whatsapp_session")
 }
 
 model MessageAttempt {
@@ -654,6 +687,7 @@ enum CampaignStatus {
 enum CampaignChannel {
   sms
   email
+  whatsapp
 }
 
 enum TrackedLinkStatus {

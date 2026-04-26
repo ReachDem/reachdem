@@ -5,8 +5,10 @@ import {
   getCampaignLaunchQueueName,
   getEmailQueueName,
   getSmsQueueName,
+  getWhatsAppQueueName,
   scheduledWorkerConfig,
   smsWorkerConfig,
+  whatsappWorkerConfig,
 } from "./config";
 import { requireScheduledWorkerEnv } from "./env";
 import type { Env, ScheduledController } from "./types";
@@ -86,12 +88,14 @@ async function handleScheduledMessages(
     until: scheduledTime,
     smsLimit: scheduledWorkerConfig.smsClaimBatchSize,
     emailLimit: scheduledWorkerConfig.emailClaimBatchSize,
+    whatsappLimit: whatsappWorkerConfig.consumer.maxBatchSize,
   });
 
   console.log("[Cron] Claimed scheduled messages", {
     updated: payload.updated ?? payload.items.length,
     smsQueue: getSmsQueueName(env.ENVIRONMENT),
     emailQueue: getEmailQueueName(env.ENVIRONMENT),
+    whatsappQueue: getWhatsAppQueueName(env.ENVIRONMENT),
   });
 
   for (const item of payload.items) {
@@ -103,12 +107,19 @@ async function handleScheduledMessages(
             channel: "sms",
             delivery_cycle: 1,
           }
-        : {
-            message_id: item.id,
-            organization_id: item.organizationId,
-            channel: "email",
-            delivery_cycle: 1,
-          };
+        : item.channel === "whatsapp"
+          ? {
+              message_id: item.id,
+              organization_id: item.organizationId,
+              channel: "whatsapp",
+              delivery_cycle: 1,
+            }
+          : {
+              message_id: item.id,
+              organization_id: item.organizationId,
+              channel: "email",
+              delivery_cycle: 1,
+            };
 
     if (job.channel === "sms") {
       console.log("[Cron] Publishing scheduled SMS message", {
@@ -126,7 +137,7 @@ async function handleScheduledMessages(
         });
         await MessageService.revertScheduledMessageClaim(job.message_id);
       }
-    } else {
+    } else if (job.channel === "email") {
       console.log("[Cron] Publishing scheduled email message", {
         messageId: job.message_id,
         queue: emailWorkerConfig.queueName,
@@ -138,6 +149,22 @@ async function handleScheduledMessages(
         console.error("[Cron] Failed to publish scheduled email message", {
           messageId: job.message_id,
           queue: getEmailQueueName(env.ENVIRONMENT),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await MessageService.revertScheduledMessageClaim(job.message_id);
+      }
+    } else {
+      console.log("[Cron] Publishing scheduled WhatsApp message", {
+        messageId: job.message_id,
+        queue: whatsappWorkerConfig.queueName,
+        resolvedQueue: getWhatsAppQueueName(env.ENVIRONMENT),
+      });
+      try {
+        await env.WHATSAPP_QUEUE.send(job);
+      } catch (error) {
+        console.error("[Cron] Failed to publish scheduled WhatsApp message", {
+          messageId: job.message_id,
+          queue: getWhatsAppQueueName(env.ENVIRONMENT),
           error: error instanceof Error ? error.message : String(error),
         });
         await MessageService.revertScheduledMessageClaim(job.message_id);

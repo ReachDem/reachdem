@@ -34,6 +34,7 @@
     "magicast": "^0.5.2",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.20.6",
     "vitest": "^4.0.18"
   },
   "dependencies": {
@@ -44,5 +45,11 @@
     "**/*.{ts,tsx,js,jsx,md,json,css}": [
       "node ./node_modules/prettier/bin/prettier.cjs --write"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.0.0",
+      "react-dom": "19.0.0"
+    }
   }
 }

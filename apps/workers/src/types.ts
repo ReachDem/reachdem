@@ -2,6 +2,7 @@ import type {
   CampaignLaunchJob,
   EmailExecutionJob,
   SmsExecutionJob,
+  WhatsAppExecutionJob,
 } from "@reachdem/shared";
 
 export interface QueueProducer<T> {
@@ -32,6 +33,7 @@ export interface Env {
   CAMPAIGN_LAUNCH_QUEUE: QueueProducer<CampaignLaunchJob>;
   SMS_QUEUE: QueueProducer<SmsExecutionJob>;
   EMAIL_QUEUE: QueueProducer<EmailExecutionJob>;
+  WHATSAPP_QUEUE: QueueProducer<WhatsAppExecutionJob>;
   DATABASE_URL?: string;
   PRISMA_ACCELERATE_URL?: string;
   ENVIRONMENT: string;
@@ -60,8 +62,12 @@ export interface Env {
   SMTP_SECURE: string;
   SENDER_EMAIL: string;
   SENDER_NAME: string;
+  EVOLUTION_API_BASE_URL?: string;
+  EVOLUTION_API_KEY?: string;
+  EVOLUTION_INSTANCE_PREFIX?: string;
 }
 
 export type SmsMessage = SmsExecutionJob;
 export type EmailMessage = EmailExecutionJob;
+export type WhatsAppMessage = WhatsAppExecutionJob;
 export type CampaignLaunchMessage = CampaignLaunchJob;

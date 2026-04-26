@@ -1,4 +1,5 @@
 // Type declarations for custom components
+import type { ReactElement } from "react";
 import type { BlockItem } from "@maily-to/core";
 
 export const marketingComponent: {
@@ -6,7 +7,7 @@ export const marketingComponent: {
   title: string;
   description: string;
   searchTerms: string[];
-  icon: JSX.Element;
+  icon: ReactElement;
   commands: BlockItem[];
 };
 
@@ -15,7 +16,7 @@ export const pricingComponent: {
   title: string;
   description: string;
   searchTerms: string[];
-  icon: JSX.Element;
+  icon: ReactElement;
   commands: BlockItem[];
 };
 
@@ -24,6 +25,6 @@ export const customComponents: Array<{
   title: string;
   description: string;
   searchTerms: string[];
-  icon: JSX.Element;
+  icon: ReactElement;
   commands: BlockItem[];
 }>;

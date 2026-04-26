@@ -7,7 +7,7 @@ export type MessageStatus =
   | "sent"
   | "failed";
 export type AttemptStatus = "queued" | "sent" | "failed";
-export type MessageChannel = "sms" | "email";
+export type MessageChannel = "sms" | "email" | "whatsapp";
 
 export interface SendSmsInput {
   to: string; // E.164 format
@@ -22,6 +22,15 @@ export interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
+  from?: string;
+  idempotency_key: string;
+  campaignId?: string;
+  scheduledAt?: string;
+}
+
+export interface SendWhatsAppInput {
+  to: string; // E.164 format
+  text: string;
   from?: string;
   idempotency_key: string;
   campaignId?: string;
@@ -49,12 +58,22 @@ export interface EmailExecutionJob {
   delivery_cycle: number;
 }
 
+export interface WhatsAppExecutionJob {
+  message_id: string;
+  organization_id: string;
+  channel: "whatsapp";
+  delivery_cycle: number;
+}
+
 export interface CampaignLaunchJob {
   campaign_id: string;
   organization_id: string;
 }
 
-export type MessageExecutionJob = SmsExecutionJob | EmailExecutionJob;
+export type MessageExecutionJob =
+  | SmsExecutionJob
+  | EmailExecutionJob
+  | WhatsAppExecutionJob;
 
 export interface ListMessagesOptions {
   status?: MessageStatus;

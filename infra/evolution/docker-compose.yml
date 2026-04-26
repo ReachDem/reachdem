@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: reachdem-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - evolution
+
+  redis:
+    image: redis:7
+    container_name: reachdem-evolution-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./redis-data:/data
+    networks:
+      - evolution
+
+  evolution:
+    image: atendai/evolution-api:v2.2.3
+    container_name: reachdem-evolution-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_URL: ${EVOLUTION_PUBLIC_BASE_URL}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      LOG_LEVEL: ${EVOLUTION_LOG_LEVEL}
+      DEL_INSTANCE: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      WEBSOCKET_ENABLED: "false"
+      RABBITMQ_ENABLED: "false"
+      SQS_ENABLED: "false"
+      WEBHOOK_GLOBAL_ENABLED: "false"
+      CONFIG_SESSION_PHONE_CLIENT: ReachDem
+      CONFIG_SESSION_PHONE_NAME: ReachDem WhatsApp
+    ports:
+      - "127.0.0.1:${EVOLUTION_LOCAL_PORT:-8080}:8080"
+    networks:
+      - evolution
+
+  caddy:
+    image: caddy:2
+    container_name: reachdem-evolution-caddy
+    restart: unless-stopped
+    depends_on:
+      - evolution
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    networks:
+      - evolution
+
+networks:
+  evolution:
+    driver: bridge

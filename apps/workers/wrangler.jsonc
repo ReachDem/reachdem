@@ -41,6 +41,10 @@
       {
         "binding": "EMAIL_QUEUE",
         "queue": "reachdem-email-queue"
+      },
+      {
+        "binding": "WHATSAPP_QUEUE",
+        "queue": "reachdem-whatsapp-queue"
       }
     ],
     "consumers": [
@@ -64,6 +68,13 @@
         "max_batch_timeout": 2,
         "max_concurrency": 5,
         "max_retries": 5
+      },
+      {
+        "queue": "reachdem-whatsapp-queue",
+        "max_batch_size": 40,
+        "max_batch_timeout": 2,
+        "max_concurrency": 5,
+        "max_retries": 5
       }
     ]
   },
@@ -72,6 +83,62 @@
     "API_BASE_URL": "http://localhost:3000"
   },
   "env": {
+    "staging": {
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "API_BASE_URL": "https://staging.reachdem.cc"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-staging"
+          },
+          {
+            "binding": "SMS_QUEUE",
+            "queue": "reachdem-sms-queue-staging"
+          },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-staging"
+          },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-campaign-launch-queue-staging",
+            "max_batch_size": 5,
+            "max_batch_timeout": 2,
+            "max_concurrency": 2,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-sms-queue-staging",
+            "max_batch_size": 50,
+            "max_batch_timeout": 2,
+            "max_concurrency": 10,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-email-queue-staging",
+            "max_batch_size": 40,
+            "max_batch_timeout": 2,
+            "max_concurrency": 5,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-whatsapp-queue-staging",
+            "max_batch_size": 40,
+            "max_batch_timeout": 2,
+            "max_concurrency": 5,
+            "max_retries": 5
+          }
+        ]
+      }
+    },
     "production": {
       "vars": {
         "ENVIRONMENT": "production",
@@ -90,6 +157,10 @@
           {
             "binding": "EMAIL_QUEUE",
             "queue": "reachdem-email-queue-production"
+          },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-production"
           }
         ],
         "consumers": [
@@ -109,6 +180,13 @@
           },
           {
             "queue": "reachdem-email-queue-production",
+            "max_batch_size": 40,
+            "max_batch_timeout": 2,
+            "max_concurrency": 5,
+            "max_retries": 5
+          },
+          {
+            "queue": "reachdem-whatsapp-queue-production",
             "max_batch_size": 40,
             "max_batch_timeout": 2,
             "max_concurrency": 5,

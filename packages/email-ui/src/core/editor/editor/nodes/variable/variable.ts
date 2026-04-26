@@ -3,6 +3,7 @@ import { Node as TNode } from "@tiptap/pm/model";
 import { PluginKey } from "@tiptap/pm/state";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
+import type { ReactElement } from "react";
 import {
   VariableSuggestionsPopover,
   VariableSuggestionsPopoverType,
@@ -51,7 +52,7 @@ export type RenderVariableOptions = {
 
 export type RenderVariableFunction = (
   opts: RenderVariableOptions
-) => JSX.Element | null;
+) => ReactElement | null;
 
 export type VariableOptions = {
   renderLabel: (props: { options: VariableOptions; node: TNode }) => string;

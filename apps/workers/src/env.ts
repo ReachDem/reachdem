@@ -42,6 +42,14 @@ export function requireEmailWorkerEnv(env: Env): void {
   ]);
 }
 
+export function requireWhatsAppWorkerEnv(env: Env): void {
+  requireKeys("whatsapp", env, [
+    "ENVIRONMENT",
+    "EVOLUTION_API_BASE_URL",
+    "EVOLUTION_API_KEY",
+  ]);
+}
+
 export function requireScheduledWorkerEnv(env: Env): void {
   requireKeys("scheduled", env, [
     "ENVIRONMENT",

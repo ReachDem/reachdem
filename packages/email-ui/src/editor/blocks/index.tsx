@@ -1,4 +1,3 @@
-import type { BlockGroupItem } from "@maily-to/core";
 import { ShoppingCart, CreditCard } from "lucide-react";
 import {
   cartAbandonmentBlock,

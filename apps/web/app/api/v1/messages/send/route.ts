@@ -4,12 +4,18 @@ import { withPublicWorkspace } from "@reachdem/auth/guards";
 import {
   EnqueueEmailUseCase,
   EnqueueSmsUseCase,
+  EnqueueWhatsAppUseCase,
   MessageInsufficientCreditsError,
   MessageSendValidationError,
 } from "@reachdem/core";
-import { sendEmailSchema, sendSmsSchema } from "@reachdem/shared";
+import {
+  sendEmailSchema,
+  sendSmsSchema,
+  sendWhatsAppSchema,
+} from "@reachdem/shared";
 import { publishEmailJob } from "../../../../../lib/publish-email-job";
 import { publishSmsJob } from "../../../../../lib/publish-sms-job";
+import { publishWhatsAppJob } from "../../../../../lib/publish-whatsapp-job";
 
 const publicSmsPayloadSchema = z.object({
   type: z.literal("transactional"),
@@ -30,9 +36,19 @@ const publicEmailPayloadSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
 });
 
+const publicWhatsAppPayloadSchema = z.object({
+  type: z.literal("transactional"),
+  channel: z.literal("whatsapp"),
+  to: z.string(),
+  text: z.string(),
+  from: z.string().min(1).max(100).optional(),
+  scheduledAt: z.string().datetime().optional(),
+});
+
 const publicMessagePayloadSchema = z.discriminatedUnion("channel", [
   publicSmsPayloadSchema,
   publicEmailPayloadSchema,
+  publicWhatsAppPayloadSchema,
 ]);
 
 export const POST = withPublicWorkspace(
@@ -81,6 +97,37 @@ export const POST = withPublicWorkspace(
           organizationId,
           parsedSms.data,
           publishSmsJob,
+          {
+            apiKeyId,
+            source: "publicApi",
+          }
+        );
+
+        return NextResponse.json(result, {
+          status: result.idempotent ? 200 : 201,
+        });
+      }
+
+      if (parsedPublicPayload.data.channel === "whatsapp") {
+        const parsedWhatsApp = sendWhatsAppSchema.safeParse({
+          ...parsedPublicPayload.data,
+          idempotency_key: idempotencyKey,
+        });
+
+        if (!parsedWhatsApp.success) {
+          return NextResponse.json(
+            {
+              error: "Invalid request body",
+              details: parsedWhatsApp.error.flatten(),
+            },
+            { status: 400 }
+          );
+        }
+
+        const result = await EnqueueWhatsAppUseCase.execute(
+          organizationId,
+          parsedWhatsApp.data,
+          publishWhatsAppJob,
           {
             apiKeyId,
             source: "publicApi",

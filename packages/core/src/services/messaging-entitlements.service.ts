@@ -7,7 +7,7 @@ import {
 } from "../errors/messaging.errors";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
-type MessagingChannel = "sms" | "email";
+type MessagingChannel = "sms" | "email" | "whatsapp";
 
 export class MessagingEntitlementsService {
   private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
@@ -51,14 +51,17 @@ export class MessagingEntitlementsService {
     );
 
     // 3. Verify maximum capacity restrictions (Quota Check)
-    const remainingIncluded = PlanEntitlementsService.getRemainingIncluded(
-      entitlements,
-      {
-        smsQuotaUsed: organization.smsQuotaUsed,
-        emailQuotaUsed: organization.emailQuotaUsed,
-      },
-      channel
-    );
+    const remainingIncluded =
+      channel === "whatsapp"
+        ? null
+        : PlanEntitlementsService.getRemainingIncluded(
+            entitlements,
+            {
+              smsQuotaUsed: organization.smsQuotaUsed,
+              emailQuotaUsed: organization.emailQuotaUsed,
+            },
+            channel
+          );
 
     if (remainingIncluded != null) {
       if (units > remainingIncluded) {
@@ -94,11 +97,13 @@ export class MessagingEntitlementsService {
                 increment: units,
               },
             }
-          : {
-              emailQuotaUsed: {
-                increment: units,
-              },
-            }),
+          : channel === "email"
+            ? {
+                emailQuotaUsed: {
+                  increment: units,
+                },
+              }
+            : {}),
       },
     });
 

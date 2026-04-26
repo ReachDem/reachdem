@@ -9,7 +9,7 @@ export const campaignStatusSchema = z.enum([
   "failed",
   "expired",
 ]);
-export const campaignChannelSchema = z.enum(["sms", "email"]);
+export const campaignChannelSchema = z.enum(["sms", "email", "whatsapp"]);
 export const audienceSourceTypeSchema = z.enum(["group", "segment"]);
 export const targetStatusSchema = z.enum([
   "pending",
@@ -48,22 +48,35 @@ export const emailCampaignContentSchema = z.object({
   fontWeights: z.array(z.number().int().positive()).max(20).optional(),
 });
 
+export const whatsappCampaignContentSchema = z.object({
+  text: z.string().min(1, "WhatsApp text is required").max(4096),
+  from: z.string().min(1).max(100).optional(),
+});
+
 export const campaignContentSchema = z.union([
   smsCampaignContentSchema,
   emailCampaignContentSchema,
+  whatsappCampaignContentSchema,
 ]);
 
 export type SmsCampaignContent = z.infer<typeof smsCampaignContentSchema>;
 export type EmailCampaignContent = z.infer<typeof emailCampaignContentSchema>;
+export type WhatsAppCampaignContent = z.infer<
+  typeof whatsappCampaignContentSchema
+>;
 export type CampaignContent = z.infer<typeof campaignContentSchema>;
 
 export function parseCampaignContent(
   channel: z.infer<typeof campaignChannelSchema>,
   content: unknown
-): SmsCampaignContent | EmailCampaignContent {
-  return channel === "sms"
-    ? smsCampaignContentSchema.parse(content)
-    : emailCampaignContentSchema.parse(content);
+): SmsCampaignContent | EmailCampaignContent | WhatsAppCampaignContent {
+  if (channel === "sms") {
+    return smsCampaignContentSchema.parse(content);
+  }
+  if (channel === "whatsapp") {
+    return whatsappCampaignContentSchema.parse(content);
+  }
+  return emailCampaignContentSchema.parse(content);
 }
 
 // ─── DTOs for Creation & Update ────────────────────────────────────────────────
@@ -79,7 +92,9 @@ export const createCampaignSchema = z
     const schema =
       value.channel === "sms"
         ? smsCampaignContentSchema
-        : emailCampaignContentSchema;
+        : value.channel === "whatsapp"
+          ? whatsappCampaignContentSchema
+          : emailCampaignContentSchema;
     const parsed = schema.safeParse(value.content);
     if (!parsed.success) {
       ctx.addIssue({

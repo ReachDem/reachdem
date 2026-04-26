@@ -232,13 +232,26 @@ export class BillingCatalogService {
     return this.getFreeTrialSmsLimit() * this.getSmsUnitAmountMinor();
   }
 
-  static getMessageUnitAmountMinor(channel: "sms" | "email"): number {
-    return channel === "sms"
-      ? this.getSmsUnitAmountMinor()
-      : this.getEmailUnitAmountMinor();
+  static getWhatsAppUnitAmountMinor(): number {
+    return readPositiveIntEnv(["PAYMENT_WHATSAPP_UNIT_AMOUNT_MINOR"], 0) ?? 0;
   }
 
-  static getMessageUsageCostMinor(channel: "sms" | "email", units = 1): number {
+  static getMessageUnitAmountMinor(
+    channel: "sms" | "email" | "whatsapp"
+  ): number {
+    if (channel === "sms") {
+      return this.getSmsUnitAmountMinor();
+    }
+    if (channel === "whatsapp") {
+      return this.getWhatsAppUnitAmountMinor();
+    }
+    return this.getEmailUnitAmountMinor();
+  }
+
+  static getMessageUsageCostMinor(
+    channel: "sms" | "email" | "whatsapp",
+    units = 1
+  ): number {
     if (units <= 0) {
       return 0;
     }
@@ -246,11 +259,19 @@ export class BillingCatalogService {
     return this.getMessageUnitAmountMinor(channel) * units;
   }
 
+  static resolveUnitAmountForTopUp(
+    channel: "sms" | "email" | "whatsapp",
+    _appliedTopUpAmountMinor: number
+  ): number {
+    return this.getMessageUnitAmountMinor(channel);
+  }
+
   static getUsagePricing() {
     return {
       currency: this.getBalanceCurrency(),
       smsUnitAmountMinor: this.getSmsUnitAmountMinor(),
       emailUnitAmountMinor: this.getEmailUnitAmountMinor(),
+      whatsappUnitAmountMinor: this.getWhatsAppUnitAmountMinor(),
       freeTrialSmsLimit: this.getFreeTrialSmsLimit(),
       freeTrialBalanceMinor: this.getFreeTrialBalanceMinor(),
     };

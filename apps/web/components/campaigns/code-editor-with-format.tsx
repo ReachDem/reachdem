@@ -133,7 +133,7 @@ export function CodeEditorWithFormat({
           height="400px"
           language={monacoLanguage}
           value={value}
-          onChange={(newValue) => onChange(newValue || "")}
+          onChange={(newValue: string | undefined) => onChange(newValue || "")}
           onMount={handleEditorDidMount}
           theme="vs-light"
           options={{

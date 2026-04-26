@@ -1,0 +1,5 @@
+{$EVOLUTION_HOSTNAME} {
+  encode gzip zstd
+
+  reverse_proxy evolution:8080
+}

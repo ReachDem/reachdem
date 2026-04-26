@@ -35,6 +35,7 @@ const MailyEditor = lazy(() =>
 
 // Type for the editor from maily-to/core (uses @tiptap v2)
 type MailyEditor = any;
+const DEFAULT_EDITOR_BLOCKS = DEFAULT_SLASH_COMMANDS as any;
 
 export type EmailMode = "visual" | "html" | "react";
 
@@ -427,7 +428,7 @@ export function EmailComposer({
               }
             >
               <MailyEditor
-                blocks={DEFAULT_SLASH_COMMANDS}
+                blocks={DEFAULT_EDITOR_BLOCKS}
                 config={{
                   hasMenuBar: false,
                   wrapClassName: cn("editor-wrap", isEditorLoading && "hidden"),

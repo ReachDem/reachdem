@@ -6,6 +6,7 @@ import type {
   MessageBatch,
   ScheduledController,
   SmsMessage,
+  WhatsAppMessage,
 } from "./types";
 import { resetPrismaClient } from "../../../packages/database/src/index";
 import {
@@ -14,11 +15,14 @@ import {
   getCampaignLaunchQueueName,
   getEmailQueueName,
   getSmsQueueName,
+  getWhatsAppQueueName,
   smsWorkerConfig,
+  whatsappWorkerConfig,
 } from "./config";
 import { handleCampaignLaunchBatch } from "./campaign-launch";
 import { handleSmsBatch } from "./queue-sms";
 import { handleEmailBatch } from "./queue-email";
+import { handleWhatsAppBatch } from "./queue-whatsapp";
 import { handleScheduled } from "./scheduled";
 
 function serializeError(error: unknown) {
@@ -40,6 +44,7 @@ function workerRuntimeSummary(env: Env) {
       campaignLaunch: getCampaignLaunchQueueName(env.ENVIRONMENT),
       sms: getSmsQueueName(env.ENVIRONMENT),
       email: getEmailQueueName(env.ENVIRONMENT),
+      whatsapp: getWhatsAppQueueName(env.ENVIRONMENT),
     },
   };
 }
@@ -79,6 +84,9 @@ function configureWorkerDatabase(env: Env) {
     SMTP_SECURE: env.SMTP_SECURE,
     SENDER_EMAIL: env.SENDER_EMAIL,
     SENDER_NAME: env.SENDER_NAME,
+    EVOLUTION_API_BASE_URL: env.EVOLUTION_API_BASE_URL,
+    EVOLUTION_API_KEY: env.EVOLUTION_API_KEY,
+    EVOLUTION_INSTANCE_PREFIX: env.EVOLUTION_INSTANCE_PREFIX,
   } satisfies Record<string, string | undefined>;
 
   for (const [key, value] of Object.entries(secretEnvMappings)) {
@@ -152,12 +160,17 @@ export default {
       return handleEnqueueEmail(request, env);
     }
 
+    if (request.method === "POST" && url.pathname === "/queue/whatsapp") {
+      return handleEnqueueWhatsApp(request, env);
+    }
+
     if (url.pathname === "/queue/status") {
       return Response.json({
         queues: [
           getCampaignLaunchQueueName(env.ENVIRONMENT),
           getSmsQueueName(env.ENVIRONMENT),
           getEmailQueueName(env.ENVIRONMENT),
+          getWhatsAppQueueName(env.ENVIRONMENT),
         ],
         environment: env.ENVIRONMENT,
       });
@@ -194,6 +207,9 @@ export default {
         break;
       case getEmailQueueName(env.ENVIRONMENT):
         await handleEmailBatch(batch as MessageBatch<EmailMessage>, env);
+        break;
+      case getWhatsAppQueueName(env.ENVIRONMENT):
+        await handleWhatsAppBatch(batch as MessageBatch<WhatsAppMessage>, env);
         break;
       default:
         console.error("[Queue] Unknown queue", {
@@ -332,6 +348,47 @@ async function handleEnqueueEmail(
   } catch (error) {
     console.error(
       "[Queue API] Failed to enqueue email job",
+      serializeError(error)
+    );
+    return Response.json({ error: "Invalid request body" }, { status: 400 });
+  }
+}
+
+async function handleEnqueueWhatsApp(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  try {
+    const body = (await request.json()) as WhatsAppMessage;
+
+    if (!body.message_id || !body.organization_id || !body.channel) {
+      return Response.json(
+        {
+          error:
+            "Missing required fields: message_id, organization_id, channel",
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log("[Queue API] Enqueueing WhatsApp job", {
+      messageId: body.message_id,
+      organizationId: body.organization_id,
+      channel: body.channel,
+      deliveryCycle: body.delivery_cycle,
+      queue: whatsappWorkerConfig.queueName,
+      resolvedQueue: getWhatsAppQueueName(env.ENVIRONMENT),
+      environment: env.ENVIRONMENT,
+    });
+    await env.WHATSAPP_QUEUE.send(body);
+    return Response.json({
+      success: true,
+      message: "WhatsApp job queued",
+      job: body,
+    });
+  } catch (error) {
+    console.error(
+      "[Queue API] Failed to enqueue WhatsApp job",
       serializeError(error)
     );
     return Response.json({ error: "Invalid request body" }, { status: 400 });

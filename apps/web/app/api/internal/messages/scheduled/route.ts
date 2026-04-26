@@ -53,6 +53,7 @@ const claimScheduledSchema = z.object({
   until: z.string().datetime(),
   smsLimit: z.number().int().positive(),
   emailLimit: z.number().int().positive(),
+  whatsappLimit: z.number().int().positive().default(50),
 });
 
 export async function POST(req: NextRequest) {
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       until: untilDate,
       smsLimit: parsed.data.smsLimit,
       emailLimit: parsed.data.emailLimit,
+      whatsappLimit: parsed.data.whatsappLimit,
     });
 
     return NextResponse.json(result);

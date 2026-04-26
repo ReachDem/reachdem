@@ -1,7 +1,7 @@
-import { LogoWithCoverImageIcon } from "@/editor/components/icons/logo-with-cover-image";
 import { BlockItem } from "./types";
-import { LogoWithTextHorizonIcon } from "@/editor/components/icons/logo-with-text-horizon";
-import { LogoWithTextVerticalIcon } from "@/editor/components/icons/logo-with-text-vertical";
+import { LogoWithCoverImageIcon } from "../editor/components/icons/logo-with-cover-image";
+import { LogoWithTextHorizonIcon } from "../editor/components/icons/logo-with-text-horizon";
+import { LogoWithTextVerticalIcon } from "../editor/components/icons/logo-with-text-vertical";
 
 export const headerLogoWithTextHorizontal: BlockItem = {
   title: "Logo with Text (Horizontal)",

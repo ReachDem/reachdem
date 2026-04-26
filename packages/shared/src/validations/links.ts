@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const trackedLinkStatusSchema = z.enum(["active", "disabled"]);
-export const trackedLinkChannelSchema = z.enum(["sms", "email"]);
+export const trackedLinkChannelSchema = z.enum(["sms", "email", "whatsapp"]);
 
 export const createTrackedLinkSchema = z.object({
   targetUrl: z.string().url("targetUrl must be a valid URL"),

@@ -21,6 +21,7 @@ dist/
 # local env files
 .env*.local
 .env
+apps/workers/.dev.vars
 
 # vercel
 .vercel
@@ -31,6 +32,7 @@ dist/
 
 # turbo
 .turbo
+apps/workers/.wrangler/
 
 # typescript
 *.tsbuildinfo
