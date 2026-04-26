@@ -75,7 +75,7 @@ export async function getDashboardChecklistState() {
       title: "Import contacts",
       description: "Add your first contacts to your database.",
       status: step2Done ? "done" : "pending",
-      href: "/contacts/import",
+      href: "/contacts/",
     },
     {
       id: "step3",
@@ -85,7 +85,7 @@ export async function getDashboardChecklistState() {
           ? "Kick-start tests with the API."
           : "Create your first marketing campaign.",
       status: step3Done ? "done" : "pending",
-      href: role === "DEVELOPER" ? "/settings/api" : "/campaigns/new",
+      href: role === "DEVELOPER" ? "/api-config" : "/campaigns/new",
     },
   ];
 
