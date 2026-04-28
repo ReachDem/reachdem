@@ -45,9 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const data = {
-  workspaces: [
-    { id: "2", name: "Aquarius", logo: "/aquarius-wave-logo-blue.jpg" },
-  ],
+  workspaces: [{ id: "2", name: "", logo: "" }],
   currentWorkspace: {
     id: "1",
     name: "",
