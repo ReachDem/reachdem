@@ -103,6 +103,7 @@
     "react-resizable-panels": "^2.1.7",
     "react-shepherd": "^7.0.4",
     "recharts": "2.15.4",
+    "shepherd.js": "15.2.2",
     "sonner": "^1.7.4",
     "swagger-ui-dist": "^5.32.0",
     "tailwind-merge": "^3.4.0",

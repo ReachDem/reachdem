@@ -377,6 +377,9 @@ importers:
       recharts:
         specifier: 2.15.4
         version: 2.15.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      shepherd.js:
+        specifier: 15.2.2
+        version: 15.2.2
       sonner:
         specifier: ^1.7.4
         version: 1.7.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
