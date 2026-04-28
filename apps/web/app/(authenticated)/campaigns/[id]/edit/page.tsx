@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { CalendarDaysIcon } from "@heroicons/react/24/outline";
 import { format, isPast, startOfToday } from "date-fns";
 import { toast } from "sonner";
+import { getOrgSmsConfig } from "@/actions/campaigns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +80,16 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   const [smsContent, setSmsContent] = useState<SmsContent>({
     text: "",
   });
+
+  // Org SMS sender config
+  const [orgSmsConfig, setOrgSmsConfig] = useState<{
+    effectiveSenderId: string;
+    isCustom: boolean;
+  }>({ effectiveSenderId: "ReachDem", isCustom: false });
+
+  useEffect(() => {
+    getOrgSmsConfig().then((cfg) => setOrgSmsConfig(cfg));
+  }, []);
 
   // Fetch segments and groups
   const {
@@ -688,6 +699,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
                 value={smsContent}
                 onChange={setSmsContent}
                 disabled={isLoading}
+                effectiveSenderId={orgSmsConfig.effectiveSenderId}
+                isCustomSender={orgSmsConfig.isCustom}
               />
             )}
           </div>

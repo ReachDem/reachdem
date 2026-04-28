@@ -77,10 +77,24 @@ export default async function WorkspaceSettingsPage() {
   // Fetch full organizational data from database
   const org = await prisma.organization.findUnique({
     where: { id: activeOrg.id },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logo: true,
+      workspaceVerificationStatus: true,
+      websiteUrl: true,
+      senderId: true,
       members: {
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
         },
       },
     },

@@ -9,6 +9,7 @@ import {
   createAndLaunchCampaign,
   createAndScheduleCampaign,
   createCampaign,
+  getOrgSmsConfig,
 } from "@/actions/campaigns";
 
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,16 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
   const [smsContent, setSmsContent] = useState<SmsContent>({
     text: "",
   });
+
+  // Org SMS sender config
+  const [orgSmsConfig, setOrgSmsConfig] = useState<{
+    effectiveSenderId: string;
+    isCustom: boolean;
+  }>({ effectiveSenderId: "ReachDem", isCustom: false });
+
+  useEffect(() => {
+    getOrgSmsConfig().then((cfg) => setOrgSmsConfig(cfg));
+  }, []);
 
   // Fetch segments and groups
   const {
@@ -478,6 +489,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
                 value={smsContent}
                 onChange={setSmsContent}
                 disabled={isLoading}
+                effectiveSenderId={orgSmsConfig.effectiveSenderId}
+                isCustomSender={orgSmsConfig.isCustom}
               />
             )}
           </div>

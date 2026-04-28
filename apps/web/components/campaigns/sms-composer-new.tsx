@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 import { createTrackedLink } from "@/actions/links";
 import { toast } from "sonner";
+import { CheckCircle2, Info } from "lucide-react";
 
 export interface SmsContent {
   text: string;
@@ -37,6 +38,10 @@ interface SmsComposerProps {
   value: SmsContent;
   onChange: (value: SmsContent) => void;
   disabled?: boolean;
+  /** The effective sender ID resolved from the organization (verified custom or default "ReachDem") */
+  effectiveSenderId?: string;
+  /** Whether the sender ID is a custom verified one (true) or the ReachDem default (false) */
+  isCustomSender?: boolean;
 }
 
 // Common variables
@@ -67,6 +72,8 @@ export function SmsComposerNew({
   value,
   onChange,
   disabled = false,
+  effectiveSenderId = "ReachDem",
+  isCustomSender = false,
 }: SmsComposerProps) {
   const [detectedUrls, setDetectedUrls] = useState<DetectedUrl[]>([]);
   const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
@@ -343,20 +350,51 @@ export function SmsComposerNew({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left side - Editor */}
         <div className="space-y-4">
-          {/* Sender ID */}
+          {/* Sender ID — read-only, resolved from org settings */}
           <div className="space-y-2">
             <Label htmlFor="sender-id">Sender ID</Label>
-            <Input
-              id="sender-id"
-              placeholder="e.g., YourBrand"
-              value={value.senderId || ""}
-              onChange={(e) => handleSenderIdChange(e.target.value)}
-              disabled={disabled}
-              maxLength={11}
-              className="font-mono"
-            />
+            <div className="flex items-center gap-2">
+              <div
+                id="sender-id"
+                className="bg-muted/60 border-input flex h-9 flex-1 items-center rounded-md border px-3 font-mono text-sm font-semibold tracking-widest uppercase"
+              >
+                {effectiveSenderId}
+              </div>
+              {isCustomSender ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center">
+                        <CheckCircle2 className="size-4 text-emerald-500" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Your verified Sender ID</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center">
+                        <Info className="text-muted-foreground size-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        Default sender. Configure a custom Sender ID in
+                        Workspace Settings.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <p className="text-muted-foreground text-xs">
-              Max 11 characters. This is how your name appears to recipients.
+              {isCustomSender
+                ? "Your verified Sender ID. Recipients will see this name."
+                : "Using the default sender. Go to Settings → Workspace to request a custom Sender ID."}
             </p>
           </div>
 
@@ -540,7 +578,7 @@ export function SmsComposerNew({
         {/* Right side - Phone Preview */}
         <div className="flex items-start justify-center lg:justify-end">
           <PhoneMockup
-            senderId={value.senderId || "SENDER"}
+            senderId={effectiveSenderId}
             message={getRenderedPreview()}
             highlightedMessage={renderPreviewWithHighlights()}
           />

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { auth } from "./auth";
+import { prisma } from "@reachdem/database";
 
 /**
  * RBAC helper utilities for org-scoped route protection.
@@ -41,8 +42,9 @@ export async function requireAuth(): Promise<NonNullable<SessionResult>> {
  */
 export async function requireOrgMembership() {
   const session = await requireAuth();
+  const organizationId = await resolveActiveOrganizationId(session);
 
-  if (!session.session.activeOrganizationId) {
+  if (!organizationId) {
     throw new Response(
       JSON.stringify({
         error: "No active organization. Please select a workspace.",
@@ -51,8 +53,23 @@ export async function requireOrgMembership() {
     );
   }
 
-  const activeMember = await auth.api.getActiveMember({
-    headers: await headers(),
+  const activeMember = await prisma.member.findUnique({
+    where: {
+      organizationId_userId: {
+        organizationId,
+        userId: session.user.id,
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+    },
   });
 
   if (!activeMember) {
@@ -64,7 +81,14 @@ export async function requireOrgMembership() {
     );
   }
 
-  return { ...session, member: activeMember };
+  return {
+    ...session,
+    session: {
+      ...session.session,
+      activeOrganizationId: organizationId,
+    },
+    member: activeMember,
+  };
 }
 
 /**
@@ -115,14 +139,68 @@ export async function getActiveOrganization() {
     headers: await headers(),
   });
 
-  if (!session?.session.activeOrganizationId) {
+  if (!session) {
     return null;
   }
 
-  const org = await auth.api.getFullOrganization({
-    headers: await headers(),
-    query: { organizationId: session.session.activeOrganizationId },
+  const organizationId = await resolveActiveOrganizationId(session);
+
+  if (!organizationId) {
+    return null;
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true },
   });
 
   return org;
+}
+
+async function resolveActiveOrganizationId(
+  session: NonNullable<SessionResult>
+): Promise<string | null> {
+  const currentOrganizationId = session.session.activeOrganizationId;
+
+  if (currentOrganizationId) {
+    return currentOrganizationId;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { defaultOrganizationId: true },
+  });
+
+  const defaultMembership = user?.defaultOrganizationId
+    ? await prisma.member.findFirst({
+        where: {
+          userId: session.user.id,
+          organizationId: user.defaultOrganizationId,
+        },
+        select: { organizationId: true },
+      })
+    : null;
+
+  const fallbackMembership =
+    defaultMembership ??
+    (await prisma.member.findFirst({
+      where: {
+        userId: session.user.id,
+      },
+      orderBy: { createdAt: "asc" },
+      select: { organizationId: true },
+    }));
+
+  const fallbackOrganizationId = fallbackMembership?.organizationId ?? null;
+
+  if (fallbackOrganizationId) {
+    await prisma.session
+      .update({
+        where: { token: session.session.token },
+        data: { activeOrganizationId: fallbackOrganizationId },
+      })
+      .catch(() => {});
+  }
+
+  return fallbackOrganizationId;
 }

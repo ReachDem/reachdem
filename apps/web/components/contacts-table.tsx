@@ -252,14 +252,14 @@ export function ContactsTable({
         </DropdownMenu>
 
         <ContactImportDialog>
-          <Button variant="outline" size="sm">
+          <Button id="contacts-import-btn" variant="outline" size="sm">
             <IconUpload className="size-4" />
             <span className="hidden lg:inline">Import</span>
           </Button>
         </ContactImportDialog>
 
         <AddContactDrawer>
-          <Button size="sm">
+          <Button id="contacts-add-btn" size="sm">
             <IconPlus className="size-4" />
             <span className="hidden lg:inline">Add Contact</span>
           </Button>

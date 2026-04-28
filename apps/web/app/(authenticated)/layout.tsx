@@ -32,11 +32,30 @@ export default async function AuthenticatedLayout({
     ? await prisma.organization.findUnique({
         where: { id: activeOrganizationId },
         select: {
+          id: true,
+          name: true,
+          logo: true,
           senderId: true,
           workspaceVerificationStatus: true,
         },
       })
     : null;
+  const workspaceMemberships = await prisma.member.findMany({
+    where: { userId: flow.session.user.id },
+    orderBy: { createdAt: "asc" },
+    select: {
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+        },
+      },
+    },
+  });
+  const workspaces = workspaceMemberships.map(
+    (membership) => membership.organization
+  );
 
   const showVerificationBanner = Boolean(
     activeOrganization?.senderId &&
@@ -53,7 +72,11 @@ export default async function AuthenticatedLayout({
           } as React.CSSProperties
         }
       >
-        <AppSidebar variant="inset" />
+        <AppSidebar
+          variant="inset"
+          initialWorkspace={activeOrganization}
+          initialWorkspaces={workspaces}
+        />
         <SidebarInset>
           {showVerificationBanner ? (
             <OrganizationVerificationBanner

@@ -545,3 +545,43 @@ export async function duplicateCampaign(id: string) {
     );
   }
 }
+
+const DEFAULT_SENDER_ID = "ReachDem";
+
+export async function getOrgSmsConfig(): Promise<{
+  effectiveSenderId: string;
+  isCustom: boolean;
+  verificationStatus:
+    | "not_submitted"
+    | "pending"
+    | "verified"
+    | "rejected"
+    | null;
+}> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        senderId: true,
+        workspaceVerificationStatus: true,
+      },
+    });
+
+    const isVerified = org?.workspaceVerificationStatus === "verified";
+    const hasCustomSender = isVerified && Boolean(org?.senderId);
+
+    return {
+      effectiveSenderId: hasCustomSender ? org!.senderId! : DEFAULT_SENDER_ID,
+      isCustom: hasCustomSender,
+      verificationStatus:
+        (org?.workspaceVerificationStatus as any) ?? "not_submitted",
+    };
+  } catch {
+    return {
+      effectiveSenderId: DEFAULT_SENDER_ID,
+      isCustom: false,
+      verificationStatus: null,
+    };
+  }
+}

@@ -45,10 +45,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const data = {
-  workspaces: [{ id: "2", name: "", logo: "" }],
+  workspaces: [{ id: "fallback", name: "Workspace", logo: "" }],
   currentWorkspace: {
     id: "1",
-    name: "",
+    name: "Workspace",
     logo: "",
   },
   user: {
@@ -147,26 +147,61 @@ const data = {
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+type SidebarWorkspace = {
+  id: string;
+  name: string;
+  logo?: string | null;
+};
+
+type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
+  initialWorkspace?: SidebarWorkspace | null;
+  initialWorkspaces?: SidebarWorkspace[];
+};
+
+export function AppSidebar({
+  initialWorkspace = null,
+  initialWorkspaces = [],
+  ...props
+}: AppSidebarProps) {
   const { data: session } = useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { data: organizations } = authClient.useListOrganizations();
   const [isHydrated, setIsHydrated] = React.useState(false);
+  const [optimisticWorkspaceId, setOptimisticWorkspaceId] = React.useState<
+    string | null
+  >(null);
+  const [, startSwitchTransition] = React.useTransition();
 
   React.useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  const currentWorkspaceName = activeOrg?.name ?? "";
-  const isOrgLoading = !isHydrated || !activeOrg?.name;
-  const workspaces =
+  const workspaces: SidebarWorkspace[] =
     isHydrated && organizations?.length
       ? organizations.map((org: any) => ({
           id: org.id,
-          name: org.name,
+          name: org.name || "Workspace",
           logo: org.logo,
         }))
-      : data.workspaces;
+      : initialWorkspaces.length
+        ? initialWorkspaces
+        : data.workspaces;
+
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === optimisticWorkspaceId) ??
+    (activeOrg?.id
+      ? {
+          id: activeOrg.id,
+          name: activeOrg.name || "Workspace",
+          logo: activeOrg.logo,
+        }
+      : null) ??
+    initialWorkspace ??
+    workspaces[0] ??
+    data.currentWorkspace;
+
+  const currentWorkspaceName = activeWorkspace.name || "Workspace";
+  const isOrgLoading = !activeWorkspace?.id && !isHydrated;
 
   const userData =
     isHydrated && session?.user
@@ -179,7 +214,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const orgInitial = currentWorkspaceName
     ? currentWorkspaceName.charAt(0).toUpperCase()
-    : "";
+    : "W";
+
+  const handleWorkspaceSelect = React.useCallback((workspaceId: string) => {
+    setOptimisticWorkspaceId(workspaceId);
+    startSwitchTransition(() => {
+      void authClient.organization.setActive({ organizationId: workspaceId });
+    });
+  }, []);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -204,7 +246,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     ) : (
                       <Avatar className="size-8 rounded-md bg-white shadow">
                         <AvatarImage
-                          src={activeOrg?.logo || undefined}
+                          src={activeWorkspace.logo || undefined}
                           alt={currentWorkspaceName}
                         />
                         <AvatarFallback className="rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 font-bold text-white">
@@ -242,6 +284,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <DropdownMenuItem
                       key={workspace.id}
                       className="cursor-pointer gap-2"
+                      onSelect={() => handleWorkspaceSelect(workspace.id)}
                     >
                       <Avatar className="size-6 rounded bg-gradient-to-br from-blue-500 to-cyan-400">
                         <AvatarImage
@@ -252,7 +295,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           {wsInitial}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="font-semibold">{workspace.name}</span>
+                      <span className="font-semibold">
+                        {workspace.name || "Workspace"}
+                      </span>
                     </DropdownMenuItem>
                   );
                 })}

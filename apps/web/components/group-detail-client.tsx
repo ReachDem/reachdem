@@ -10,6 +10,7 @@ import {
   IconCheck,
   IconUsers,
   IconPencil,
+  IconPlus,
 } from "@tabler/icons-react";
 import { type ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
@@ -52,6 +53,7 @@ import {
 } from "@/lib/api/groups";
 
 import { useGroupDetailStore } from "@/lib/stores/group-detail-store";
+import { AddContactDrawer } from "@/components/add-contact-drawer";
 
 // ─── Members Panel (Main Column) ──────────────────────────────────────────────
 
@@ -195,32 +197,41 @@ function GroupMembersPanel({
           </Button>
         )}
       </div>
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogTrigger asChild>
-          <Button size="sm" className="gap-1.5">
-            <IconUserPlus className="size-4" />
-            Add Contacts
+      <div className="flex items-center gap-2">
+        <AddContactDrawer groupId={groupId} onContactAdded={handleMembersAdded}>
+          <Button size="sm" variant="outline" className="gap-1.5">
+            <IconPlus className="size-4" />
+            New contact
           </Button>
-        </DialogTrigger>
+        </AddContactDrawer>
 
-        <DialogContent className="flex max-h-[90dvh] w-full flex-col p-4 sm:max-w-4xl lg:max-w-5xl">
-          <DialogHeader className="px-1">
-            <DialogTitle>Add Contacts to Group</DialogTitle>
-            <DialogDescription>
-              Select contacts from your workspace to add to this group.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-[300px] flex-1 overflow-auto overscroll-contain">
-            <GroupContactPicker
-              groupId={groupId}
-              allContacts={allContacts}
-              existingMemberIds={memberIds}
-              onMembersAdded={handleMembersAdded}
-              onCancel={() => setIsAddModalOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5">
+              <IconUserPlus className="size-4" />
+              Add Contacts
+            </Button>
+          </DialogTrigger>
+
+          <DialogContent className="flex max-h-[90dvh] w-full flex-col p-4 sm:max-w-4xl lg:max-w-5xl">
+            <DialogHeader className="px-1">
+              <DialogTitle>Add Contacts to Group</DialogTitle>
+              <DialogDescription>
+                Select contacts from your workspace to add to this group.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="min-h-[300px] flex-1 overflow-auto overscroll-contain">
+              <GroupContactPicker
+                groupId={groupId}
+                allContacts={allContacts}
+                existingMemberIds={memberIds}
+                onMembersAdded={handleMembersAdded}
+                onCancel={() => setIsAddModalOpen(false)}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 

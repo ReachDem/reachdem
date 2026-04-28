@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useContactsStore } from "@/lib/stores/contacts-store";
+import { addGroupMembers } from "@/lib/api/groups";
 import {
   Select,
   SelectContent,
@@ -27,7 +28,17 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 
-export function AddContactDrawer({ children }: { children: React.ReactNode }) {
+export function AddContactDrawer({
+  children,
+  groupId,
+  onContactAdded,
+}: {
+  children: React.ReactNode;
+  /** If provided, the new contact is automatically added to this group after creation */
+  groupId?: string;
+  /** Optional callback fired after a contact is successfully created (and added to group if groupId is set) */
+  onContactAdded?: (contactId: string) => void;
+}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -73,6 +84,16 @@ export function AddContactDrawer({ children }: { children: React.ReactNode }) {
       }
 
       addContact(json.data);
+
+      // If a groupId was provided, add the new contact to that group
+      if (groupId && json.data?.id) {
+        await addGroupMembers(groupId, [json.data.id]);
+      }
+
+      if (onContactAdded && json.data?.id) {
+        onContactAdded(json.data.id);
+      }
+
       toast.success("Contact added successfully");
       setOpen(false);
     } catch (err: any) {

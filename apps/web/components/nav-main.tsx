@@ -75,7 +75,15 @@ export function NavMain({
                   {item.items.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
-                        <a href={subItem.url} className="h-9">
+                        <a
+                          href={subItem.url}
+                          className="h-9"
+                          id={
+                            subItem.url === "/contacts/groups"
+                              ? "contacts-groups-nav"
+                              : undefined
+                          }
+                        >
                           {subItem.icon && (
                             <subItem.icon className="text-muted-foreground mr-1 size-4" />
                           )}
