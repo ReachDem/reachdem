@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import "./fonts.css";
 import { Providers } from "@/components/providers";
+import { ThemeScript } from "@/components/theme-script";
 import { getThemeScript } from "@/lib/theme";
 
 const neueMontreal = localFont({
@@ -53,10 +54,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={`${neueMontreal.variable} font-sans antialiased`}>
-        <script
-          id="theme-script"
-          dangerouslySetInnerHTML={{ __html: themeScript }}
-        />
+        <ThemeScript script={themeScript} />
         <Providers>{children}</Providers>
       </body>
     </html>

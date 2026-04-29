@@ -225,7 +225,18 @@ export function buildContactColumns<T extends ContactRow>(
       accessorFn: (row) => (row.customFields as Record<string, unknown>)?.[key],
       header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " "),
       cell: ({ getValue }) => {
-        const val = getValue() as string;
+        const raw = getValue();
+        if (raw === null || raw === undefined)
+          return <span className="text-muted-foreground">—</span>;
+        // If the value is a plain object or array, extract a display string
+        let val: string;
+        if (typeof raw === "object") {
+          // Handle {value, ...} shaped objects (e.g. rich contact fields)
+          const obj = raw as Record<string, unknown>;
+          val = typeof obj.value === "string" ? obj.value : JSON.stringify(raw);
+        } else {
+          val = String(raw);
+        }
         if (!val) return <span className="text-muted-foreground">—</span>;
         return <span className="text-sm">{val}</span>;
       },

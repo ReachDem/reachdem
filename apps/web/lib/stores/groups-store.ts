@@ -28,6 +28,8 @@ interface GroupsState {
   addGroup: (group: Group) => void;
   /** Remove a group optimistically after deletion */
   removeGroup: (id: string) => void;
+  /** Update a group optimistically after edit */
+  updateGroup: (group: Group) => void;
 }
 
 export const useGroupsStore = create<GroupsState>((set, get) => ({
@@ -63,5 +65,10 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
       groups: state.groups.filter((g) => g.id !== id),
       selectedGroupId:
         state.selectedGroupId === id ? null : state.selectedGroupId,
+    })),
+
+  updateGroup: (group) =>
+    set((state) => ({
+      groups: state.groups.map((g) => (g.id === group.id ? group : g)),
     })),
 }));

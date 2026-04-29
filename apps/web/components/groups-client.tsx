@@ -11,6 +11,8 @@ import {
   IconTrash,
   IconLoader2,
   IconUserMinus,
+  IconUserPlus,
+  IconCheck,
   IconLayoutColumns,
   IconChevronDown,
 } from "@tabler/icons-react";
@@ -21,6 +23,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -50,9 +53,13 @@ import {
 } from "@/components/contact-data-table";
 import {
   type Group,
+  type Contact,
   createGroup,
+  updateGroup,
   deleteGroup,
   listGroupContacts,
+  listContacts,
+  addGroupMembers,
   removeGroupMembers,
 } from "@/lib/api/groups";
 import {
@@ -71,14 +78,16 @@ function GroupPanelToolbar({
   globalFilter,
   setGlobalFilter,
   table,
+  onEdit,
+  onAddContacts,
 }: {
   group: Group;
   globalFilter: string;
   setGlobalFilter: (value: string) => void;
   table: any;
+  onEdit: () => void;
+  onAddContacts: () => void;
 }) {
-  const router = useRouter();
-
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="relative max-w-sm flex-1">
@@ -125,10 +134,14 @@ function GroupPanelToolbar({
           size="sm"
           variant="outline"
           className="shrink-0 gap-1.5"
-          onClick={() => router.push(`/contacts/groups/${group.id}`)}
+          onClick={onEdit}
         >
           <IconPencil className="size-4" />
-          <span className="hidden sm:inline">Manage</span>
+          <span className="hidden sm:inline">Edit</span>
+        </Button>
+        <Button size="sm" className="shrink-0 gap-1.5" onClick={onAddContacts}>
+          <IconUserPlus className="size-4" />
+          <span className="hidden sm:inline">Add Contacts</span>
         </Button>
       </div>
     </div>
@@ -156,14 +169,23 @@ function GroupPanelLoading() {
 
 // ─── Group Panel (right column) ───────────────────────────────────────────────
 
-function GroupPanel({ group }: { group: Group }) {
-  const router = useRouter();
+function GroupPanel({
+  group,
+  onEdit,
+  onAddContacts,
+  refreshSignal,
+}: {
+  group: Group;
+  onEdit: () => void;
+  onAddContacts: () => void;
+  refreshSignal: number;
+}) {
   const [members, setMembers] = React.useState<ContactRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [removing, setRemoving] = React.useState(false);
 
-  // Fetch members when group changes
+  // Fetch members when group changes or contacts are added
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -181,7 +203,7 @@ function GroupPanel({ group }: { group: Group }) {
     return () => {
       cancelled = true;
     };
-  }, [group.id]);
+  }, [group.id, refreshSignal]);
 
   async function handleRemoveMember(contactId: string) {
     setRemoving(true);
@@ -242,6 +264,8 @@ function GroupPanel({ group }: { group: Group }) {
       globalFilter={globalFilter}
       setGlobalFilter={setGlobalFilter}
       table={table}
+      onEdit={onEdit}
+      onAddContacts={onAddContacts}
     />
   );
 
@@ -379,6 +403,40 @@ function useDeleteGroupDialog() {
   return { deleteTarget, setDeleteTarget, isDeleting, handleDelete };
 }
 
+function useEditGroupDialog() {
+  const [editTarget, setEditTarget] = React.useState<Group | null>(null);
+  const [editError, setEditError] = React.useState<string | null>(null);
+  const [isPending, setIsPending] = React.useState(false);
+  const updateGroupInStore = useGroupsStore((s) => s.updateGroup);
+
+  async function handleEdit(data: { name: string; description: string }) {
+    if (!editTarget) return;
+    setIsPending(true);
+    setEditError(null);
+    try {
+      const updated = await updateGroup(editTarget.id, data);
+      toast.success(`Group "${updated.name}" updated.`);
+      updateGroupInStore(updated);
+      setEditTarget(null);
+    } catch (err: unknown) {
+      setEditError(
+        err instanceof Error ? err.message : "Failed to update group"
+      );
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return {
+    editTarget,
+    setEditTarget,
+    editError,
+    setEditError,
+    isPending,
+    handleEdit,
+  };
+}
+
 // ─── Main Groups Client ───────────────────────────────────────────────────────
 
 interface GroupsClientProps {
@@ -406,6 +464,24 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
   } = useCreateGroupDialog();
   const { deleteTarget, setDeleteTarget, isDeleting, handleDelete } =
     useDeleteGroupDialog();
+  const {
+    editTarget,
+    setEditTarget,
+    editError,
+    setEditError,
+    isPending: isEditPending,
+    handleEdit,
+  } = useEditGroupDialog();
+  const [addContactsGroup, setAddContactsGroup] = React.useState<Group | null>(
+    null
+  );
+  const [addContactsOpen, setAddContactsOpen] = React.useState(false);
+  const [refreshSignal, setRefreshSignal] = React.useState(0);
+
+  function openAddContacts(group: Group) {
+    setAddContactsGroup(group);
+    setAddContactsOpen(true);
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -456,8 +532,9 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
                         selectGroup(id);
                       }
                     }}
-                    onEdit={(id) => router.push(`/contacts/groups/${id}`)}
+                    onEdit={(g) => setEditTarget(g)}
                     onDelete={(g) => setDeleteTarget(g)}
+                    onAddContacts={(g) => openAddContacts(g)}
                   />
                 ))
               ) : (
@@ -472,7 +549,13 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
         {/* ── Right panel ── */}
         <div className="hidden flex-1 flex-col overflow-hidden md:flex">
           {selectedGroup ? (
-            <GroupPanel key={selectedGroup.id} group={selectedGroup} />
+            <GroupPanel
+              key={selectedGroup.id}
+              group={selectedGroup}
+              refreshSignal={refreshSignal}
+              onEdit={() => setEditTarget(selectedGroup)}
+              onAddContacts={() => openAddContacts(selectedGroup)}
+            />
           ) : (
             <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 text-sm">
               <IconUsers className="size-8 opacity-20" />
@@ -492,6 +575,29 @@ export function GroupsClient({ initialGroups }: GroupsClientProps) {
         onSubmit={handleCreate}
         isPending={isPending}
         error={createError}
+      />
+
+      {/* Edit dialog */}
+      <EditGroupDialog
+        group={editTarget}
+        open={!!editTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditTarget(null);
+            setEditError(null);
+          }
+        }}
+        onSubmit={handleEdit}
+        isPending={isEditPending}
+        error={editError}
+      />
+
+      {/* Add contacts dialog */}
+      <AddContactsDialog
+        group={addContactsGroup}
+        open={addContactsOpen}
+        onOpenChange={setAddContactsOpen}
+        onSuccess={() => setRefreshSignal((n) => n + 1)}
       />
 
       {/* Delete confirm */}
@@ -534,12 +640,14 @@ function GroupListItem({
   onSelect,
   onEdit,
   onDelete,
+  onAddContacts,
 }: {
   group: Group;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit: (group: Group) => void;
   onDelete: (g: Group) => void;
+  onAddContacts: (group: Group) => void;
 }) {
   const [hovered, setHovered] = React.useState(false);
 
@@ -590,10 +698,22 @@ function GroupListItem({
             variant="ghost"
             size="icon"
             className="size-7"
-            title="Manage group"
+            title="Add contacts"
             onClick={(e) => {
               e.stopPropagation();
-              onEdit(group.id);
+              onAddContacts(group);
+            }}
+          >
+            <IconUserPlus className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            title="Edit group"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(group);
             }}
           >
             <IconPencil className="size-3.5" />
@@ -647,6 +767,260 @@ function CreateGroupDialog({
           isPending={isPending}
           error={error}
         />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit Group Dialog ────────────────────────────────────────────────────────
+
+function EditGroupDialog({
+  group,
+  open,
+  onOpenChange,
+  onSubmit,
+  isPending,
+  error,
+}: {
+  group: Group | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { name: string; description: string }) => Promise<void>;
+  isPending: boolean;
+  error: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit group</DialogTitle>
+          <DialogDescription>
+            Update the group name or description.
+          </DialogDescription>
+        </DialogHeader>
+        {group && (
+          <GroupForm
+            key={group.id}
+            defaultValues={{
+              name: group.name,
+              description: group.description ?? "",
+            }}
+            onSubmit={onSubmit}
+            onCancel={() => onOpenChange(false)}
+            submitLabel="Save changes"
+            isPending={isPending}
+            error={error}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add Contacts Dialog ──────────────────────────────────────────────────────
+
+function AddContactsDialog({
+  group,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  group: Group | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [allContacts, setAllContacts] = React.useState<ContactRow[]>([]);
+  const [existingMemberIds, setExistingMemberIds] = React.useState<Set<string>>(
+    new Set()
+  );
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isAdding, setIsAdding] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open || !group) return;
+    let cancelled = false;
+    setIsLoading(true);
+    Promise.all([
+      listContacts({ limit: 500 }),
+      listGroupContacts(group.id, { limit: 500 }),
+    ])
+      .then(([contacts, members]) => {
+        if (cancelled) return;
+        setAllContacts(contacts.items as ContactRow[]);
+        setExistingMemberIds(new Set(members.items.map((m) => m.id)));
+      })
+      .catch(() => toast.error("Failed to load contacts."))
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, group?.id]);
+
+  const columns = React.useMemo<ColumnDef<ContactRow>[]>(() => {
+    const base = buildContactColumns(allContacts, {
+      showSelect: false,
+      renderActions: () => null,
+    });
+    const leanCols = base.filter(
+      (c) =>
+        c.id !== "actions" &&
+        (c as any).accessorKey !== "gender" &&
+        (c as any).accessorKey !== "work" &&
+        (c as any).accessorKey !== "createdAt"
+    );
+    return [
+      {
+        id: "select",
+        header: ({ table }) => {
+          const selectableRows = table
+            .getRowModel()
+            .rows.filter((r) => !existingMemberIds.has(r.original.id));
+          const allSelected =
+            selectableRows.length > 0 &&
+            selectableRows.every((r) => r.getIsSelected());
+          const someSelected = selectableRows.some((r) => r.getIsSelected());
+          return (
+            <div className="-ml-2 flex items-center justify-center">
+              <Checkbox
+                checked={allSelected || (someSelected && "indeterminate")}
+                onCheckedChange={(v) =>
+                  selectableRows.forEach((r) => r.toggleSelected(!!v))
+                }
+                aria-label="Select all eligible"
+                disabled={selectableRows.length === 0}
+              />
+            </div>
+          );
+        },
+        cell: ({ row }) => {
+          const isMember = existingMemberIds.has(row.original.id);
+          return (
+            <div className="-ml-2 flex items-center justify-center">
+              <Checkbox
+                checked={isMember || row.getIsSelected()}
+                onCheckedChange={(v) => !isMember && row.toggleSelected(!!v)}
+                aria-label="Select row"
+                disabled={isMember}
+              />
+            </div>
+          );
+        },
+        enableSorting: false,
+        enableHiding: false,
+      },
+      ...leanCols,
+      {
+        id: "status",
+        header: "",
+        cell: ({ row }) => {
+          if (!existingMemberIds.has(row.original.id)) return null;
+          return (
+            <div className="flex justify-end pr-2">
+              <Badge
+                variant="secondary"
+                className="gap-1 text-xs font-normal whitespace-nowrap"
+              >
+                <IconCheck className="size-3" />
+                In Group
+              </Badge>
+            </div>
+          );
+        },
+      },
+    ] as ColumnDef<ContactRow>[];
+  }, [allContacts, existingMemberIds]);
+
+  const initialVisibility = React.useMemo(
+    () => defaultContactVisibility(columns as ColumnDef<ContactRow>[]),
+    [columns]
+  );
+
+  const { table, globalFilter, setGlobalFilter } = useContactTableState(
+    allContacts,
+    columns,
+    initialVisibility,
+    10,
+    "group-picker-dialog"
+  );
+
+  const selectedCount = table
+    .getFilteredSelectedRowModel()
+    .rows.filter((r) => !existingMemberIds.has(r.original.id)).length;
+
+  async function handleAdd() {
+    if (!group || selectedCount === 0) return;
+    setIsAdding(true);
+    const idsToAdd = table
+      .getFilteredSelectedRowModel()
+      .rows.filter((r) => !existingMemberIds.has(r.original.id))
+      .map((r) => r.original.id);
+    try {
+      await addGroupMembers(group.id, idsToAdd);
+      toast.success(`Added ${idsToAdd.length} contact(s) to the group.`);
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add contacts"
+      );
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
+  const toolbar = (
+    <div className="flex items-center gap-2 px-1">
+      <div className="relative flex-1">
+        <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Input
+          placeholder="Search contacts…"
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="h-9 pl-8"
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90dvh] w-full flex-col p-4 sm:max-w-4xl lg:max-w-5xl">
+        <DialogHeader className="px-1">
+          <DialogTitle>Add Contacts to &ldquo;{group?.name}&rdquo;</DialogTitle>
+          <DialogDescription>
+            Select contacts from your workspace to add to this group.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-[300px] flex-1 overflow-auto overscroll-contain">
+          <ContactDataTable
+            table={table as any}
+            columnCount={columns.length}
+            toolbar={toolbar}
+            footer={<ContactTablePagination table={table as any} />}
+            isLoading={isLoading}
+            compact
+          />
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t pt-4">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isAdding}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={selectedCount === 0 || isAdding}
+            onClick={handleAdd}
+            className="gap-1.5"
+          >
+            {isAdding && <IconLoader2 className="size-4 animate-spin" />}
+            Add {selectedCount > 0 ? `(${selectedCount})` : ""}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
