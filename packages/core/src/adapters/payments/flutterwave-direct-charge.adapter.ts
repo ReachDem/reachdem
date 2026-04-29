@@ -61,9 +61,19 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
   const clientId = process.env.FLUTTERWAVE_V4_CLIENT_ID?.trim();
   const clientSecret = process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim();
 
-  if (!clientId || !clientSecret) {
+  if (!clientId && !clientSecret) {
     throw new PaymentConfigurationError(
       "Flutterwave v4 payments require FLUTTERWAVE_V4_CLIENT_ID and FLUTTERWAVE_V4_CLIENT_SECRET."
+    );
+  }
+  if (!clientId) {
+    throw new PaymentConfigurationError(
+      "Missing FLUTTERWAVE_V4_CLIENT_ID environment variable."
+    );
+  }
+  if (!clientSecret) {
+    throw new PaymentConfigurationError(
+      "Missing FLUTTERWAVE_V4_CLIENT_SECRET environment variable."
     );
   }
 
