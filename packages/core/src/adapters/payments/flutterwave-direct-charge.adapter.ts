@@ -24,22 +24,8 @@ function getBaseUrl(): string {
 }
 
 function getTokenUrl(): string {
-  // Allow explicit override
-  const override = process.env.FLUTTERWAVE_V4_TOKEN_URL?.trim();
-  if (override) return override;
-
-  const base = getBaseUrl();
-  // The sandbox/experience environment uses its own IDP derived from the base host.
-  // e.g. https://f4bexperience.flutterwave.com -> https://idp.f4bexperience.flutterwave.com/...
-  if (base !== DEFAULT_V4_URL) {
-    try {
-      const url = new URL(base);
-      return `https://idp.${url.host}/realms/flutterwave/protocol/openid-connect/token`;
-    } catch {
-      // fall through to default
-    }
-  }
-  return DEFAULT_TOKEN_URL;
+  // Allow explicit override for non-standard environments
+  return process.env.FLUTTERWAVE_V4_TOKEN_URL?.trim() || DEFAULT_TOKEN_URL;
 }
 
 function buildUrl(path: string): string {
