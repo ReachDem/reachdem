@@ -63,8 +63,14 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
     return cachedToken.access_token;
   }
 
-  const clientId = process.env.FLUTTERWAVE_V4_CLIENT_ID?.trim();
-  const clientSecret = process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim();
+  const clientId = process.env.FLUTTERWAVE_V4_CLIENT_ID?.trim().replace(
+    /^["']|["']$/g,
+    ""
+  );
+  const clientSecret = process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim().replace(
+    /^["']|["']$/g,
+    ""
+  );
 
   if (!clientId && !clientSecret) {
     throw new PaymentConfigurationError(
