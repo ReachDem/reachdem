@@ -89,6 +89,13 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
   }
 
   const tokenUrl = getTokenUrl();
+  console.log("[Flutterwave] Token request debug", {
+    tokenUrl,
+    clientIdLength: clientId.length,
+    clientIdPrefix: clientId.slice(0, 8),
+    clientSecretLength: clientSecret.length,
+    clientSecretPrefix: clientSecret.slice(0, 4),
+  });
   const res = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -100,7 +107,13 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to get Flutterwave token: ${await res.text()}`);
+    const body = await res.text();
+    console.error("[Flutterwave] Token request failed", {
+      tokenUrl,
+      status: res.status,
+      body,
+    });
+    throw new Error(`Failed to get Flutterwave token: ${body}`);
   }
 
   const data = await res.json();
