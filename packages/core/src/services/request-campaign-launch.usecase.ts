@@ -10,6 +10,7 @@ import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import {
   CampaignInsufficientCreditsError,
   CampaignInvalidStatusError,
+  CampaignLaunchValidationError,
   CampaignNotFoundError,
 } from "../errors/campaign.errors";
 
@@ -73,6 +74,14 @@ export class RequestCampaignLaunchUseCase {
       campaignId,
       campaign.channel
     );
+
+    if (eligibleTargetCount === 0) {
+      const channelField =
+        campaign.channel === "email" ? "email address" : "phone number";
+      throw new CampaignLaunchValidationError(
+        `No eligible contacts found for this campaign. Make sure your audience group has contacts with a valid ${channelField}.`
+      );
+    }
 
     const entitlements = PlanEntitlementsService.applyCreditPurchaseStatus(
       PlanEntitlementsService.get(organization.planCode),
