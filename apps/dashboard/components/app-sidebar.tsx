@@ -13,9 +13,9 @@ import {
   IconSettings,
   IconHelpCircle,
   IconLogout,
-  IconPlus,
   IconMail,
   IconChevronDown,
+  IconBroadcast,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -75,18 +75,18 @@ export function AppSidebar({ email = "" }: AppSidebarProps) {
   return (
     <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-screen w-60 shrink-0 flex-col border-r">
       {/* ── Workspace header ───────────────────────────────────── */}
-      <div className="border-sidebar-border flex items-center gap-2.5 border-b px-4 py-4">
-        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-sm font-bold">
+      <div className="border-sidebar-border flex items-center gap-2.5 border-b px-4 py-2">
+        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-bold">
           R
         </div>
         <span className="truncate text-sm font-semibold">ReachDem</span>
       </div>
 
       {/* ── Quick actions ──────────────────────────────────────── */}
-      <div className="border-sidebar-border flex items-center gap-2 border-b px-3 py-3">
+      <div className="border-sidebar-border flex items-center gap-2 p-4">
         <button className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 flex flex-1 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-          <IconPlus size={14} />
-          Quick Create
+          <IconBroadcast size={14} />
+          Broadcast
         </button>
         <button className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-8 items-center justify-center rounded-md transition-colors">
           <IconMail size={16} />
@@ -94,10 +94,10 @@ export function AppSidebar({ email = "" }: AppSidebarProps) {
       </div>
 
       {/* ── Navigation ─────────────────────────────────────────── */}
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-sidebar-foreground/40 mb-1 px-2 text-[10px] font-semibold tracking-widest uppercase">
+            <p className="text-sidebar-foreground/40 mb-1 px-2 text-[10px] font-semibold">
               {group.label}
             </p>
             <ul className="space-y-0.5">
@@ -128,7 +128,7 @@ export function AppSidebar({ email = "" }: AppSidebarProps) {
       </nav>
 
       {/* ── Bottom actions ─────────────────────────────────────── */}
-      <div className="border-sidebar-border space-y-0.5 border-t px-3 py-3">
+      <div className="border-sidebar-border space-y-0.5 border-t px-3 py-4">
         <Link
           href="/settings"
           className="text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors"
@@ -146,7 +146,7 @@ export function AppSidebar({ email = "" }: AppSidebarProps) {
       </div>
 
       {/* ── User footer ────────────────────────────────────────── */}
-      <div className="border-sidebar-border border-t px-3 py-3">
+      <div className="border-sidebar-border border-t px-3 py-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="hover:bg-sidebar-accent/60 flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors">
