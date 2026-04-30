@@ -835,19 +835,39 @@ function AddContactsDialog({
     new Set()
   );
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isSearching, setIsSearching] = React.useState(false);
   const [isAdding, setIsAdding] = React.useState(false);
+  const [searchValue, setSearchValue] = React.useState("");
+  const searchTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
+  // Fetch all contacts by paginating (API max is 100 per page)
+  async function fetchAllContacts(search?: string): Promise<ContactRow[]> {
+    const contacts: ContactRow[] = [];
+    let page = 1;
+    while (true) {
+      const res = await listContacts({ limit: 100, page, search });
+      contacts.push(...(res.items as ContactRow[]));
+      if (contacts.length >= res.meta.total || res.items.length < 100) break;
+      page++;
+    }
+    return contacts;
+  }
+
+  // Load on open
   React.useEffect(() => {
     if (!open || !group) return;
     let cancelled = false;
     setIsLoading(true);
+    setSearchValue("");
     Promise.all([
-      listContacts({ limit: 500 }),
+      fetchAllContacts(),
       listGroupContacts(group.id, { limit: 500 }),
     ])
       .then(([contacts, members]) => {
         if (cancelled) return;
-        setAllContacts(contacts.items as ContactRow[]);
+        setAllContacts(contacts);
         setExistingMemberIds(new Set(members.items.map((m) => m.id)));
       })
       .catch(() => toast.error("Failed to load contacts."))
@@ -858,6 +878,23 @@ function AddContactsDialog({
       cancelled = true;
     };
   }, [open, group?.id]);
+
+  // Server-side search with debounce
+  function handleSearch(value: string) {
+    setSearchValue(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const contacts = await fetchAllContacts(value || undefined);
+        setAllContacts(contacts);
+      } catch {
+        toast.error("Search failed.");
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+  }
 
   const columns = React.useMemo<ColumnDef<ContactRow>[]>(() => {
     const base = buildContactColumns(allContacts, {
@@ -938,7 +975,7 @@ function AddContactsDialog({
     [columns]
   );
 
-  const { table, globalFilter, setGlobalFilter } = useContactTableState(
+  const { table } = useContactTableState(
     allContacts,
     columns,
     initialVisibility,
@@ -947,14 +984,14 @@ function AddContactsDialog({
   );
 
   const selectedCount = table
-    .getFilteredSelectedRowModel()
+    .getSelectedRowModel()
     .rows.filter((r) => !existingMemberIds.has(r.original.id)).length;
 
   async function handleAdd() {
     if (!group || selectedCount === 0) return;
     setIsAdding(true);
     const idsToAdd = table
-      .getFilteredSelectedRowModel()
+      .getSelectedRowModel()
       .rows.filter((r) => !existingMemberIds.has(r.original.id))
       .map((r) => r.original.id);
     try {
@@ -977,10 +1014,13 @@ function AddContactsDialog({
         <IconSearch className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
         <Input
           placeholder="Search contacts…"
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
+          value={searchValue}
+          onChange={(e) => handleSearch(e.target.value)}
           className="h-9 pl-8"
         />
+        {isSearching && (
+          <IconLoader2 className="text-muted-foreground absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin" />
+        )}
       </div>
     </div>
   );
