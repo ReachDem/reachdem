@@ -698,7 +698,11 @@ function useDataTableHandlers(router: ReturnType<typeof useRouter>) {
 
       setIsLaunching(true);
       try {
-        await launchCampaign(campaign.id);
+        const result = await launchCampaign(campaign.id);
+        if (!result.success) {
+          toast.error(result.error || "Failed to launch campaign");
+          return;
+        }
         toast.success("Campaign launched successfully");
         router.refresh();
       } catch (error: any) {

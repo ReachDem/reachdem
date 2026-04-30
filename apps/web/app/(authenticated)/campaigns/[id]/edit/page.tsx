@@ -612,7 +612,9 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
       if (!launchResponse.ok) {
         const errorData = await launchResponse.json();
-        throw new Error(errorData.error || "Failed to launch campaign");
+        throw new Error(
+          errorData.details || errorData.error || "Failed to launch campaign"
+        );
       }
 
       toast.success("Campaign launched successfully");
