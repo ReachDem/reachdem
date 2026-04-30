@@ -227,7 +227,11 @@ export function CampaignsClientTable({
     if (!campaignToLaunch) return;
     setIsLaunching(true);
     try {
-      await launchCampaign(campaignToLaunch.id);
+      const result = await launchCampaign(campaignToLaunch.id);
+      if (!result.success) {
+        toast.error(result.error || "Failed to launch campaign");
+        return;
+      }
       toast.success("Campaign launched successfully");
       router.refresh();
       void refreshCampaignSignals(true);
