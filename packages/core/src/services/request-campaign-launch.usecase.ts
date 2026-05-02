@@ -169,11 +169,13 @@ export class RequestCampaignLaunchUseCase {
           ...(updateContent ? { content: updateContent } : {}),
         },
       });
+    });
 
-      await publishCampaignLaunchJob({
-        campaign_id: campaignId,
-        organization_id: organizationId,
-      });
+    // Publish the job AFTER the transaction commits to avoid coupling a
+    // non-rollbackable HTTP side-effect to the DB transaction.
+    await publishCampaignLaunchJob({
+      campaign_id: campaignId,
+      organization_id: organizationId,
     });
 
     await ActivityLogger.log({
@@ -299,6 +301,7 @@ export class RequestCampaignLaunchUseCase {
         const contacts = await prisma.contact.findMany({
           where: {
             organizationId,
+            deletedAt: null,
             memberships: {
               some: { groupId: audience.sourceId },
             },

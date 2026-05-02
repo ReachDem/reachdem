@@ -16,10 +16,16 @@ export async function handleCampaignLaunchBatch(
   env: Env
 ): Promise<void> {
   requireCampaignWorkerEnv(env);
+
+  const databaseUrl = env.DATABASE_URL ?? process.env.DATABASE_URL ?? "";
   console.log("[Campaign Launch Queue] Processing batch", {
     queue: batch.queue,
     size: batch.messages.length,
     environment: env.ENVIRONMENT,
+    hasDatabaseUrl: databaseUrl.length > 0,
+    databaseUrlProtocol: databaseUrl.includes("://")
+      ? databaseUrl.split("://")[0]
+      : "MISSING",
     smsQueue: getSmsQueueName(env.ENVIRONMENT),
     emailQueue: getEmailQueueName(env.ENVIRONMENT),
     whatsappQueue: getWhatsAppQueueName(env.ENVIRONMENT),

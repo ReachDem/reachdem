@@ -283,6 +283,7 @@ export class ProcessCampaignLaunchJobUseCase {
         const contacts = await prisma.contact.findMany({
           where: {
             organizationId,
+            deletedAt: null,
             memberships: {
               some: { groupId: audience.sourceId },
             },
