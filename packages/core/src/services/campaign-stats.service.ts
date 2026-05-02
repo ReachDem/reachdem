@@ -124,11 +124,20 @@ export class CampaignStatsService {
 
     stats.resolvedStatus = resolvedStatus;
 
-    await RedisCacheClient.set(
-      cacheKey,
-      stats as unknown as Record<string, unknown>,
-      CAMPAIGN_STATS_TTL_SECONDS
+    // Don't cache when the campaign is running but no targets have been created
+    // yet — the worker may not have processed the job. This avoids showing
+    // "Audience 0" for up to a full TTL after a campaign is launched.
+    const shouldCache = !(
+      resolvedStatus === "running" && stats.audienceSize === 0
     );
+
+    if (shouldCache) {
+      await RedisCacheClient.set(
+        cacheKey,
+        stats as unknown as Record<string, unknown>,
+        CAMPAIGN_STATS_TTL_SECONDS
+      );
+    }
 
     return stats;
   }

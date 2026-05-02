@@ -175,8 +175,12 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
             console.log("[Edit Campaign] Loaded audience:", audienceData);
 
             // Set selected segment or group
-            if (audienceData.data && audienceData.data.length > 0) {
-              const firstAudience = audienceData.data[0];
+            // The API returns a plain array (not {data: [...]})
+            const audienceItems = Array.isArray(audienceData)
+              ? audienceData
+              : (audienceData.data ?? []);
+            if (audienceItems.length > 0) {
+              const firstAudience = audienceItems[0];
               if (firstAudience.sourceType === "segment") {
                 setSelectedSegmentId(firstAudience.sourceId);
               } else if (firstAudience.sourceType === "group") {

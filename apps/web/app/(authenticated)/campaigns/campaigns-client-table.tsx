@@ -194,6 +194,24 @@ export function CampaignsClientTable({
     void refreshCampaignSignals();
   }, [currentPage, search]);
 
+  // Poll every 8 seconds while any visible campaign is in "running" state so
+  // the audience size and progress update automatically after the worker
+  // creates and processes its targets.
+  useEffect(() => {
+    const hasRunningCampaign = paginatedCampaigns.some(
+      (c) =>
+        (campaignStats[c.id]?.resolvedStatus ?? c.status) === "running" ||
+        c.status === "running"
+    );
+    if (!hasRunningCampaign) return;
+
+    const id = setInterval(() => {
+      void refreshCampaignSignals();
+    }, 8000);
+
+    return () => clearInterval(id);
+  }, [paginatedCampaigns, campaignStats]);
+
   const handleDelete = async () => {
     if (!campaignToDelete) return;
     setIsDeleting(true);
@@ -369,6 +387,15 @@ export function CampaignsClientTable({
     }
 
     if (stats.audienceSize === 0) {
+      // If still running, targets haven't been created by the worker yet
+      if (effectiveStatus === "running") {
+        return (
+          <span className="text-muted-foreground animate-pulse text-xs">
+            Processing…
+          </span>
+        );
+      }
+
       return (
         <div className="flex min-w-[180px] flex-col items-center gap-2 text-center">
           <div className="relative w-[90px]">
