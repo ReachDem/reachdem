@@ -173,6 +173,36 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
     router,
   ]);
 
+  const createCheckoutSession = async (plan: {
+    code: string;
+    currency: string;
+  }) => {
+    setBusyKey(plan.code);
+    try {
+      const res = await fetch("/api/v1/payments/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "subscription",
+          planCode: plan.code,
+          currency: plan.currency,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to initiate checkout");
+      }
+      const data = (await res.json()) as { checkoutUrl?: string | null };
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch {
+      toast.error("Unable to start checkout. Please try again.");
+      setBusyKey(null);
+    }
+  };
+
   if (!billing) {
     return (
       <SettingsCard>
@@ -196,46 +226,6 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
   const customPlan = billing.availablePlans.find(
     (plan) => plan.contactSales || plan.priceMinor == null
   );
-
-  const createCheckoutSession = async (payload: {
-    kind: "subscription" | "creditPurchase";
-    currency: string;
-    planCode?: string;
-    creditsQuantity?: number;
-    busyKey: string;
-  }) => {
-    try {
-      setBusyKey(payload.busyKey);
-
-      const response = await fetch("/api/v1/payments/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          kind: payload.kind,
-          currency: payload.currency,
-          planCode: payload.planCode,
-          creditsQuantity: payload.creditsQuantity,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error ?? "Unable to create payment session");
-      }
-
-      if (!result.checkoutUrl) {
-        throw new Error("Provider checkout URL is missing");
-      }
-
-      window.location.assign(result.checkoutUrl);
-    } catch (error: any) {
-      toast.error(error.message ?? "Unable to start checkout.");
-      setBusyKey(null);
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -289,7 +279,6 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {standardPlans.map((plan) => {
               const isCurrentPlan = billing.planCode === plan.code;
-              const isBusy = busyKey === `plan:${plan.code}`;
 
               return (
                 <div
@@ -338,23 +327,27 @@ export function BillingWorkspacePanel({ billing }: BillingWorkspacePanelProps) {
                     <Button
                       className="w-full bg-[#f58220] text-white hover:bg-[#d6701a]"
                       disabled={
-                        isCurrentPlan || Boolean(busyKey) || isNavigating
+                        isCurrentPlan || isNavigating || busyKey === plan.code
                       }
-                      onClick={() =>
-                        void createCheckoutSession({
-                          kind: "subscription",
-                          currency: plan.currency,
-                          planCode: plan.code,
-                          busyKey: `plan:${plan.code}`,
-                        })
-                      }
+                      onClick={() => {
+                        if (!isCurrentPlan && plan.priceMinor != null) {
+                          void createCheckoutSession({
+                            code: plan.code,
+                            currency: plan.currency,
+                          });
+                        }
+                      }}
                     >
-                      {isBusy ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      {isCurrentPlan
-                        ? "Current plan"
-                        : `Upgrade to ${plan.name}`}
+                      {busyKey === plan.code ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Redirecting…
+                        </>
+                      ) : isCurrentPlan ? (
+                        "Current plan"
+                      ) : (
+                        `Upgrade to ${plan.name}`
+                      )}
                     </Button>
                   </div>
                 </div>

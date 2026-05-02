@@ -7,6 +7,7 @@ import type {
 } from "@reachdem/shared";
 import { getFlutterwaveChargeFailureInsight } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
+import { BillingCatalogService } from "./billing-catalog.service";
 import { CreditTopUpService } from "./credit-top-up.service";
 import { PaymentAdapterRegistryService } from "./payment-adapter-registry.service";
 import { PaymentOrchestratorService } from "./payment-orchestrator.service";
@@ -310,10 +311,16 @@ export class DirectChargePaymentService {
     input: CreateDirectChargeDto,
     appBaseUrl: string
   ): Promise<DirectChargeResponse> {
-    const quote = CreditTopUpService.quoteFromEnteredAmount(
-      input.amountMinor,
-      input.currency
-    );
+    const isSubscription = input.kind === "subscription";
+    const resolvedAmountMinor = isSubscription
+      ? BillingCatalogService.getPlanAmountMinor(input.planCode)
+      : (input.amountMinor ?? 0);
+    const quote = isSubscription
+      ? null
+      : CreditTopUpService.quoteFromEnteredAmount(
+          input.amountMinor ?? 0,
+          input.currency
+        );
 
     let directChargeSession: {
       paymentSessionId: string;
@@ -329,16 +336,19 @@ export class DirectChargePaymentService {
         await PaymentOrchestratorService.createDirectChargeSession({
           organizationId,
           initiatedByUserId,
-          kind: "creditPurchase",
+          kind: input.kind,
+          planCode: isSubscription ? (input.planCode ?? null) : null,
           currency: input.currency,
-          amountMinor: input.amountMinor,
+          amountMinor: resolvedAmountMinor,
           metadata: {
             ...(input.metadata ?? {}),
             paymentMethodType: input.paymentMethodType,
             savePaymentMethodRequested: Boolean(input.card?.saveCard),
-            topUpQuote: quote,
+            ...(quote ? { topUpQuote: quote } : {}),
           },
-          description: `ReachDem balance top up (${input.amountMinor.toLocaleString()} ${input.currency})`,
+          description: isSubscription
+            ? `ReachDem ${input.planCode} subscription`
+            : `ReachDem balance top up (${(input.amountMinor ?? 0).toLocaleString()} ${input.currency})`,
         });
 
       const provider =
@@ -414,7 +424,7 @@ export class DirectChargePaymentService {
         actorId: initiatedByUserId,
         paymentSessionId: directChargeSession.paymentSessionId,
         paymentMethodType: input.paymentMethodType,
-        amountMinor: input.amountMinor,
+        amountMinor: resolvedAmountMinor,
         currency: input.currency,
         phase: "initiate",
         chargeData: responseChargeData,
@@ -449,7 +459,7 @@ export class DirectChargePaymentService {
           actorId: initiatedByUserId,
           paymentSessionId: directChargeSession.paymentSessionId,
           paymentMethodType: input.paymentMethodType,
-          amountMinor: input.amountMinor,
+          amountMinor: resolvedAmountMinor,
           currency: input.currency,
           phase: "error",
           fallbackMessage:

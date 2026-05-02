@@ -117,8 +117,7 @@ export const paymentCardSchema = z.object({
 
 export const createDirectChargeSchema = paymentSessionBaseSchema
   .extend({
-    kind: z.literal("creditPurchase"),
-    amountMinor: z.number().int().positive(),
+    amountMinor: z.number().int().positive().optional(),
     paymentMethodType: paymentMethodTypeSchema,
     customerName: paymentCustomerNameSchema,
     email: z.string().trim().email(),
@@ -129,20 +128,39 @@ export const createDirectChargeSchema = paymentSessionBaseSchema
     card: paymentCardSchema.optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.planCode) {
+    if (value.kind === "creditPurchase" && !value.amountMinor) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "planCode is not supported for direct credit top ups",
-        path: ["planCode"],
+        message: "amountMinor is required for credit purchases",
+        path: ["amountMinor"],
       });
     }
 
-    if (value.creditsQuantity) {
+    if (value.kind === "creditPurchase" && value.creditsQuantity) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
           "creditsQuantity is derived from the entered amount for direct top ups",
         path: ["creditsQuantity"],
+      });
+    }
+
+    if (value.kind === "subscription" && !value.planCode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "planCode is required for subscription payments",
+        path: ["planCode"],
+      });
+    }
+
+    if (
+      value.kind === "subscription" &&
+      (value.planCode === "free" || value.planCode === "custom")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "This plan cannot be purchased through checkout",
+        path: ["planCode"],
       });
     }
 

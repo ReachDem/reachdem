@@ -126,7 +126,11 @@ export class FlutterwaveHostedPaymentAdapter implements PaymentProviderPort {
             title: "ReachDem Payment",
             description: input.description,
           },
-          ...(paymentOptions ? { payment_options: paymentOptions } : {}),
+          ...(input.paymentPlanId
+            ? { payment_plan: input.paymentPlanId, payment_options: "card" }
+            : paymentOptions
+              ? { payment_options: paymentOptions }
+              : {}),
           configurations: {
             session_duration: Number(
               process.env.PAYMENT_SESSION_DURATION_MINUTES ?? "30"
