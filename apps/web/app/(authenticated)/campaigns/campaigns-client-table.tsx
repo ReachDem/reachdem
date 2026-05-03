@@ -65,6 +65,7 @@ interface CampaignsClientTableProps {
 
 interface CampaignStatsSnapshot {
   audienceSize: number;
+  estimatedAudienceSize?: number;
   pendingCount: number;
   sentCount: number;
   failedCount: number;
