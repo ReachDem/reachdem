@@ -13,12 +13,22 @@ function getWorkerBaseUrl(): string {
   return (
     process.env.CAMPAIGN_WORKER_BASE_URL ??
     process.env.CLOUDFLARE_WORKER_BASE_URL ??
-    DEFAULT_WORKER_BASE_URL
+    (process.env.NODE_ENV === "production" ? "" : DEFAULT_WORKER_BASE_URL)
   );
 }
 
 export async function getWorkerRuntimeStatus(): Promise<WorkerRuntimeStatus> {
   const baseUrl = getWorkerBaseUrl();
+
+  if (!baseUrl) {
+    return {
+      reachable: false,
+      healthy: false,
+      error: "CAMPAIGN_WORKER_BASE_URL is not configured",
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
   console.log("[Worker Status] Checking worker runtime", { baseUrl });
 
   try {

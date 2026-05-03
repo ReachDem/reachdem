@@ -1,12 +1,9 @@
 import type { CampaignLaunchJob } from "@reachdem/shared";
 
-const DEFAULT_WORKER_BASE_URL = "http://127.0.0.1:8787";
-
 function requireWorkerBaseUrl(): string {
   const baseUrl =
     process.env.CAMPAIGN_WORKER_BASE_URL ??
-    process.env.CLOUDFLARE_WORKER_BASE_URL ??
-    DEFAULT_WORKER_BASE_URL;
+    process.env.CLOUDFLARE_WORKER_BASE_URL;
 
   if (!baseUrl) {
     throw new Error(
