@@ -389,10 +389,18 @@ export function CampaignsClientTable({
     if (stats.audienceSize === 0) {
       // If still running, targets haven't been created by the worker yet
       if (effectiveStatus === "running") {
+        const estimated = stats.estimatedAudienceSize ?? 0;
         return (
-          <span className="text-muted-foreground animate-pulse text-xs">
-            Processing…
-          </span>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="text-muted-foreground animate-pulse text-xs">
+              Processing…
+            </span>
+            {estimated > 0 && (
+              <span className="text-muted-foreground text-[10px]">
+                ~{estimated} destinataires
+              </span>
+            )}
+          </div>
         );
       }
 

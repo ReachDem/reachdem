@@ -158,6 +158,8 @@ export interface CampaignAudienceResponse {
 export interface CampaignStatsResponse {
   campaignId: string;
   audienceSize: number;
+  /** Estimated audience size based on group member counts, used when targets haven't been created yet */
+  estimatedAudienceSize?: number;
   pendingCount: number;
   sentCount: number;
   failedCount: number;

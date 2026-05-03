@@ -105,6 +105,24 @@ export class CampaignStatsService {
         campaign.status as CampaignStatsResponse["resolvedStatus"],
     };
 
+    // When targets haven't been created yet (worker still processing),
+    // compute an estimate from the group member counts so the UI can
+    // display something meaningful instead of "Processing…".
+    if (stats.audienceSize === 0 && campaign.status === "running") {
+      const audiences = await prisma.campaignAudience.findMany({
+        where: { campaignId, organizationId, sourceType: "group" },
+        select: { sourceId: true },
+      });
+      if (audiences.length > 0) {
+        const groupIds = audiences.map((a) => a.sourceId);
+        const result = await prisma.groupMember.aggregate({
+          where: { groupId: { in: groupIds }, contact: { deletedAt: null } },
+          _count: { _all: true },
+        });
+        stats.estimatedAudienceSize = result._count._all;
+      }
+    }
+
     const resolvedStatus = this.deriveResolvedStatus({
       currentStatus: campaign.status as CampaignStatsResponse["resolvedStatus"],
       updatedAt: campaign.updatedAt,
