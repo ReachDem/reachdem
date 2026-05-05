@@ -16,6 +16,7 @@ export interface EmailSendResult {
 
 interface ProcessEmailJobOptions {
   republish: (job: EmailExecutionJob) => Promise<void>;
+  maxDeliveryCycles?: number;
   sendEmail: (input: {
     to: string;
     subject: string;
@@ -159,7 +160,9 @@ export class ProcessEmailMessageJobUseCase {
       return "sent";
     }
 
-    if (job.delivery_cycle < 3) {
+    const maxDeliveryCycles = options.maxDeliveryCycles ?? 3;
+
+    if (job.delivery_cycle < maxDeliveryCycles) {
       await prisma.message.update({
         where: { id: message.id },
         data: {

@@ -979,3 +979,62 @@ model PlatformSetting {
 
   @@map("platform_setting")
 }
+
+// ─── Admin Broadcast ─────────────────────────────────────────────────────────
+
+enum BroadcastChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+}
+
+model AdminBroadcast {
+  id        String            @id @default(uuid())
+  subject   String?
+  body      String            // HTML for email, plain text for SMS/WhatsApp
+  bodyJson  Json?             // Editor JSON state (for email re-editing)
+  channel   BroadcastChannel
+  status    BroadcastStatus   @default(DRAFT)
+  sentAt    DateTime?
+  sentBy    String            // admin email
+  metadata  Json?             // extra per-channel data (fromName, fromEmail, etc.)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  recipients AdminBroadcastRecipient[]
+
+  @@index([channel, createdAt])
+  @@index([status, createdAt])
+  @@map("admin_broadcast")
+}
+
+model AdminBroadcastRecipient {
+  id          String   @id @default(uuid())
+  broadcastId String
+  userId      String?
+  email       String?
+  phone       String?
+  status      String   @default("pending") // pending | sent | delivered | bounced | failed | opened | clicked
+  messageId   String?  // provider message ID (Resend ID, SMS provider ID)
+  errorMessage String?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  broadcast AdminBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@index([broadcastId, status])
+  @@index([broadcastId, email])
+  @@index([messageId])
+  @@map("admin_broadcast_recipient")
+}

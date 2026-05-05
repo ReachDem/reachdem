@@ -4,9 +4,11 @@ import { ActivityLogger } from "./activity-logger.service";
 import { EvolutionWhatsAppAdapter } from "../adapters/whatsapp/evolution-whatsapp.adapter";
 import { OrganizationWhatsAppSessionService } from "./organization-whatsapp-session.service";
 import { personalizeTemplate } from "../utils/message-personalization";
+import { CampaignStatsService } from "./campaign-stats.service";
 
 interface ProcessJobOptions {
   republish: (job: WhatsAppExecutionJob) => Promise<void>;
+  maxDeliveryCycles?: number;
 }
 
 export class ProcessWhatsAppMessageJobUseCase {
@@ -144,11 +146,15 @@ export class ProcessWhatsAppMessageJobUseCase {
         });
 
         await this.markCampaignTarget(message.id, "sent");
+        await this.finalizeCampaignIfReady(message.campaignId);
+        await CampaignStatsService.invalidate(message.campaignId);
 
         return "sent";
       }
 
-      if (job.delivery_cycle < 3 && result.retryable) {
+      const maxDeliveryCycles = options.maxDeliveryCycles ?? 3;
+
+      if (job.delivery_cycle < maxDeliveryCycles && result.retryable) {
         await prisma.$transaction([
           prisma.messageAttempt.create({
             data: {
@@ -219,6 +225,8 @@ export class ProcessWhatsAppMessageJobUseCase {
       });
 
       await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       return "failed";
     } catch (error) {
@@ -249,6 +257,39 @@ export class ProcessWhatsAppMessageJobUseCase {
     await prisma.campaignTarget.updateMany({
       where: { messageId },
       data: { status },
+    });
+  }
+
+  private static async finalizeCampaignIfReady(
+    campaignId: string | null
+  ): Promise<void> {
+    if (!campaignId) return;
+
+    const groupedStatuses = await prisma.campaignTarget.groupBy({
+      by: ["status"],
+      where: { campaignId },
+      _count: { _all: true },
+    });
+
+    const counts = new Map(
+      groupedStatuses.map((item) => [item.status, item._count._all])
+    );
+    const pendingCount = counts.get("pending") ?? 0;
+    if (pendingCount > 0) return;
+
+    const sentCount = counts.get("sent") ?? 0;
+    const unsuccessfulCount =
+      (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);
+    const finalStatus =
+      unsuccessfulCount === 0
+        ? "completed"
+        : sentCount === 0
+          ? "failed"
+          : "partial";
+
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: finalStatus },
     });
   }
 }

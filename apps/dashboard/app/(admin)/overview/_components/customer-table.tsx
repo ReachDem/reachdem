@@ -11,13 +11,19 @@ import {
   IconLoader2,
   IconBadge,
   IconBuildingSkyscraper,
+  IconSend,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { CustomerRow } from "@/lib/db";
-import { approveOrg, rejectOrg, getDocumentUrl } from "../_actions/verify-org";
+import {
+  approveOrg,
+  rejectOrg,
+  getDocumentUrl,
+  sendVerificationNudge,
+} from "../_actions/verify-org";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -187,7 +193,81 @@ function DocumentLink({
   );
 }
 
-// ─── Verification Drawer ──────────────────────────────────────────────────────
+function VerificationNudge({
+  orgId,
+  orgName,
+}: {
+  orgId: string;
+  orgName: string;
+}) {
+  const defaultMessage = `Bonjour,\n\nNous avons bien recu votre Sender ID pour ${orgName}. Cependant, pour que celui-ci soit active, vous devez d'abord verifier votre organisation en soumettant vos documents (piece d'identite et document commercial).\n\nRendez-vous dans Parametres > Verification pour completer cette etape.`;
+  const [message, setMessage] = React.useState(defaultMessage);
+  const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleSend() {
+    setSending(true);
+    setSent(null);
+    const result = await sendVerificationNudge(orgId, message);
+    setSending(false);
+    if (result.success) {
+      setSent({ type: "success", text: "Message envoye" });
+    } else {
+      setSent({ type: "error", text: result.error ?? "Erreur" });
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
+        <span className="text-[10px] font-semibold tracking-widest text-amber-600 uppercase dark:text-amber-400">
+          Rappel verification
+        </span>
+        <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Cette organisation a configure un Sender ID mais n'a pas soumis ses
+        documents de verification.
+      </p>
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        rows={5}
+        className="border-input bg-background text-foreground focus:ring-ring w-full resize-none rounded-md border px-3 py-2 text-xs focus:ring-1 focus:outline-none"
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleSend}
+          disabled={sending || !message.trim()}
+          className="gap-1.5"
+        >
+          {sending ? (
+            <IconLoader2 size={14} className="animate-spin" />
+          ) : (
+            <IconSend size={14} />
+          )}
+          Envoyer le rappel
+        </Button>
+        {sent && (
+          <span
+            className={cn(
+              "text-xs font-medium",
+              sent.type === "success" ? "text-emerald-600" : "text-rose-600"
+            )}
+          >
+            {sent.text}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function VerificationDrawer({
   org,
@@ -376,6 +456,15 @@ function VerificationDrawer({
                 </p>
               </div>
             </section>
+
+            {/* Nudge: sender ID set but org not verified */}
+            {org.senderId &&
+              org.workspaceVerificationStatus === "not_submitted" && (
+                <VerificationNudge
+                  orgId={org.id}
+                  orgName={org.companyName ?? org.name}
+                />
+              )}
 
             {/* Feedback */}
             {feedback && (

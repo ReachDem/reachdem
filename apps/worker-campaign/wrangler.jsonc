@@ -1,0 +1,93 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reachdem-worker-campaign",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "find_additional_modules": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true }
+  },
+  "vars": { "WORKER_ENV": "development" },
+  "queues": {
+    "producers": [
+      {
+        "binding": "CAMPAIGN_LAUNCH_QUEUE",
+        "queue": "reachdem-campaign-launch-queue"
+      },
+      { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
+      { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" },
+      { "binding": "WHATSAPP_QUEUE", "queue": "reachdem-whatsapp-queue" }
+    ],
+    "consumers": [
+      {
+        "queue": "reachdem-campaign-launch-queue",
+        "max_batch_size": 5,
+        "max_batch_timeout": 2,
+        "max_concurrency": 2,
+        "max_retries": 5
+      }
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "reachdem-worker-campaign-staging",
+      "vars": { "WORKER_ENV": "staging" },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-staging"
+          },
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-staging" },
+          { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue-staging" },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-campaign-launch-queue-staging",
+            "max_batch_size": 5,
+            "max_batch_timeout": 2,
+            "max_concurrency": 2,
+            "max_retries": 5
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "reachdem-worker-campaign",
+      "vars": { "WORKER_ENV": "production" },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-v2-production"
+          },
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-v2-production" },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-v2-production"
+          },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-v2-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-campaign-launch-queue-v2-production",
+            "max_batch_size": 5,
+            "max_batch_timeout": 2,
+            "max_concurrency": 2,
+            "max_retries": 5
+          }
+        ]
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { personalizeTemplate } from "../utils/message-personalization";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
+  maxDeliveryCycles?: number;
 }
 
 export class ProcessSmsMessageJobUseCase {
@@ -145,7 +146,9 @@ export class ProcessSmsMessageJobUseCase {
       return "sent";
     }
 
-    if (job.delivery_cycle < 3) {
+    const maxDeliveryCycles = options.maxDeliveryCycles ?? 3;
+
+    if (job.delivery_cycle < maxDeliveryCycles) {
       console.warn("[SMS Delivery] Requeue after failed provider attempts", {
         messageId: message.id,
         organizationId: job.organization_id,

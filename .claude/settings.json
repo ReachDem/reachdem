@@ -1,4 +1,31 @@
 {
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:resend.com)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm db:push)",
+      "Bash(pnpm prisma *)",
+      "Bash(pnpm exec *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('exports:', list\\(d.get\\('exports',{}\\).keys\\(\\)\\)[:10]\\); print\\('main:', d.get\\('main','?'\\)\\); print\\('types:', d.get\\('types','?'\\)\\)\")",
+      "Bash(node -e \"const d=require\\('/c/Users/Belrick/Desktop/reachdem/apps/dashboard/node_modules/@react-email/editor/package.json'\\); console.log\\('exports:', Object.keys\\(d.exports||{}\\).slice\\(0,10\\)\\); console.log\\('main:', d.main\\); console.log\\('version:', d.version\\);\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); const exp=d.exports||{}; Object.entries\\(exp\\).slice\\(0,15\\).forEach\\(\\([k,v]\\)=>console.log\\(k,'->', typeof v==='string'?v:JSON.stringify\\(v\\).slice\\(0,80\\)\\)\\)\")",
+      "Bash(pnpm run *)",
+      "Bash(pnpm remove *)",
+      "WebFetch(domain:www.youtube.com)",
+      "Bash(node -e \"const m=require\\('./node_modules/.pnpm/@tabler+icons-react@3.35.0_react@19.0.0/node_modules/@tabler/icons-react/dist/cjs/tabler-icons-react.js'\\); const names=['IconSpacing','IconPhotoText','IconSticker','IconDiscount','IconClock','IconChartBar','IconLayoutRows','IconColumns2','IconColumns3','IconLayoutBoard','IconContainer','IconClick','IconSearch']; names.forEach\\(n=>console.log\\(n, n in m ? 'OK' : 'MISSING'\\)\\)\")",
+      "Read(//c/c/Users/Belrick/Desktop/reachdem/apps/dashboard/**)",
+      "Bash(pnpm build *)",
+      "Read(//c/c/Users/Belrick/Desktop/reachdem/node_modules/**)",
+      "Bash(pnpm ls *)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const icons = require\\('@tabler/icons-react'\\); const matches = Object.keys\\(icons\\).filter\\(k => k.startsWith\\('IconDiscount'\\)\\); console.log\\(matches\\);\")",
+      "Bash(xargs sed *)"
+    ],
+    "additionalDirectories": [
+      "\\root\\.gstack\\projects\\ReachDem-reachdem\\ceo-plans"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
