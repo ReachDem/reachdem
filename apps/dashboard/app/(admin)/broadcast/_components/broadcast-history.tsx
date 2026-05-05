@@ -108,7 +108,7 @@ export function BroadcastHistory({ broadcasts }: Props) {
                     <StatCard label="Recipients" value={b._count.recipients} />
                     <StatCard
                       label="From"
-                      value={meta?.fromEmail ?? "—"}
+                      value={meta?.fromEmail ?? meta?.fromName ?? "—"}
                       small
                     />
                   </div>
