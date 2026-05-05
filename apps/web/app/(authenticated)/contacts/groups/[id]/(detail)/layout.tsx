@@ -13,12 +13,8 @@ export default async function GroupDetailLayout({
 }) {
   const { id } = await params;
 
-  let group;
-  try {
-    group = await getGroupById(id);
-  } catch {
-    notFound();
-  }
+  const group = await getGroupById(id);
+  if (!group) notFound();
 
   return (
     <>

@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
   ],
   serverExternalPackages: [
     "@prisma/client",
-    "better-auth",
+    "better-auth/adapters/prisma",
     "@better-auth/core",
   ],
   // Turbopack alias (used by `next dev` in Next.js 16)

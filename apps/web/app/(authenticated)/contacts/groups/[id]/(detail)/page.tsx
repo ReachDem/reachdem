@@ -14,12 +14,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  try {
-    const group = await getGroupById(id);
-    return { title: `${group.name} – Groups – ReachDem` };
-  } catch {
-    return { title: "Group – ReachDem" };
-  }
+  const group = await getGroupById(id);
+  if (!group) return { title: "Group – ReachDem" };
+  return { title: `${group.name} – Groups – ReachDem` };
 }
 
 export default async function GroupDetailPage({
