@@ -7,6 +7,31 @@ import { createSmtpTransport, getSmtpSenderEmail } from "@/lib/smtp";
 // JSONContent from @tiptap/core — inline type to avoid direct dependency
 type JSONContent = Record<string, unknown>;
 
+const EMAIL_SEND_CONCURRENCY = 5;
+const DEFAULT_MAX_SYNC_EMAIL_RECIPIENTS = 100;
+
+function getMaxSyncEmailRecipients() {
+  const configured = Number(process.env.ADMIN_EMAIL_BROADCAST_SYNC_LIMIT);
+  return Number.isInteger(configured) && configured > 0
+    ? configured
+    : DEFAULT_MAX_SYNC_EMAIL_RECIPIENTS;
+}
+
+async function mapWithConcurrency<T, TResult>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<TResult>
+): Promise<TResult[]> {
+  const results: TResult[] = [];
+
+  for (let index = 0; index < items.length; index += concurrency) {
+    const chunk = items.slice(index, index + concurrency);
+    results.push(...(await Promise.all(chunk.map(mapper))));
+  }
+
+  return results;
+}
+
 export async function sendEmailBroadcast(formData: {
   subject: string;
   bodyHtml: string;
@@ -14,75 +39,134 @@ export async function sendEmailBroadcast(formData: {
   fromName: string;
   sentBy: string;
 }) {
+  const maxRecipients = getMaxSyncEmailRecipients();
   const users = await db.user.findMany({
-    select: { id: true, email: true, name: true },
+    select: { id: true, email: true },
     where: { emailVerified: true },
+    orderBy: { createdAt: "asc" },
+    take: maxRecipients + 1,
   });
 
   if (users.length === 0) {
     return { error: "No verified users found" };
   }
 
-  const broadcast = await db.adminBroadcast.create({
-    data: {
-      subject: formData.subject,
-      body: formData.bodyHtml,
-      bodyJson: formData.bodyJson as object,
-      channel: "EMAIL",
-      status: "SENDING",
-      sentBy: formData.sentBy,
-      metadata: { fromName: formData.fromName },
-      recipients: {
-        create: users.map((u) => ({
-          userId: u.id,
-          email: u.email,
-          status: "pending",
-        })),
-      },
-    },
-    include: { recipients: true },
-  });
-
-  const senderEmail = getSmtpSenderEmail();
-  const transporter = createSmtpTransport();
-  const errors: string[] = [];
-
-  for (const recipient of broadcast.recipients) {
-    if (!recipient.email) continue;
-    try {
-      const info = await transporter.sendMail({
-        from: `"${formData.fromName}" <${senderEmail}>`,
-        to: recipient.email,
-        subject: formData.subject,
-        html: formData.bodyHtml,
-        headers: {
-          "X-Broadcast-Id": broadcast.id,
-          "X-Recipient-Id": recipient.id,
-        },
-      });
-
-      await db.adminBroadcastRecipient.update({
-        where: { id: recipient.id },
-        data: { status: "sent", messageId: info.messageId ?? null },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      errors.push(`${recipient.email}: ${msg}`);
-      await db.adminBroadcastRecipient.update({
-        where: { id: recipient.id },
-        data: { status: "failed", errorMessage: msg },
-      });
-    }
+  if (users.length > maxRecipients) {
+    return {
+      error: `Email broadcast has ${users.length}+ verified recipients. The admin SMTP action is capped at ${maxRecipients} recipients to avoid request timeouts; use the campaign worker flow for larger sends.`,
+    };
   }
 
-  const close = (transporter as { close?: () => void | Promise<void> }).close;
-  if (typeof close === "function") await close.call(transporter);
+  const broadcast = await db.$transaction(async (tx) => {
+    const created = await tx.adminBroadcast.create({
+      data: {
+        subject: formData.subject,
+        body: formData.bodyHtml,
+        bodyJson: formData.bodyJson as object,
+        channel: "EMAIL",
+        status: "SENDING",
+        sentBy: formData.sentBy,
+        metadata: {
+          fromName: formData.fromName,
+          recipientCount: users.length,
+        },
+      },
+    });
+
+    await tx.adminBroadcastRecipient.createMany({
+      data: users.map((user) => ({
+        broadcastId: created.id,
+        userId: user.id,
+        email: user.email,
+        status: "pending",
+      })),
+    });
+
+    return created;
+  });
+
+  const recipients = await db.adminBroadcastRecipient.findMany({
+    where: { broadcastId: broadcast.id, email: { not: null } },
+    select: { id: true, email: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const senderEmail = getSmtpSenderEmail();
+  const transporter = createSmtpTransport();
+
+  const results = await mapWithConcurrency(
+    recipients,
+    EMAIL_SEND_CONCURRENCY,
+    async (recipient) => {
+      try {
+        const info = await transporter.sendMail({
+          from: `"${formData.fromName}" <${senderEmail}>`,
+          to: recipient.email!,
+          subject: formData.subject,
+          html: formData.bodyHtml,
+          headers: {
+            "X-Broadcast-Id": broadcast.id,
+            "X-Recipient-Id": recipient.id,
+          },
+        });
+
+        return {
+          recipientId: recipient.id,
+          email: recipient.email!,
+          ok: true as const,
+          messageId: info.messageId ?? null,
+        };
+      } catch (err) {
+        return {
+          recipientId: recipient.id,
+          email: recipient.email!,
+          ok: false as const,
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    }
+  );
+
+  try {
+    const close = (transporter as { close?: () => void | Promise<void> }).close;
+    if (typeof close === "function") await close.call(transporter);
+  } catch {
+    // Nothing useful to recover here; delivery results above are authoritative.
+  }
+
+  const sent = results.filter((result) => result.ok);
+  const failed = results.filter((result) => !result.ok);
+  const errors = failed.map((result) => `${result.email}: ${result.error}`);
+
+  if (sent.length > 0) {
+    await db.adminBroadcastRecipient.updateMany({
+      where: { id: { in: sent.map((result) => result.recipientId) } },
+      data: { status: "sent" },
+    });
+  }
+
+  if (failed.length > 0) {
+    await db.adminBroadcastRecipient.updateMany({
+      where: { id: { in: failed.map((result) => result.recipientId) } },
+      data: {
+        status: "failed",
+        errorMessage: "SMTP delivery failed; see broadcast metadata.",
+      },
+    });
+  }
 
   await db.adminBroadcast.update({
     where: { id: broadcast.id },
     data: {
-      status: errors.length === broadcast.recipients.length ? "FAILED" : "SENT",
+      status: sent.length === 0 ? "FAILED" : "SENT",
       sentAt: new Date(),
+      metadata: {
+        fromName: formData.fromName,
+        fromEmail: senderEmail,
+        recipientCount: recipients.length,
+        sentCount: sent.length,
+        failedCount: failed.length,
+        errors: errors.slice(0, 50),
+      },
     },
   });
 
@@ -90,7 +174,7 @@ export async function sendEmailBroadcast(formData: {
   return {
     success: true,
     broadcastId: broadcast.id,
-    sent: broadcast.recipients.length - errors.length,
+    sent: sent.length,
     errors,
   };
 }
@@ -100,30 +184,11 @@ export async function sendSmsBroadcast(formData: {
   channel: "SMS" | "WHATSAPP";
   sentBy: string;
 }) {
-  const users = await db.user.findMany({
-    select: { id: true, email: true },
-    where: { emailVerified: true },
-  });
-
-  const broadcast = await db.adminBroadcast.create({
-    data: {
-      body: formData.body,
-      channel: formData.channel === "SMS" ? "SMS" : "WHATSAPP",
-      status: "SENT",
-      sentBy: formData.sentBy,
-      sentAt: new Date(),
-      recipients: {
-        create: users.map((u) => ({
-          userId: u.id,
-          email: u.email,
-          status: "sent",
-        })),
-      },
-    },
-  });
-
-  revalidatePath("/broadcast");
-  return { success: true, broadcastId: broadcast.id };
+  void formData;
+  return {
+    error:
+      "SMS and WhatsApp admin broadcasts are not connected to a provider yet. Use the campaign worker flow, or wire this action to the SMS/WhatsApp workers before enabling it.",
+  };
 }
 
 export async function getBroadcasts() {

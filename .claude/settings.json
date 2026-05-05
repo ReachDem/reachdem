@@ -20,7 +20,22 @@
       "Bash(python3 -c ' *)",
       "Bash(node -e ' *)",
       "Bash(node -e \"const icons = require\\('@tabler/icons-react'\\); const matches = Object.keys\\(icons\\).filter\\(k => k.startsWith\\('IconDiscount'\\)\\); console.log\\(matches\\);\")",
-      "Bash(xargs sed *)"
+      "Bash(xargs sed *)",
+      "Bash(npx playwright *)",
+      "Read(//c/Users/Belrick/AppData/Local/Temp/claude/c--Users-Belrick-Desktop-reachdem/03902444-14c2-42db-a99b-a72d28b479ab/tasks/**)",
+      "Bash(export PATH=\"$HOME/.bun/bin:$PATH\")",
+      "Read(//c/Users/Belrick/.claude/skills/gstack/**)",
+      "Bash(./setup)",
+      "Bash(bun --version)",
+      "Bash(bun install *)",
+      "Bash(bun run *)",
+      "Read(//c/Users/Belrick/AppData/Local/ms-playwright//**)",
+      "Read(//c/Users/Belrick/AppData/Local/ms-playwright/**)",
+      "Bash(cp -r chromium_headless_shell-1217 chromium_headless_shell-1208)",
+      "Read(//c/Users/Belrick/AppData/Local/Temp/**)",
+      "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-a.png\")",
+      "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-b.png\")",
+      "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-c.png\")"
     ],
     "additionalDirectories": [
       "\\root\\.gstack\\projects\\ReachDem-reachdem\\ceo-plans"

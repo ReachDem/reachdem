@@ -5,6 +5,8 @@ import { EvolutionWhatsAppAdapter } from "../adapters/whatsapp/evolution-whatsap
 import { OrganizationWhatsAppSessionService } from "./organization-whatsapp-session.service";
 import { personalizeTemplate } from "../utils/message-personalization";
 import { CampaignStatsService } from "./campaign-stats.service";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
+import { MessageInsufficientCreditsError } from "../errors/messaging.errors";
 
 interface ProcessJobOptions {
   republish: (job: WhatsAppExecutionJob) => Promise<void>;
@@ -71,6 +73,11 @@ export class ProcessWhatsAppMessageJobUseCase {
       return "skipped";
     }
 
+    const allowed = await this.assertBillableSendAllowed(message);
+    if (!allowed) {
+      return "failed";
+    }
+
     try {
       const session = await OrganizationWhatsAppSessionService.ensureSession(
         job.organization_id
@@ -107,8 +114,14 @@ export class ProcessWhatsAppMessageJobUseCase {
       });
 
       if (result.success) {
-        await prisma.$transaction([
-          prisma.messageAttempt.create({
+        await prisma.$transaction(async (tx) => {
+          await MessagingEntitlementsService.captureMessageSend(
+            tx,
+            job.organization_id,
+            "whatsapp"
+          );
+
+          await tx.messageAttempt.create({
             data: {
               messageId: message.id,
               organizationId: job.organization_id,
@@ -120,16 +133,17 @@ export class ProcessWhatsAppMessageJobUseCase {
               errorMessage: null,
               durationMs: result.durationMs,
             },
-          }),
-          prisma.message.update({
+          });
+
+          await tx.message.update({
             where: { id: message.id },
             data: {
               status: "sent",
               providerSelected: adapter.providerName,
               providerMessageId: result.providerMessageId,
             },
-          }),
-        ]);
+          });
+        });
 
         await ActivityLogger.log({
           organizationId: job.organization_id,
@@ -260,10 +274,60 @@ export class ProcessWhatsAppMessageJobUseCase {
     });
   }
 
+  private static async assertBillableSendAllowed(message: {
+    id: string;
+    organizationId: string;
+    correlationId: string;
+    campaignId: string | null;
+  }): Promise<boolean> {
+    try {
+      await MessagingEntitlementsService.assertMessageSendAllowed(
+        prisma,
+        message.organizationId,
+        "whatsapp"
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof MessageInsufficientCreditsError)) {
+        throw error;
+      }
+
+      await prisma.message.update({
+        where: { id: message.id },
+        data: { status: "failed" },
+      });
+
+      await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
+
+      await ActivityLogger.log({
+        organizationId: message.organizationId,
+        correlationId: message.correlationId,
+        category: "whatsapp",
+        action: "send_failed",
+        resourceType: "message",
+        resourceId: message.id,
+        status: "failed",
+        meta: {
+          message: error.message,
+          reason: "insufficient_credits_before_send",
+        },
+      });
+
+      return false;
+    }
+  }
+
   private static async finalizeCampaignIfReady(
     campaignId: string | null
   ): Promise<void> {
     if (!campaignId) return;
+
+    const pendingCount = await prisma.campaignTarget.count({
+      where: { campaignId, status: "pending" },
+    });
+    if (pendingCount > 0) return;
 
     const groupedStatuses = await prisma.campaignTarget.groupBy({
       by: ["status"],
@@ -274,9 +338,6 @@ export class ProcessWhatsAppMessageJobUseCase {
     const counts = new Map(
       groupedStatuses.map((item) => [item.status, item._count._all])
     );
-    const pendingCount = counts.get("pending") ?? 0;
-    if (pendingCount > 0) return;
-
     const sentCount = counts.get("sent") ?? 0;
     const unsuccessfulCount =
       (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);

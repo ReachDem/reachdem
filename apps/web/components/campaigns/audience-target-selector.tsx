@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Users, Filter, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ContactPicker, type PickedContact } from "./contact-picker";
 import { cn } from "@/lib/utils";
 
 type TargetType = "segment" | "group" | null;
@@ -30,6 +30,8 @@ interface AudienceTargetSelectorProps {
   selectedGroupId?: string;
   onSegmentChange?: (segmentId: string) => void;
   onGroupChange?: (groupId: string) => void;
+  selectedContacts?: PickedContact[];
+  onContactsChange?: (contacts: PickedContact[]) => void;
   disabled?: boolean;
 }
 
@@ -40,100 +42,136 @@ export function AudienceTargetSelector({
   selectedGroupId,
   onSegmentChange,
   onGroupChange,
+  selectedContacts = [],
+  onContactsChange,
   disabled = false,
 }: AudienceTargetSelectorProps) {
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId);
   const selectedGroup = groups.find((g) => g.id === selectedGroupId);
+  const hasManualContacts = selectedContacts.length > 0;
+  const hasGroupOrSegment = !!selectedSegmentId || !!selectedGroupId;
 
   const handleSegmentSelect = (segmentId: string) => {
     onSegmentChange?.(segmentId);
-    // Clear group selection
     if (selectedGroupId) {
       onGroupChange?.("");
+    }
+    if (hasManualContacts) {
+      onContactsChange?.([]);
     }
   };
 
   const handleGroupSelect = (groupId: string) => {
     onGroupChange?.(groupId);
-    // Clear segment selection
     if (selectedSegmentId) {
       onSegmentChange?.("");
+    }
+    if (hasManualContacts) {
+      onContactsChange?.([]);
+    }
+  };
+
+  const handleContactsChange = (contacts: PickedContact[]) => {
+    onContactsChange?.(contacts);
+    if (contacts.length > 0) {
+      if (selectedSegmentId) onSegmentChange?.("");
+      if (selectedGroupId) onGroupChange?.("");
     }
   };
 
   return (
-    <div className="flex flex-col items-end space-y-3">
-      <div className="bg-background inline-flex rounded-lg border">
-        {/* Segments Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              disabled={disabled}
-              className={cn(
-                "gap-2 rounded-r-none border-r",
-                selectedSegmentId && "bg-accent"
-              )}
-            >
-              <Filter className="h-4 w-4" />
-              {selectedSegment ? selectedSegment.name : "Segments"}
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            {segments.length === 0 ? (
-              <DropdownMenuItem disabled>
-                No segments available
-              </DropdownMenuItem>
-            ) : (
-              segments.map((segment) => (
-                <DropdownMenuItem
-                  key={segment.id}
-                  onClick={() => handleSegmentSelect(segment.id)}
-                  className={cn(
-                    selectedSegmentId === segment.id && "bg-accent"
-                  )}
-                >
-                  {segment.name}
+    <div className="flex flex-col space-y-3">
+      <div className="flex justify-end">
+        <div className="bg-background inline-flex rounded-lg border">
+          {/* Segments Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                disabled={disabled || hasManualContacts}
+                className={cn(
+                  "gap-2 rounded-r-none border-r",
+                  selectedSegmentId && "bg-accent"
+                )}
+              >
+                <Filter className="h-4 w-4" />
+                {selectedSegment ? selectedSegment.name : "Segments"}
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              {segments.length === 0 ? (
+                <DropdownMenuItem disabled>
+                  No segments available
                 </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ) : (
+                segments.map((segment) => (
+                  <DropdownMenuItem
+                    key={segment.id}
+                    onClick={() => handleSegmentSelect(segment.id)}
+                    className={cn(
+                      selectedSegmentId === segment.id && "bg-accent"
+                    )}
+                  >
+                    {segment.name}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* Groups Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              disabled={disabled}
-              className={cn(
-                "gap-2 rounded-l-none",
-                selectedGroupId && "bg-accent"
-              )}
-            >
-              <Users className="h-4 w-4" />
-              {selectedGroup ? selectedGroup.name : "Groups"}
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            {groups.length === 0 ? (
-              <DropdownMenuItem disabled>No groups available</DropdownMenuItem>
-            ) : (
-              groups.map((group) => (
-                <DropdownMenuItem
-                  key={group.id}
-                  onClick={() => handleGroupSelect(group.id)}
-                  className={cn(selectedGroupId === group.id && "bg-accent")}
-                >
-                  {group.name}
+          {/* Groups Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                disabled={disabled || hasManualContacts}
+                className={cn(
+                  "gap-2 rounded-l-none",
+                  selectedGroupId && "bg-accent"
+                )}
+              >
+                <Users className="h-4 w-4" />
+                {selectedGroup ? selectedGroup.name : "Groups"}
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              {groups.length === 0 ? (
+                <DropdownMenuItem disabled>
+                  No groups available
                 </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ) : (
+                groups.map((group) => (
+                  <DropdownMenuItem
+                    key={group.id}
+                    onClick={() => handleGroupSelect(group.id)}
+                    className={cn(selectedGroupId === group.id && "bg-accent")}
+                  >
+                    {group.name}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      {/* Separator */}
+      <div className="flex items-center gap-3">
+        <div className="bg-border h-px flex-1" />
+        <span className="text-muted-foreground text-xs tracking-wide uppercase">
+          ou selectionner des contacts individuels
+        </span>
+        <div className="bg-border h-px flex-1" />
+      </div>
+
+      {/* Contact Picker */}
+      <ContactPicker
+        selectedContacts={selectedContacts}
+        onContactsChange={handleContactsChange}
+        disabled={disabled || hasGroupOrSegment}
+      />
     </div>
   );
 }

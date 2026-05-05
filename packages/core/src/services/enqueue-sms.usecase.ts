@@ -47,7 +47,7 @@ export class EnqueueSmsUseCase {
     const message = await prisma.$transaction(async (tx) => {
       const reservation = input.campaignId
         ? { senderId: input.from }
-        : await MessagingEntitlementsService.reserveMessageSend(
+        : await MessagingEntitlementsService.assertMessageSendAllowed(
             tx,
             organizationId,
             "sms"

@@ -10,6 +10,7 @@ import {
   createAndScheduleCampaign,
   createCampaign,
   getOrgSmsConfig,
+  createGroupForManualContacts,
 } from "@/actions/campaigns";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   type SmsContent,
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
+import type { PickedContact } from "@/components/campaigns/contact-picker";
 import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
 import { useSegments } from "@/hooks/use-segments";
 import { useGroups } from "@/hooks/use-groups";
@@ -72,6 +74,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
   const [scheduledTime, setScheduledTime] = useState("09:00");
   const [campaignTitle, setCampaignTitle] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
+  const [selectedContacts, setSelectedContacts] = useState<PickedContact[]>([]);
 
   // Email content state
   const [emailContent, setEmailContent] = useState<EmailContent>({
@@ -139,6 +142,20 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
 
   if (!type) {
     return <CampaignFormSkeleton />;
+  }
+
+  async function resolveAudienceGroup(): Promise<string[]> {
+    if (selectedContacts.length > 0) {
+      const result = await createGroupForManualContacts(
+        selectedContacts.map((c) => c.id),
+        campaignTitle.trim()
+      );
+      if (!result.success || !result.groupId) {
+        throw new Error(result.error || "Failed to create contact group");
+      }
+      return [result.groupId];
+    }
+    return selectedGroupId ? [selectedGroupId] : [];
   }
 
   const handleSaveDraft = async () => {
@@ -240,8 +257,13 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     }
 
     // Validate audience
-    if (!selectedSegmentId && !selectedGroupId) {
-      const error = "Please select a target audience (segment or group)";
+    if (
+      !selectedSegmentId &&
+      !selectedGroupId &&
+      selectedContacts.length === 0
+    ) {
+      const error =
+        "Please select a target audience (segment, group, or contacts)";
       console.error("[Campaign] Validation error:", error);
       toast.error(error);
       return;
@@ -296,13 +318,14 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     setIsLoading(true);
 
     try {
+      const audienceGroups = await resolveAudienceGroup();
       const result = await createAndScheduleCampaign({
         name: campaignTitle.trim(),
         description: optionalTrimmedString(campaignDescription),
         channel: type,
         content,
         scheduledAt: scheduledDateTime.toISOString(),
-        audienceGroups: selectedGroupId ? [selectedGroupId] : [],
+        audienceGroups,
         audienceSegments: selectedSegmentId ? [selectedSegmentId] : [],
       });
 
@@ -364,8 +387,13 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     }
 
     // Validate audience
-    if (!selectedSegmentId && !selectedGroupId) {
-      const error = "Please select a target audience (segment or group)";
+    if (
+      !selectedSegmentId &&
+      !selectedGroupId &&
+      selectedContacts.length === 0
+    ) {
+      const error =
+        "Please select a target audience (segment, group, or contacts)";
       console.error("[Campaign] Validation error:", error);
       toast.error(error);
       return;
@@ -409,12 +437,13 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     setIsLoading(true);
 
     try {
+      const audienceGroups = await resolveAudienceGroup();
       const result = await createAndLaunchCampaign({
         name: campaignTitle.trim(),
         description: optionalTrimmedString(campaignDescription),
         channel: type,
         content,
-        audienceGroups: selectedGroupId ? [selectedGroupId] : [],
+        audienceGroups,
         audienceSegments: selectedSegmentId ? [selectedSegmentId] : [],
       });
 
@@ -490,6 +519,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
             selectedGroupId={selectedGroupId}
             onSegmentChange={setSelectedSegmentId}
             onGroupChange={setSelectedGroupId}
+            selectedContacts={selectedContacts}
+            onContactsChange={setSelectedContacts}
             disabled={isLoading || isLoadingSegments || isLoadingGroups}
           />
 
