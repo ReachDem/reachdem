@@ -351,6 +351,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
   };
 
   const handleLaunch = async (skipSpamWarning = false) => {
+    if (isLoading) return;
+
     console.log("[Campaign] Starting launch...");
     console.log("[Campaign] Type:", type);
     console.log("[Campaign] Title:", campaignTitle);
@@ -399,6 +401,8 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       return;
     }
 
+    setIsLoading(true);
+
     const content =
       type === "email"
         ? buildEmailCampaignContent(
@@ -419,6 +423,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       });
 
       if (shouldWarnBeforeSendingEmail(analysis)) {
+        setIsLoading(false);
         toast.warning("Ce message risque d'être classé comme spam.", {
           description: getEmailSpamWarningReasons(analysis).join(" "),
           duration: 20000,
@@ -433,8 +438,6 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         return;
       }
     }
-
-    setIsLoading(true);
 
     try {
       const audienceGroups = await resolveAudienceGroup();

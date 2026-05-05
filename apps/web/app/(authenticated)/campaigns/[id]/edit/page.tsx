@@ -479,6 +479,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   };
 
   const handleLaunch = async (skipSpamWarning = false) => {
+    if (isLoading) return;
+
     console.log("[Edit Campaign] Starting launch...");
 
     // Validate content
@@ -504,6 +506,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       return;
     }
 
+    setIsLoading(true);
+
     // Prepare content
     const content =
       type === "email"
@@ -525,6 +529,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       });
 
       if (shouldWarnBeforeSendingEmail(analysis)) {
+        setIsLoading(false);
         toast.warning("Ce message risque d'etre classe comme spam.", {
           description: getEmailSpamWarningReasons(analysis).join(" "),
           duration: 20000,
@@ -539,8 +544,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         return;
       }
     }
-
-    setIsLoading(true);
 
     try {
       let campaignIdToLaunch = campaignId;
