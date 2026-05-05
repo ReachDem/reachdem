@@ -161,7 +161,7 @@ export function AudienceTargetSelector({
       <div className="flex items-center gap-3">
         <div className="bg-border h-px flex-1" />
         <span className="text-muted-foreground text-xs tracking-wide uppercase">
-          ou selectionner des contacts individuels
+          or select individual contacts
         </span>
         <div className="bg-border h-px flex-1" />
       </div>

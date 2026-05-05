@@ -59,9 +59,6 @@ export function ContactPicker({
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
-        Contacts individuels
-      </label>
       <div
         className={cn(
           "flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-lg border px-3 py-2",
@@ -98,8 +95,8 @@ export function ContactPicker({
           onFocus={() => query.length >= 2 && setIsOpen(true)}
           placeholder={
             selectedContacts.length === 0
-              ? "Rechercher un contact..."
-              : "Ajouter..."
+              ? "Search for a contact..."
+              : "Add more..."
           }
           disabled={disabled}
           className="placeholder:text-muted-foreground min-w-[120px] flex-1 border-none bg-transparent text-sm outline-none"
@@ -110,12 +107,12 @@ export function ContactPicker({
         <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg">
           {isLoading && (
             <div className="text-muted-foreground px-3 py-2 text-xs">
-              Recherche...
+              Searching...
             </div>
           )}
           {!isLoading && filteredResults.length === 0 && query.length >= 2 && (
             <div className="text-muted-foreground px-3 py-2 text-xs">
-              Aucun contact trouve
+              No contacts found
             </div>
           )}
           {filteredResults.map((contact) => (
@@ -149,8 +146,7 @@ export function ContactPicker({
       {selectedContacts.length > 0 && (
         <div className="text-muted-foreground mt-1.5 text-xs">
           {selectedContacts.length} contact
-          {selectedContacts.length > 1 ? "s" : ""} selectionne
-          {selectedContacts.length > 1 ? "s" : ""}
+          {selectedContacts.length > 1 ? "s" : ""} selected
         </div>
       )}
     </div>

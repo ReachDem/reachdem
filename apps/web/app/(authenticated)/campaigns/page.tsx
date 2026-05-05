@@ -1,11 +1,10 @@
 import { Suspense } from "react";
-import Link from "next/link";
-import { Plus, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 import { getCampaigns } from "@/actions/campaigns";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CampaignsClientTable } from "./campaigns-client-table";
+import { CreateCampaignButton } from "@/components/campaigns/create-campaign-button";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +23,7 @@ export default async function CampaignsPage() {
             Create, manage, and launch your campaigns.
           </p>
         </div>
-        <Link href="/campaigns/new">
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create campaign
-          </Button>
-        </Link>
+        <CreateCampaignButton />
       </div>
 
       <Suspense fallback={<TableSkeleton />}>

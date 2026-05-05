@@ -1,25 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-
-import { CampaignTypeSelector } from "@/components/campaigns/campaign-type-selector";
-import { Button } from "@/components/ui/button";
+import { Mail, MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const [selectedType, setSelectedType] = useState<"email" | "sms" | null>(
-    null
-  );
 
-  const handleContinue = () => {
-    if (selectedType) {
-      // Navigate to the campaign form with the selected type
-      router.push(`/campaigns/new/${selectedType}`);
-    }
-  };
+  function handleSelect(type: "email" | "sms") {
+    router.push(`/campaigns/new/${type}`);
+  }
 
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 p-8">
@@ -32,17 +22,46 @@ export default function NewCampaignPage() {
         </p>
       </div>
 
-      <div className="space-y-6">
-        <CampaignTypeSelector value={selectedType} onChange={setSelectedType} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => handleSelect("email")}
+          className={cn(
+            "group hover:border-primary flex min-h-[200px] flex-col items-start justify-between rounded-lg border-2 p-6 text-left transition-all hover:shadow-md",
+            "border-border bg-background hover:bg-primary/5"
+          )}
+        >
+          <Mail className="text-muted-foreground group-hover:text-primary h-8 w-8" />
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">Email</h3>
+            <p className="text-muted-foreground text-sm">
+              Reach out with rich content, images, and personalized messages
+            </p>
+          </div>
+          <div className="text-muted-foreground text-xs">
+            Best for detailed communications
+          </div>
+        </button>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Link href="/campaigns">
-            <Button variant="outline">Cancel</Button>
-          </Link>
-          <Button onClick={handleContinue} disabled={!selectedType}>
-            Continue
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={() => handleSelect("sms")}
+          className={cn(
+            "group hover:border-primary flex min-h-[200px] flex-col items-start justify-between rounded-lg border-2 p-6 text-left transition-all hover:shadow-md",
+            "border-border bg-background hover:bg-primary/5"
+          )}
+        >
+          <MessageSquare className="text-muted-foreground group-hover:text-primary h-8 w-8" />
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">SMS</h3>
+            <p className="text-muted-foreground text-sm">
+              Direct messaging for quick, urgent communications
+            </p>
+          </div>
+          <div className="text-muted-foreground text-xs">
+            160 characters max, instant delivery
+          </div>
+        </button>
       </div>
     </div>
   );

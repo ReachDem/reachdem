@@ -635,7 +635,7 @@ export async function createGroupForManualContacts(
 
     const group = await GroupService.createGroup(organizationId, {
       name: groupName,
-      description: `Groupe statique cree automatiquement pour la campagne "${campaignName}"`,
+      description: `Auto-created group for campaign "${campaignName}"`,
     });
 
     const { GroupMemberService } = await import("@reachdem/core");
