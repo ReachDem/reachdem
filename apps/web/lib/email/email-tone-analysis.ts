@@ -4,7 +4,7 @@ import { z } from "zod";
 import type {
   AnalyzeEmailSpamInput,
   EmailToneAnalysis,
-} from "@/lib/email-spam-score";
+} from "@/lib/email/email-spam-score";
 
 const toneAnalysisSchema = z.object({
   risk: z.enum(["low", "medium", "high"]),

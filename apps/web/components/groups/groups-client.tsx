@@ -16,7 +16,7 @@ import {
   IconLayoutColumns,
   IconChevronDown,
 } from "@tabler/icons-react";
-import { ContactsTableSkeleton } from "@/components/skeletons";
+import { ContactsTableSkeleton } from "@/components/shared/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type ColumnDef } from "@tanstack/react-table";
 
@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { GroupForm } from "@/components/group-form";
+import { GroupForm } from "@/components/groups/group-form";
 import {
   type ContactRow,
   buildContactColumns,
@@ -50,7 +50,7 @@ import {
   useContactTableState,
   ContactDataTable,
   ContactTablePagination,
-} from "@/components/contact-data-table";
+} from "@/components/contacts/contact-data-table";
 import {
   type Group,
   type Contact,
@@ -67,7 +67,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenu,
-} from "./ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 
 import { useGroupsStore } from "@/lib/stores/groups-store";
 

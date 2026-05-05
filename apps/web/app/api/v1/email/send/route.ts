@@ -5,7 +5,7 @@ import {
   MessageInsufficientCreditsError,
 } from "@reachdem/core";
 import { sendEmailSchema } from "@reachdem/shared";
-import { publishEmailJob } from "../../../../../lib/publish-email-job";
+import { publishEmailJob } from "@/lib/queue/publish-email-job";
 
 export const POST = withWorkspace(async ({ req, organizationId }) => {
   try {

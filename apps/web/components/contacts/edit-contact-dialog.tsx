@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { updateContact } from "@/app/actions/contacts";
-import type { ContactRow } from "@/components/contact-data-table";
+import type { ContactRow } from "@/components/contacts/contact-data-table";
 
 interface EditContactDialogProps {
   contact: ContactRow;

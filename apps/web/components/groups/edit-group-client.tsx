@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { GroupForm } from "@/components/group-form";
+import { GroupForm } from "@/components/groups/group-form";
 import { updateGroup, deleteGroup } from "@/lib/api/groups";
 
 interface EditGroupClientProps {

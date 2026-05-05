@@ -19,7 +19,7 @@ import {
   SettingsCardDescription,
   SettingsCardHeader,
   SettingsCardTitle,
-} from "@/components/settings-card";
+} from "@/components/shared/settings-card";
 import {
   Dialog,
   DialogContent,

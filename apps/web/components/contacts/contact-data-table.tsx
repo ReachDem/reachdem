@@ -16,7 +16,7 @@ import {
   IconChevronsLeft,
   IconChevronsRight,
 } from "@tabler/icons-react";
-import { ContactsTableSkeleton } from "@/components/skeletons";
+import { ContactsTableSkeleton } from "@/components/shared/skeletons";
 import {
   type ColumnDef,
   type ColumnFiltersState,

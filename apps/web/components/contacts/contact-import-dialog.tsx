@@ -36,7 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AiMappingTester } from "@/components/ai-mapping-tester";
+import { AiMappingTester } from "@/components/contacts/ai-mapping-tester";
 
 import {
   Table,

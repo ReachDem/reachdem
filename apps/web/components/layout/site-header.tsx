@@ -2,8 +2,8 @@
 
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { SearchCommand } from "@/components/search-command";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SearchCommand } from "@/components/shared/search-command";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 

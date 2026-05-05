@@ -3,8 +3,8 @@ import {
   applyToneAnalysisToEmailSpam,
   type AnalyzeEmailSpamInput,
   type EmailSpamAnalysis,
-} from "@/lib/email-spam-score";
-import { analyzeEmailTone } from "@/lib/email-tone-analysis";
+} from "@/lib/email/email-spam-score";
+import { analyzeEmailTone } from "@/lib/email/email-tone-analysis";
 
 export async function analyzeEmailSpamWithAI(
   input: AnalyzeEmailSpamInput

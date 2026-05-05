@@ -4,9 +4,9 @@ import {
   getGroupContacts,
   getContactsForPicker,
 } from "@/app/actions/groups";
-import { GroupDetailClient } from "@/components/group-detail-client";
+import { GroupDetailClient } from "@/components/groups/group-detail-client";
 
-import { GroupDetailSkeleton } from "@/components/skeletons";
+import { GroupDetailSkeleton } from "@/components/shared/skeletons";
 
 export async function generateMetadata({
   params,

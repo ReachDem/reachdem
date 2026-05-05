@@ -18,8 +18,8 @@ import {
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
 import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
-import { useSegments } from "@/lib/hooks/use-segments";
-import { useGroups } from "@/lib/hooks/use-groups";
+import { useSegments } from "@/hooks/use-segments";
+import { useGroups } from "@/hooks/use-groups";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -43,7 +43,7 @@ import {
   fetchEmailSpamAnalysis,
   getEmailSpamWarningReasons,
   shouldWarnBeforeSendingEmail,
-} from "@/lib/email-send-guard";
+} from "@/lib/email/email-send-guard";
 import { cn } from "@/lib/utils";
 
 interface EditCampaignPageProps {

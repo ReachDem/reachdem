@@ -38,9 +38,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { NumberTicker } from "@/components/ui/number-ticker";
 
-import { ContactImportDialog } from "@/components/contact-import-dialog";
-import { AddContactDrawer } from "@/components/add-contact-drawer";
-import { EditContactDialog } from "@/components/edit-contact-dialog";
+import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
+import { AddContactDrawer } from "@/components/contacts/add-contact-drawer";
+import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
 import { deleteContacts } from "@/app/actions/contacts";
 import {
   type ContactRow,
@@ -49,7 +49,7 @@ import {
   useContactTableState,
   ContactDataTable,
   ContactTablePagination,
-} from "@/components/contact-data-table";
+} from "@/components/contacts/contact-data-table";
 import { useContactsStore } from "@/lib/stores/contacts-store";
 
 // Re-export the rich Contact type (superset of ContactRow) for backwards compat

@@ -3,12 +3,12 @@
 import { auth } from "@reachdem/auth";
 import { ensureDefaultApiKeyForOrganization } from "@reachdem/auth/api-key";
 import { prisma } from "@reachdem/database";
-import { generateUniqueOrganizationSlug } from "../lib/slugify";
+import { generateUniqueOrganizationSlug } from "../lib/server/slugify";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { ReachDemRole, AcquisitionSource } from "@reachdem/shared";
 import { PlatformBillingSettingsService } from "@reachdem/core";
-import { getAuthFlowState } from "../lib/auth-flow";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 
 // Helper partagé pour récupérer la session et les headers
 async function requireAuthSession() {

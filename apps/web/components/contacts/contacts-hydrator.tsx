@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ContactRow } from "@/components/contact-data-table";
+import type { ContactRow } from "@/components/contacts/contact-data-table";
 import { useContactsStore } from "@/lib/stores/contacts-store";
 
 /**

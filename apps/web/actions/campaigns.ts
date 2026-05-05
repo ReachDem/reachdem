@@ -15,7 +15,7 @@ import type {
   UpdateCampaignDto,
   CampaignResponse,
 } from "@reachdem/shared";
-import { publishCampaignLaunchJob } from "@/lib/publish-campaign-launch-job";
+import { publishCampaignLaunchJob } from "@/lib/queue/publish-campaign-launch-job";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({

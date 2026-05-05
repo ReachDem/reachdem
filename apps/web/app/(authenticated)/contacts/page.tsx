@@ -1,7 +1,7 @@
-import { ContactsTable } from "@/components/contacts-table";
-import { ContactsHydrator } from "@/components/contacts-hydrator";
+import { ContactsTable } from "@/components/contacts/contacts-table";
+import { ContactsHydrator } from "@/components/contacts/contacts-hydrator";
 import { getContacts } from "@/app/actions/contacts";
-import { ContactsOnboardingTour } from "@/components/contacts-onboarding-tour";
+import { ContactsOnboardingTour } from "@/components/contacts/contacts-onboarding-tour";
 
 export default async function ContactsPage() {
   const contacts = await getContacts();

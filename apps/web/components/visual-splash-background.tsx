@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Shader6 } from "@/components/shader6";
+import { Shader6 } from "@/components/shared/shader6";
 
 export function VisualSplashBackground() {
   return (

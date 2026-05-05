@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./fonts.css";
-import { Providers } from "@/components/providers";
-import { ThemeScript } from "@/components/theme-script";
+import { Providers } from "@/components/shared/providers";
+import { ThemeScript } from "@/components/shared/theme-script";
 import { getThemeScript } from "@/lib/theme";
 import { Analytics } from "@vercel/analytics/next";
 

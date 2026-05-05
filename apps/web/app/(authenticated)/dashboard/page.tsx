@@ -5,9 +5,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { Button } from "@/components/ui/button";
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { Cta18 } from "@/components/cta18";
-import { DataTable } from "@/components/data-table";
+import { ChartAreaInteractive } from "@/components/dashboard/chart-area-interactive";
+import { Cta18 } from "@/components/dashboard/cta18";
+import { DataTable } from "@/components/shared/data-table";
 import { DashboardChecklist } from "@/components/onboarding/dashboard-checklist";
 
 function isScheduledCampaign(campaign: {

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getGroupById } from "@/app/actions/groups";
-import { EditGroupClient } from "@/components/edit-group-client";
+import { EditGroupClient } from "@/components/groups/edit-group-client";
 
 export async function generateMetadata({
   params,

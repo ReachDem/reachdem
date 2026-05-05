@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding-wizard";
-import { ContinueSetupRecovery } from "@/components/continue-setup-recovery";
-import { getAuthFlowState } from "@/lib/auth-flow";
+import { ContinueSetupRecovery } from "@/components/shared/continue-setup-recovery";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 
 export default async function ContinueSetupPage() {
   const flow = await getAuthFlowState();

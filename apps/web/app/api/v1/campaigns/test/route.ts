@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@reachdem/auth";
 import { z } from "zod";
-import { wrapContentInEmailStructure } from "@/lib/render-email";
+import { wrapContentInEmailStructure } from "@/lib/email/render-email";
 import { EnqueueEmailUseCase } from "@reachdem/core";
-import { publishEmailJob } from "@/lib/publish-email-job";
+import { publishEmailJob } from "@/lib/queue/publish-email-job";
 import { randomUUID } from "crypto";
 
 const testEmailSchema = z.object({

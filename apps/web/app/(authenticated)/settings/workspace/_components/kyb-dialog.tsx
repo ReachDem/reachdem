@@ -16,7 +16,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { submitKybVerification } from "@/actions/kyb-verification";
 import { AlertCircle, Loader2, UploadCloud } from "lucide-react";
-import { ALLOWED_KYB_DOC_TYPES, ALLOWED_KYB_IMAGE_TYPES } from "@/lib/kyb";
+import {
+  ALLOWED_KYB_DOC_TYPES,
+  ALLOWED_KYB_IMAGE_TYPES,
+} from "@/lib/server/kyb";
 
 export function KybDialog({
   status,

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { RegisterForm } from "@/components/register-form";
-import { getAuthFlowState } from "@/lib/auth-flow";
+import { RegisterForm } from "@/components/auth/register-form";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 import { VisualSplashBackground } from "@/components/visual-splash-background";
 
 export default async function RegisterPage() {

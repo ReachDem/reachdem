@@ -8,7 +8,7 @@ import {
   RequestCampaignLaunchUseCase,
 } from "@reachdem/core";
 import { withPublicWorkspace } from "@reachdem/auth/guards";
-import { publishCampaignLaunchJob } from "../../../../../../lib/publish-campaign-launch-job";
+import { publishCampaignLaunchJob } from "@/lib/queue/publish-campaign-launch-job";
 
 // Launch Campaign
 export const POST = withPublicWorkspace(

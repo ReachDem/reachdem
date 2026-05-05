@@ -16,11 +16,11 @@ import {
   fetchEmailSpamAnalysis,
   getEmailSpamWarningReasons,
   shouldWarnBeforeSendingEmail,
-} from "@/lib/email-send-guard";
+} from "@/lib/email/email-send-guard";
 import {
   analyzeEmailSpam,
   type EmailSpamAnalysis,
-} from "@/lib/email-spam-score";
+} from "@/lib/email/email-spam-score";
 
 // Import editor and default commands
 import {

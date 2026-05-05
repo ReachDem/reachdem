@@ -1,7 +1,7 @@
 import type {
   AnalyzeEmailSpamInput,
   EmailSpamAnalysis,
-} from "@/lib/email-spam-score";
+} from "@/lib/email/email-spam-score";
 
 export async function fetchEmailSpamAnalysis(
   input: AnalyzeEmailSpamInput

@@ -44,7 +44,7 @@ import {
   useContactTableState,
   ContactDataTable,
   ContactTablePagination,
-} from "@/components/contact-data-table";
+} from "@/components/contacts/contact-data-table";
 
 import {
   type Contact,
@@ -53,7 +53,7 @@ import {
 } from "@/lib/api/groups";
 
 import { useGroupDetailStore } from "@/lib/stores/group-detail-store";
-import { AddContactDrawer } from "@/components/add-contact-drawer";
+import { AddContactDrawer } from "@/components/contacts/add-contact-drawer";
 
 // ─── Members Panel (Main Column) ──────────────────────────────────────────────
 

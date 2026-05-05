@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePayment } from "@/hooks/usePayment";
+import { usePayment } from "@/hooks/use-payment";
 
 const NETWORKS_BY_COUNTRY: Record<string, { label: string; value: string }[]> =
   {

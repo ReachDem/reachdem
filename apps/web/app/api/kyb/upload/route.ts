@@ -3,7 +3,10 @@ import { auth } from "@reachdem/auth";
 import { uploadToR2 } from "@reachdem/core";
 import { prisma } from "@reachdem/database";
 import { nanoid } from "nanoid";
-import { ALLOWED_KYB_DOC_TYPES, ALLOWED_KYB_IMAGE_TYPES } from "@/lib/kyb";
+import {
+  ALLOWED_KYB_DOC_TYPES,
+  ALLOWED_KYB_IMAGE_TYPES,
+} from "@/lib/server/kyb";
 
 function getExtension(file: File) {
   const explicitExtension = file.name.split(".").pop()?.toLowerCase();

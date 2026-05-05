@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuthFlowState } from "@/lib/auth-flow";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 
 export async function GET() {
   const flow = await getAuthFlowState();

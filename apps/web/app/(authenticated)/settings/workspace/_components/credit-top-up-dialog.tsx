@@ -16,7 +16,7 @@ import {
 import { useSession } from "@reachdem/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usePayment } from "@/hooks/usePayment";
+import { usePayment } from "@/hooks/use-payment";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Select,
