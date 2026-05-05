@@ -9,6 +9,7 @@ import { createHash } from "crypto";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignLinkTrackingService } from "./campaign-link-tracking.service";
 import { CampaignService } from "./campaign.service";
+import { CampaignStatsService } from "./campaign-stats.service";
 import { EnqueueEmailUseCase } from "./enqueue-email.usecase";
 import { EnqueueSmsUseCase } from "./enqueue-sms.usecase";
 import { EnqueueWhatsAppUseCase } from "./enqueue-whatsapp.usecase";
@@ -69,10 +70,15 @@ export class ProcessCampaignLaunchJobUseCase {
         refreshedCampaign.channel
       );
 
+      // Invalidate the stats cache now that targets exist (or are confirmed
+      // absent) so the next request reflects reality instead of the pre-launch
+      // empty snapshot.
+      await CampaignStatsService.invalidate(job.campaign_id);
+
       if (targets.length === 0) {
         await prisma.campaign.update({
           where: { id: job.campaign_id },
-          data: { status: "completed" },
+          data: { status: "failed" },
         });
 
         await ActivityLogger.log({
@@ -80,12 +86,13 @@ export class ProcessCampaignLaunchJobUseCase {
           actorType: "system",
           actorId: "system",
           category: campaign.channel,
-          action: "updated",
+          action: "send_failed",
           resourceType: "campaign",
           resourceId: job.campaign_id,
-          status: "success",
+          status: "failed",
           meta: {
-            message: "Completed empty campaign",
+            message:
+              "No eligible contacts found when processing campaign launch",
             campaignId: job.campaign_id,
             targetCount: 0,
           },
@@ -276,6 +283,7 @@ export class ProcessCampaignLaunchJobUseCase {
         const contacts = await prisma.contact.findMany({
           where: {
             organizationId,
+            deletedAt: null,
             memberships: {
               some: { groupId: audience.sourceId },
             },

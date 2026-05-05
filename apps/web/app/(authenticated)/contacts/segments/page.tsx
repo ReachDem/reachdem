@@ -3,7 +3,7 @@ import { getSegments } from "@/app/actions/segments";
 import { SegmentsClient } from "@/components/segments-client";
 import { type Segment } from "@/lib/api/segments";
 
-import { GroupsPageSkeleton } from "@/components/skeletons";
+import { GroupsPageSkeleton } from "@/components/shared/skeletons";
 
 export const metadata = { title: "Segments – ReachDem" };
 

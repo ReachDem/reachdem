@@ -38,10 +38,10 @@ describe("cameroon-mobile-routing", () => {
 
     expect(route).toEqual([
       {
-        provider: "lmt",
+        provider: "avlytext",
         payload: {
           to: "+237677123456",
-          from: "ReachDem",
+          from: "AnySender",
           text: "hello",
         },
       },
@@ -76,7 +76,7 @@ describe("cameroon-mobile-routing", () => {
         provider: "mboaSms",
         payload: {
           to: "+237699123456",
-          from: "CustomOrangeSender",
+          from: "infos",
           text: "hello",
         },
       },

@@ -1,5 +1,5 @@
 export const scheduledWorkerConfig = {
-  cron: "* * * * *",
+  cron: "*/5 * * * *",
   campaignClaimBatchSize: 50,
   smsClaimBatchSize: 100,
   emailClaimBatchSize: 50,

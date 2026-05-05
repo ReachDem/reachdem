@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ContactRow } from "@/components/contact-data-table";
+import type { ContactRow } from "@/components/contacts/contact-data-table";
 import { getContacts } from "@/app/actions/contacts";
 
 interface ContactsState {

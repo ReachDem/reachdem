@@ -18,8 +18,8 @@ import {
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
 import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
-import { useSegments } from "@/lib/hooks/use-segments";
-import { useGroups } from "@/lib/hooks/use-groups";
+import { useSegments } from "@/hooks/use-segments";
+import { useGroups } from "@/hooks/use-groups";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -43,7 +43,7 @@ import {
   fetchEmailSpamAnalysis,
   getEmailSpamWarningReasons,
   shouldWarnBeforeSendingEmail,
-} from "@/lib/email-send-guard";
+} from "@/lib/email/email-send-guard";
 import { cn } from "@/lib/utils";
 
 interface EditCampaignPageProps {
@@ -175,8 +175,12 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
             console.log("[Edit Campaign] Loaded audience:", audienceData);
 
             // Set selected segment or group
-            if (audienceData.data && audienceData.data.length > 0) {
-              const firstAudience = audienceData.data[0];
+            // The API returns a plain array (not {data: [...]})
+            const audienceItems = Array.isArray(audienceData)
+              ? audienceData
+              : (audienceData.data ?? []);
+            if (audienceItems.length > 0) {
+              const firstAudience = audienceItems[0];
               if (firstAudience.sourceType === "segment") {
                 setSelectedSegmentId(firstAudience.sourceId);
               } else if (firstAudience.sourceType === "group") {
@@ -612,7 +616,9 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
 
       if (!launchResponse.ok) {
         const errorData = await launchResponse.json();
-        throw new Error(errorData.error || "Failed to launch campaign");
+        throw new Error(
+          errorData.details || errorData.error || "Failed to launch campaign"
+        );
       }
 
       toast.success("Campaign launched successfully");

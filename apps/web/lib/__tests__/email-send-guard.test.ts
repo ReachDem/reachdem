@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   getEmailSpamWarningReasons,
   shouldWarnBeforeSendingEmail,
-} from "@/lib/email-send-guard";
+} from "@/lib/email/email-send-guard";
 import {
   analyzeEmailSpam,
   applyToneAnalysisToEmailSpam,
-} from "@/lib/email-spam-score";
+} from "@/lib/email/email-spam-score";
 
 describe("email send guard", () => {
   it("does not warn for low-risk operational copy", () => {

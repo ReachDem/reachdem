@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAuthFlowState } from "@/lib/auth-flow";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 import { SetupWizardShell } from "@/components/setup-wizard-shell";
 
 export default async function SetupLayout({

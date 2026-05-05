@@ -2,11 +2,11 @@ import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAuthFlowState } from "@/lib/auth-flow";
+import { getAuthFlowState } from "@/lib/server/auth-flow";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { OrganizationVerificationBanner } from "@/components/organization-verification-banner";
-import { SiteHeader } from "@/components/site-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { OrganizationVerificationBanner } from "@/components/shared/organization-verification-banner";
+import { SiteHeader } from "@/components/layout/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TipsProvider } from "@/components/onboarding/tips-engine";
 

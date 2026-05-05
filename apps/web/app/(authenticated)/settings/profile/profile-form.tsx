@@ -18,8 +18,8 @@ import {
   SettingsCardFooter,
   SettingsCardHeader,
   SettingsCardTitle,
-} from "@/components/settings-card";
-import { AvatarCropperDialog } from "@/components/avatar-cropper-dialog";
+} from "@/components/shared/settings-card";
+import { AvatarCropperDialog } from "@/components/shared/avatar-cropper-dialog";
 import { zodFormResolver } from "@/lib/zod-form-resolver";
 
 const nameFormSchema = z.object({

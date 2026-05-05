@@ -65,6 +65,7 @@ interface CampaignsClientTableProps {
 
 interface CampaignStatsSnapshot {
   audienceSize: number;
+  estimatedAudienceSize?: number;
   pendingCount: number;
   sentCount: number;
   failedCount: number;
@@ -194,6 +195,24 @@ export function CampaignsClientTable({
     void refreshCampaignSignals();
   }, [currentPage, search]);
 
+  // Poll every 8 seconds while any visible campaign is in "running" state so
+  // the audience size and progress update automatically after the worker
+  // creates and processes its targets.
+  useEffect(() => {
+    const hasRunningCampaign = paginatedCampaigns.some(
+      (c) =>
+        (campaignStats[c.id]?.resolvedStatus ?? c.status) === "running" ||
+        c.status === "running"
+    );
+    if (!hasRunningCampaign) return;
+
+    const id = setInterval(() => {
+      void refreshCampaignSignals();
+    }, 8000);
+
+    return () => clearInterval(id);
+  }, [paginatedCampaigns, campaignStats]);
+
   const handleDelete = async () => {
     if (!campaignToDelete) return;
     setIsDeleting(true);
@@ -227,7 +246,11 @@ export function CampaignsClientTable({
     if (!campaignToLaunch) return;
     setIsLaunching(true);
     try {
-      await launchCampaign(campaignToLaunch.id);
+      const result = await launchCampaign(campaignToLaunch.id);
+      if (!result.success) {
+        toast.error(result.error || "Failed to launch campaign");
+        return;
+      }
       toast.success("Campaign launched successfully");
       router.refresh();
       void refreshCampaignSignals(true);
@@ -365,6 +388,23 @@ export function CampaignsClientTable({
     }
 
     if (stats.audienceSize === 0) {
+      // If still running, targets haven't been created by the worker yet
+      if (effectiveStatus === "running") {
+        const estimated = stats.estimatedAudienceSize ?? 0;
+        return (
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="text-muted-foreground animate-pulse text-xs">
+              Processing…
+            </span>
+            {estimated > 0 && (
+              <span className="text-muted-foreground text-[10px]">
+                ~{estimated} destinataires
+              </span>
+            )}
+          </div>
+        );
+      }
+
       return (
         <div className="flex min-w-[180px] flex-col items-center gap-2 text-center">
           <div className="relative w-[90px]">

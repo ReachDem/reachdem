@@ -13,9 +13,9 @@ import {
   sendSmsSchema,
   sendWhatsAppSchema,
 } from "@reachdem/shared";
-import { publishEmailJob } from "../../../../../lib/publish-email-job";
-import { publishSmsJob } from "../../../../../lib/publish-sms-job";
-import { publishWhatsAppJob } from "../../../../../lib/publish-whatsapp-job";
+import { publishEmailJob } from "@/lib/queue/publish-email-job";
+import { publishSmsJob } from "@/lib/queue/publish-sms-job";
+import { publishWhatsAppJob } from "@/lib/queue/publish-whatsapp-job";
 
 const publicSmsPayloadSchema = z.object({
   type: z.literal("transactional"),

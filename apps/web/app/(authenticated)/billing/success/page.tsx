@@ -9,6 +9,7 @@ function BillingSuccessContent() {
   const searchParams = useSearchParams();
   const method = searchParams.get("method");
   const isCardPayment = method === "card";
+  const isSubscription = method === "subscription";
 
   return (
     <main className="bg-background fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden px-8 text-center">
@@ -37,8 +38,8 @@ function BillingSuccessContent() {
           Payment received
         </h1>
         <p className="text-muted-foreground mb-16">
-          {isCardPayment
-            ? "You're all set. Next time, checkout will feel even faster."
+          {isCardPayment || isSubscription
+            ? "You're all set. Your new plan is now active."
             : "Your payment was successful."}
         </p>
 
@@ -46,12 +47,16 @@ function BillingSuccessContent() {
           <Button
             onClick={() =>
               router.push(
-                method === "card" ? "/settings/workspace" : "/campaigns/new"
+                isCardPayment || isSubscription
+                  ? "/settings/workspace"
+                  : "/campaigns/new"
               )
             }
             className="h-[3.5rem] w-full rounded-md border-none bg-[#ff751f] font-medium text-white transition-all hover:bg-[#e66a1c] active:scale-[0.98]"
           >
-            {method === "card" ? "Back to workspace" : "Create your campaign"}
+            {isCardPayment || isSubscription
+              ? "Back to workspace"
+              : "Create your campaign"}
           </Button>
           <button
             onClick={() => router.push("/settings/workspace")}

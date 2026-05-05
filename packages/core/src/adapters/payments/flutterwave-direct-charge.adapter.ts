@@ -14,13 +14,18 @@ import {
   encryptFlutterwaveField,
 } from "../../utils/flutterwave-encryption";
 
-const TOKEN_URL =
+const DEFAULT_TOKEN_URL =
   "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
 const DEFAULT_V4_URL = "https://api.flutterwave.com/v4";
 const ZERO_DECIMAL_CURRENCIES = new Set(["XAF", "XOF", "JPY", "KRW", "UGX"]);
 
 function getBaseUrl(): string {
   return process.env.FLUTTERWAVE_V4_BASE_URL?.trim() || DEFAULT_V4_URL;
+}
+
+function getTokenUrl(): string {
+  // Allow explicit override for non-standard environments
+  return process.env.FLUTTERWAVE_V4_TOKEN_URL?.trim() || DEFAULT_TOKEN_URL;
 }
 
 function buildUrl(path: string): string {
@@ -58,16 +63,40 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
     return cachedToken.access_token;
   }
 
-  const clientId = process.env.FLUTTERWAVE_V4_CLIENT_ID?.trim();
-  const clientSecret = process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim();
+  const clientId = process.env.FLUTTERWAVE_V4_CLIENT_ID?.trim().replace(
+    /^["']|["']$/g,
+    ""
+  );
+  const clientSecret = process.env.FLUTTERWAVE_V4_CLIENT_SECRET?.trim().replace(
+    /^["']|["']$/g,
+    ""
+  );
 
-  if (!clientId || !clientSecret) {
+  if (!clientId && !clientSecret) {
     throw new PaymentConfigurationError(
       "Flutterwave v4 payments require FLUTTERWAVE_V4_CLIENT_ID and FLUTTERWAVE_V4_CLIENT_SECRET."
     );
   }
+  if (!clientId) {
+    throw new PaymentConfigurationError(
+      "Missing FLUTTERWAVE_V4_CLIENT_ID environment variable."
+    );
+  }
+  if (!clientSecret) {
+    throw new PaymentConfigurationError(
+      "Missing FLUTTERWAVE_V4_CLIENT_SECRET environment variable."
+    );
+  }
 
-  const res = await fetch(TOKEN_URL, {
+  const tokenUrl = getTokenUrl();
+  console.log("[Flutterwave] Token request debug", {
+    tokenUrl,
+    clientIdLength: clientId.length,
+    clientIdPrefix: clientId.slice(0, 8),
+    clientSecretLength: clientSecret.length,
+    clientSecretPrefix: clientSecret.slice(0, 4),
+  });
+  const res = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -78,7 +107,13 @@ async function getFlutterwaveV4AccessToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to get Flutterwave token: ${await res.text()}`);
+    const body = await res.text();
+    console.error("[Flutterwave] Token request failed", {
+      tokenUrl,
+      status: res.status,
+      body,
+    });
+    throw new Error(`Failed to get Flutterwave token: ${body}`);
   }
 
   const data = await res.json();

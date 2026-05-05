@@ -4,7 +4,7 @@ import { auth } from "@reachdem/auth";
 import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { DashboardChecklistStep } from "@reachdem/shared";
-import { notifyAdminsOfValidationRequest } from "@/lib/admin-notify";
+import { notifyAdminsOfValidationRequest } from "@/lib/server/admin-notify";
 
 // Compute step completions
 export async function getDashboardChecklistState() {

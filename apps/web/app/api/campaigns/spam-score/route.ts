@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeEmailSpamWithAI } from "@/lib/email-spam-score.server";
+import { analyzeEmailSpamWithAI } from "@/lib/email/email-spam-score.server";
 
 export async function POST(request: NextRequest) {
   try {

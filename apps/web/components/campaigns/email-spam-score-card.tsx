@@ -6,7 +6,7 @@ import {
   Loader2,
   ShieldAlert,
 } from "lucide-react";
-import type { EmailSpamAnalysis } from "@/lib/email-spam-score";
+import type { EmailSpamAnalysis } from "@/lib/email/email-spam-score";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,

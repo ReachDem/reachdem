@@ -4,6 +4,7 @@ import { MemberList } from "./_components/member-list";
 import { LogoUpdate } from "./_components/logo-update";
 import { KybDialog } from "./_components/kyb-dialog";
 import { SenderIdSettingsButton } from "./_components/sender-id-settings-button";
+import { OrgNameForm } from "./_components/org-name-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import {
   SettingsCardDescription,
   SettingsCardHeader,
   SettingsCardTitle,
-} from "@/components/settings-card";
+} from "@/components/shared/settings-card";
 import { DeleteOrganizationButton } from "./_components/delete-organization-button";
 import {
   AlertTriangle,
@@ -136,17 +137,7 @@ export default async function WorkspaceSettingsPage() {
           <div className="max-w-2xl space-y-8">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
-              <div className="flex gap-2">
-                <Input
-                  defaultValue={org.name}
-                  readOnly
-                  className="bg-muted/50"
-                  placeholder="Organization Name"
-                />
-                <Button variant="outline" className="shrink-0">
-                  Request Change
-                </Button>
-              </div>
+              <OrgNameForm orgId={org.id} initialName={org.name} />
             </div>
 
             <div className="space-y-2">
@@ -158,10 +149,10 @@ export default async function WorkspaceSettingsPage() {
                   className="bg-muted/50"
                   placeholder="organization-slug"
                 />
-                <Button variant="outline" className="shrink-0">
-                  Request Change
-                </Button>
               </div>
+              <p className="text-muted-foreground text-xs">
+                The slug is used in URLs and cannot be changed once set.
+              </p>
             </div>
 
             <div className="border-muted flex items-center justify-between border-t pt-4">

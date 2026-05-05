@@ -112,6 +112,14 @@ function resolveDescription(data: CreatePaymentSessionDto): string {
   return `ReachDem credits purchase (${data.creditsQuantity} credits)`;
 }
 
+function getFlutterwavePlanId(
+  planCode: string | null | undefined
+): string | null {
+  if (!planCode) return null;
+  const key = `FLUTTERWAVE_PLAN_ID_${planCode.toUpperCase()}`;
+  return process.env[key]?.trim() || null;
+}
+
 function normalizeProviderStatus(status: string | null | undefined): {
   sessionStatus: MutableSessionStatus;
   transactionStatus: MutableTransactionStatus;
@@ -477,6 +485,10 @@ export class PaymentOrchestratorService {
         description: resolveDescription(data),
         returnUrl: getReturnUrl(),
         customerEmail: user?.email ?? null,
+        paymentPlanId:
+          data.kind === "subscription"
+            ? getFlutterwavePlanId(normalizedPlanCode)
+            : null,
         metadata: {
           kind: data.kind,
           planCode: normalizedPlanCode,

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getGroupById } from "@/app/actions/groups";
-import { EditGroupClient } from "@/components/edit-group-client";
+import { EditGroupClient } from "@/components/groups/edit-group-client";
 
 export async function generateMetadata({
   params,
@@ -8,12 +8,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  try {
-    const group = await getGroupById(id);
-    return { title: `Edit ${group.name} – ReachDem` };
-  } catch {
-    return { title: "Edit Group – ReachDem" };
-  }
+  const group = await getGroupById(id);
+  if (!group) return { title: "Edit Group – ReachDem" };
+  return { title: `Edit ${group.name} – ReachDem` };
 }
 
 export default async function EditGroupPage({
@@ -23,12 +20,8 @@ export default async function EditGroupPage({
 }) {
   const { id } = await params;
 
-  let group;
-  try {
-    group = await getGroupById(id);
-  } catch {
-    notFound();
-  }
+  const group = await getGroupById(id);
+  if (!group) notFound();
 
   return (
     <div className="flex flex-1 flex-col">

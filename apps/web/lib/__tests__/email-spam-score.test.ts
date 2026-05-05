@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeEmailSpam,
   applyToneAnalysisToEmailSpam,
-} from "@/lib/email-spam-score";
+} from "@/lib/email/email-spam-score";
 
 describe("analyzeEmailSpam", () => {
   it("keeps a simple operational email in the low-risk band", () => {

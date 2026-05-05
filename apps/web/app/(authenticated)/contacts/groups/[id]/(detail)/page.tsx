@@ -4,9 +4,9 @@ import {
   getGroupContacts,
   getContactsForPicker,
 } from "@/app/actions/groups";
-import { GroupDetailClient } from "@/components/group-detail-client";
+import { GroupDetailClient } from "@/components/groups/group-detail-client";
 
-import { GroupDetailSkeleton } from "@/components/skeletons";
+import { GroupDetailSkeleton } from "@/components/shared/skeletons";
 
 export async function generateMetadata({
   params,
@@ -14,12 +14,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  try {
-    const group = await getGroupById(id);
-    return { title: `${group.name} – Groups – ReachDem` };
-  } catch {
-    return { title: "Group – ReachDem" };
-  }
+  const group = await getGroupById(id);
+  if (!group) return { title: "Group – ReachDem" };
+  return { title: `${group.name} – Groups – ReachDem` };
 }
 
 export default async function GroupDetailPage({

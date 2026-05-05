@@ -57,3 +57,7 @@ company_prospects_chunks_100/
 
 # Test data
 .vitest
+
+# agents 
+.agents/
+.gstack/

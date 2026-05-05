@@ -1,4 +1,4 @@
-import { ContactsTableSkeleton } from "@/components/skeletons";
+import { ContactsTableSkeleton } from "@/components/shared/skeletons";
 
 export default function ContactsLoading() {
   return (

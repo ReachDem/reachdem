@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { getGroups } from "@/app/actions/groups";
-import { GroupsClient } from "@/components/groups-client";
+import { GroupsClient } from "@/components/groups/groups-client";
 
-import { GroupsPageSkeleton } from "@/components/skeletons";
+import { GroupsPageSkeleton } from "@/components/shared/skeletons";
 
 export const metadata = { title: "Groups – ReachDem" };
 

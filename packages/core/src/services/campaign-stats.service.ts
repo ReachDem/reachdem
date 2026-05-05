@@ -105,6 +105,24 @@ export class CampaignStatsService {
         campaign.status as CampaignStatsResponse["resolvedStatus"],
     };
 
+    // When targets haven't been created yet (worker still processing),
+    // compute an estimate from the group member counts so the UI can
+    // display something meaningful instead of "Processing…".
+    if (stats.audienceSize === 0 && campaign.status === "running") {
+      const audiences = await prisma.campaignAudience.findMany({
+        where: { campaignId, organizationId, sourceType: "group" },
+        select: { sourceId: true },
+      });
+      if (audiences.length > 0) {
+        const groupIds = audiences.map((a) => a.sourceId);
+        const result = await prisma.groupMember.aggregate({
+          where: { groupId: { in: groupIds }, contact: { deletedAt: null } },
+          _count: { _all: true },
+        });
+        stats.estimatedAudienceSize = result._count._all;
+      }
+    }
+
     const resolvedStatus = this.deriveResolvedStatus({
       currentStatus: campaign.status as CampaignStatsResponse["resolvedStatus"],
       updatedAt: campaign.updatedAt,
@@ -124,11 +142,20 @@ export class CampaignStatsService {
 
     stats.resolvedStatus = resolvedStatus;
 
-    await RedisCacheClient.set(
-      cacheKey,
-      stats as unknown as Record<string, unknown>,
-      CAMPAIGN_STATS_TTL_SECONDS
+    // Don't cache when the campaign is running but no targets have been created
+    // yet — the worker may not have processed the job. This avoids showing
+    // "Audience 0" for up to a full TTL after a campaign is launched.
+    const shouldCache = !(
+      resolvedStatus === "running" && stats.audienceSize === 0
     );
+
+    if (shouldCache) {
+      await RedisCacheClient.set(
+        cacheKey,
+        stats as unknown as Record<string, unknown>,
+        CAMPAIGN_STATS_TTL_SECONDS
+      );
+    }
 
     return stats;
   }

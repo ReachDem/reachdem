@@ -15,7 +15,7 @@ import type {
   UpdateCampaignDto,
   CampaignResponse,
 } from "@reachdem/shared";
-import { publishCampaignLaunchJob } from "@/lib/publish-campaign-launch-job";
+import { publishCampaignLaunchJob } from "@/lib/queue/publish-campaign-launch-job";
 
 async function getOrganizationId() {
   const session = await auth.api.getSession({
@@ -135,10 +135,18 @@ export async function createCampaign(data: {
   audienceGroups: string[];
   audienceSegments: string[];
 }) {
-  const { campaign } = await createCampaignWithAudience(data);
+  try {
+    const { campaign } = await createCampaignWithAudience(data);
 
-  revalidatePath("/campaigns");
-  return { success: true, data: campaign };
+    revalidatePath("/campaigns");
+    return { success: true, data: campaign };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to create campaign",
+    };
+  }
 }
 
 type CreateCampaignWithAudienceInput = {
@@ -208,17 +216,36 @@ async function createCampaignWithAudience(
 export async function createAndScheduleCampaign(
   data: CreateCampaignWithAudienceInput & { scheduledAt: string | Date }
 ) {
-  const { campaign } = await createCampaignWithAudience(data);
+  try {
+    const { campaign } = await createCampaignWithAudience(data);
 
-  revalidatePath("/campaigns");
+    revalidatePath("/campaigns");
 
-  return { success: true, data: campaign };
+    return { success: true, data: campaign };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to schedule campaign",
+    };
+  }
 }
 
 export async function createAndLaunchCampaign(
   data: CreateCampaignWithAudienceInput
 ) {
-  const { organizationId, campaign } = await createCampaignWithAudience(data);
+  let organizationId, campaign;
+  try {
+    const result = await createCampaignWithAudience(data);
+    organizationId = result.organizationId;
+    campaign = result.campaign;
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to create campaign",
+    };
+  }
 
   try {
     await RequestCampaignLaunchUseCase.execute(
@@ -238,7 +265,11 @@ export async function createAndLaunchCampaign(
       },
     });
 
-    throw error;
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to launch campaign",
+    };
   }
 }
 
@@ -360,15 +391,23 @@ export async function deleteCampaign(id: string) {
 }
 
 export async function launchCampaign(id: string) {
-  const { organizationId } = await getOrganizationId();
-  await RequestCampaignLaunchUseCase.execute(
-    organizationId,
-    id,
-    publishCampaignLaunchJob
-  );
-  revalidatePath("/campaigns");
-  revalidatePath(`/campaigns/${id}/edit`);
-  return { success: true };
+  try {
+    const { organizationId } = await getOrganizationId();
+    await RequestCampaignLaunchUseCase.execute(
+      organizationId,
+      id,
+      publishCampaignLaunchJob
+    );
+    revalidatePath("/campaigns");
+    revalidatePath(`/campaigns/${id}/edit`);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to launch campaign",
+    };
+  }
 }
 
 export async function getAudienceGroups() {

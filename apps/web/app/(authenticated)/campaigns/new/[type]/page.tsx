@@ -23,8 +23,8 @@ import {
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
 import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
-import { useSegments } from "@/lib/hooks/use-segments";
-import { useGroups } from "@/lib/hooks/use-groups";
+import { useSegments } from "@/hooks/use-segments";
+import { useGroups } from "@/hooks/use-groups";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -48,7 +48,7 @@ import {
   fetchEmailSpamAnalysis,
   getEmailSpamWarningReasons,
   shouldWarnBeforeSendingEmail,
-} from "@/lib/email-send-guard";
+} from "@/lib/email/email-send-guard";
 import { cn } from "@/lib/utils";
 
 interface NewCampaignTypePageProps {
@@ -175,11 +175,18 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
       });
       console.log("[Campaign] Draft saved successfully:", result);
 
+      if (!result.success) {
+        toast.error(`Failed to save draft: ${result.error}`);
+        return;
+      }
+
       toast.success("Draft saved successfully");
       console.log("[Campaign] Draft save completed");
 
       // Redirect to edit page
-      router.replace(`/campaigns/${result.data.id}/edit`);
+      if (result.data) {
+        router.replace(`/campaigns/${result.data.id}/edit`);
+      }
     } catch (error) {
       console.error("[Campaign] Error saving draft:", error);
       const errorMessage =
@@ -289,7 +296,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     setIsLoading(true);
 
     try {
-      await createAndScheduleCampaign({
+      const result = await createAndScheduleCampaign({
         name: campaignTitle.trim(),
         description: optionalTrimmedString(campaignDescription),
         channel: type,
@@ -298,6 +305,11 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         audienceGroups: selectedGroupId ? [selectedGroupId] : [],
         audienceSegments: selectedSegmentId ? [selectedSegmentId] : [],
       });
+
+      if (!result.success) {
+        toast.error(`Failed to schedule campaign: ${result.error}`);
+        return;
+      }
 
       toast.success(
         `Campaign scheduled for ${format(scheduledDateTime, "dd.MM.yyyy")} at ${format(scheduledDateTime, "HH:mm")}`
@@ -397,7 +409,7 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
     setIsLoading(true);
 
     try {
-      await createAndLaunchCampaign({
+      const result = await createAndLaunchCampaign({
         name: campaignTitle.trim(),
         description: optionalTrimmedString(campaignDescription),
         channel: type,
@@ -405,6 +417,11 @@ function CampaignFormClient({ params }: NewCampaignTypePageProps) {
         audienceGroups: selectedGroupId ? [selectedGroupId] : [],
         audienceSegments: selectedSegmentId ? [selectedSegmentId] : [],
       });
+
+      if (!result.success) {
+        toast.error(`Failed to launch campaign: ${result.error}`);
+        return;
+      }
 
       toast.success("Campaign launched successfully");
       console.log("[Campaign] Launch completed");

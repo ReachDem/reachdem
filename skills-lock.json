@@ -10,6 +10,12 @@
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+    },
+    "gstack": {
+      "source": "garrytan/gstack",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "acb21a700c1fc4da2c6b01d11c06ba12731b7327cf248b6a63e2029562542a0f"
     }
   }
 }

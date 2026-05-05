@@ -5,8 +5,11 @@ import { getUploadPresignedUrl } from "@reachdem/core";
 import { prisma } from "@reachdem/database";
 import { headers } from "next/headers";
 import { nanoid } from "nanoid";
-import { ALLOWED_KYB_DOC_TYPES, ALLOWED_KYB_IMAGE_TYPES } from "@/lib/kyb";
-import { notifyAdminsOfValidationRequest } from "@/lib/admin-notify";
+import {
+  ALLOWED_KYB_DOC_TYPES,
+  ALLOWED_KYB_IMAGE_TYPES,
+} from "@/lib/server/kyb";
+import { notifyAdminsOfValidationRequest } from "@/lib/server/admin-notify";
 
 export async function generateKybUploadUrl(
   docType: "id" | "business",

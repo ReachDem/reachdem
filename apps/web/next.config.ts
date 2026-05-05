@@ -6,6 +6,7 @@ const TELEMETRY_STUB_WEBPACK = path.resolve(
   "lib/stubs/better-auth-telemetry.mjs"
 );
 const AUTH_PACKAGE_TURBOPACK = "../../packages/auth/src/index.ts";
+const AUTH_CLIENT_PACKAGE_TURBOPACK = "../../packages/auth/src/auth-client.ts";
 const CORE_PACKAGE_TURBOPACK = "../../packages/core/src/index.ts";
 const DATABASE_PACKAGE_TURBOPACK = "../../packages/database/src/index.ts";
 const EMAIL_UI_PACKAGE_TURBOPACK = "../../packages/email-ui/src/index.ts";
@@ -14,6 +15,10 @@ const TRANSACTIONAL_PACKAGE_TURBOPACK = "../../packages/transactional/index.ts";
 const AUTH_PACKAGE = path.resolve(
   __dirname,
   "../../packages/auth/src/index.ts"
+);
+const AUTH_CLIENT_PACKAGE = path.resolve(
+  __dirname,
+  "../../packages/auth/src/auth-client.ts"
 );
 const CORE_PACKAGE = path.resolve(
   __dirname,
@@ -48,13 +53,14 @@ const nextConfig: NextConfig = {
   ],
   serverExternalPackages: [
     "@prisma/client",
-    "better-auth",
+    "better-auth/adapters/prisma",
     "@better-auth/core",
   ],
   // Turbopack alias (used by `next dev` in Next.js 16)
   turbopack: {
     resolveAlias: {
       "@reachdem/auth": AUTH_PACKAGE_TURBOPACK,
+      "@reachdem/auth/client": AUTH_CLIENT_PACKAGE_TURBOPACK,
       "@reachdem/core": CORE_PACKAGE_TURBOPACK,
       "@reachdem/database": DATABASE_PACKAGE_TURBOPACK,
       "@reachdem/email-ui": EMAIL_UI_PACKAGE_TURBOPACK,
@@ -67,6 +73,7 @@ const nextConfig: NextConfig = {
   // Webpack alias (used by `next build`)
   webpack(config) {
     config.resolve.alias["@reachdem/auth"] = AUTH_PACKAGE;
+    config.resolve.alias["@reachdem/auth/client"] = AUTH_CLIENT_PACKAGE;
     config.resolve.alias["@reachdem/core"] = CORE_PACKAGE;
     config.resolve.alias["@reachdem/database"] = DATABASE_PACKAGE;
     config.resolve.alias["@reachdem/email-ui"] = EMAIL_UI_PACKAGE;

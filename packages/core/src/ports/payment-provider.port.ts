@@ -26,6 +26,8 @@ export interface CreateProviderCheckoutSessionInput {
   description: string;
   returnUrl: string;
   customerEmail?: string | null;
+  /** Flutterwave payment plan ID for recurring subscriptions. When set, the hosted checkout will link the charge to this plan and restrict payment options to card. */
+  paymentPlanId?: string | null;
   metadata?: Record<string, unknown>;
 }
 
