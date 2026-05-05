@@ -26,7 +26,11 @@ export async function getGroups() {
 
 export async function getGroupById(id: string) {
   const organizationId = await getOrganizationId();
-  return GroupService.getGroupById(id, organizationId);
+  try {
+    return await GroupService.getGroupById(id, organizationId);
+  } catch {
+    return null;
+  }
 }
 
 export async function getGroupContacts(
