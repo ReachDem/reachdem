@@ -4,9 +4,13 @@ import { ActivityLogger } from "./activity-logger.service";
 import { EvolutionWhatsAppAdapter } from "../adapters/whatsapp/evolution-whatsapp.adapter";
 import { OrganizationWhatsAppSessionService } from "./organization-whatsapp-session.service";
 import { personalizeTemplate } from "../utils/message-personalization";
+import { CampaignStatsService } from "./campaign-stats.service";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
+import { MessageInsufficientCreditsError } from "../errors/messaging.errors";
 
 interface ProcessJobOptions {
   republish: (job: WhatsAppExecutionJob) => Promise<void>;
+  maxDeliveryCycles?: number;
 }
 
 export class ProcessWhatsAppMessageJobUseCase {
@@ -69,6 +73,11 @@ export class ProcessWhatsAppMessageJobUseCase {
       return "skipped";
     }
 
+    const allowed = await this.assertBillableSendAllowed(message);
+    if (!allowed) {
+      return "failed";
+    }
+
     try {
       const session = await OrganizationWhatsAppSessionService.ensureSession(
         job.organization_id
@@ -105,8 +114,14 @@ export class ProcessWhatsAppMessageJobUseCase {
       });
 
       if (result.success) {
-        await prisma.$transaction([
-          prisma.messageAttempt.create({
+        await prisma.$transaction(async (tx) => {
+          await MessagingEntitlementsService.captureMessageSend(
+            tx,
+            job.organization_id,
+            "whatsapp"
+          );
+
+          await tx.messageAttempt.create({
             data: {
               messageId: message.id,
               organizationId: job.organization_id,
@@ -118,16 +133,17 @@ export class ProcessWhatsAppMessageJobUseCase {
               errorMessage: null,
               durationMs: result.durationMs,
             },
-          }),
-          prisma.message.update({
+          });
+
+          await tx.message.update({
             where: { id: message.id },
             data: {
               status: "sent",
               providerSelected: adapter.providerName,
               providerMessageId: result.providerMessageId,
             },
-          }),
-        ]);
+          });
+        });
 
         await ActivityLogger.log({
           organizationId: job.organization_id,
@@ -144,11 +160,15 @@ export class ProcessWhatsAppMessageJobUseCase {
         });
 
         await this.markCampaignTarget(message.id, "sent");
+        await this.finalizeCampaignIfReady(message.campaignId);
+        await CampaignStatsService.invalidate(message.campaignId);
 
         return "sent";
       }
 
-      if (job.delivery_cycle < 3 && result.retryable) {
+      const maxDeliveryCycles = options.maxDeliveryCycles ?? 3;
+
+      if (job.delivery_cycle < maxDeliveryCycles && result.retryable) {
         await prisma.$transaction([
           prisma.messageAttempt.create({
             data: {
@@ -219,6 +239,8 @@ export class ProcessWhatsAppMessageJobUseCase {
       });
 
       await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
 
       return "failed";
     } catch (error) {
@@ -249,6 +271,86 @@ export class ProcessWhatsAppMessageJobUseCase {
     await prisma.campaignTarget.updateMany({
       where: { messageId },
       data: { status },
+    });
+  }
+
+  private static async assertBillableSendAllowed(message: {
+    id: string;
+    organizationId: string;
+    correlationId: string;
+    campaignId: string | null;
+  }): Promise<boolean> {
+    try {
+      await MessagingEntitlementsService.assertMessageSendAllowed(
+        prisma,
+        message.organizationId,
+        "whatsapp"
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof MessageInsufficientCreditsError)) {
+        throw error;
+      }
+
+      await prisma.message.update({
+        where: { id: message.id },
+        data: { status: "failed" },
+      });
+
+      await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
+
+      await ActivityLogger.log({
+        organizationId: message.organizationId,
+        correlationId: message.correlationId,
+        category: "whatsapp",
+        action: "send_failed",
+        resourceType: "message",
+        resourceId: message.id,
+        status: "failed",
+        meta: {
+          message: error.message,
+          reason: "insufficient_credits_before_send",
+        },
+      });
+
+      return false;
+    }
+  }
+
+  private static async finalizeCampaignIfReady(
+    campaignId: string | null
+  ): Promise<void> {
+    if (!campaignId) return;
+
+    const pendingCount = await prisma.campaignTarget.count({
+      where: { campaignId, status: "pending" },
+    });
+    if (pendingCount > 0) return;
+
+    const groupedStatuses = await prisma.campaignTarget.groupBy({
+      by: ["status"],
+      where: { campaignId },
+      _count: { _all: true },
+    });
+
+    const counts = new Map(
+      groupedStatuses.map((item) => [item.status, item._count._all])
+    );
+    const sentCount = counts.get("sent") ?? 0;
+    const unsuccessfulCount =
+      (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);
+    const finalStatus =
+      unsuccessfulCount === 0
+        ? "completed"
+        : sentCount === 0
+          ? "failed"
+          : "partial";
+
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: finalStatus },
     });
   }
 }

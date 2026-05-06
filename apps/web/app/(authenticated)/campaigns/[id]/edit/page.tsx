@@ -17,6 +17,7 @@ import {
   type SmsContent,
 } from "@/components/campaigns/sms-composer-new";
 import { AudienceTargetSelector } from "@/components/campaigns/audience-target-selector";
+import type { PickedContact } from "@/components/campaigns/contact-picker";
 import { CampaignFormSkeleton } from "@/components/campaigns/campaign-form-skeleton";
 import { useSegments } from "@/hooks/use-segments";
 import { useGroups } from "@/hooks/use-groups";
@@ -68,6 +69,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   const [campaignTitle, setCampaignTitle] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
   const [isFailedCampaign, setIsFailedCampaign] = useState(false);
+  const [selectedContacts, setSelectedContacts] = useState<PickedContact[]>([]);
 
   // Email content state
   const [emailContent, setEmailContent] = useState<EmailContent>({
@@ -477,6 +479,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
   };
 
   const handleLaunch = async (skipSpamWarning = false) => {
+    if (isLoading) return;
+
     console.log("[Edit Campaign] Starting launch...");
 
     // Validate content
@@ -502,6 +506,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       return;
     }
 
+    setIsLoading(true);
+
     // Prepare content
     const content =
       type === "email"
@@ -523,6 +529,7 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
       });
 
       if (shouldWarnBeforeSendingEmail(analysis)) {
+        setIsLoading(false);
         toast.warning("Ce message risque d'etre classe comme spam.", {
           description: getEmailSpamWarningReasons(analysis).join(" "),
           duration: 20000,
@@ -537,8 +544,6 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
         return;
       }
     }
-
-    setIsLoading(true);
 
     try {
       let campaignIdToLaunch = campaignId;
@@ -689,6 +694,8 @@ function EditCampaignClient({ params }: EditCampaignPageProps) {
             selectedGroupId={selectedGroupId}
             onSegmentChange={setSelectedSegmentId}
             onGroupChange={setSelectedGroupId}
+            selectedContacts={selectedContacts}
+            onContactsChange={setSelectedContacts}
             disabled={isLoading || isLoadingSegments || isLoadingGroups}
           />
 

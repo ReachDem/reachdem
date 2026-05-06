@@ -12,7 +12,7 @@ type MessagingChannel = "sms" | "email" | "whatsapp";
 export class MessagingEntitlementsService {
   private static readonly DEFAULT_SMS_SENDER_ID = "ReachDem";
 
-  static async reserveMessageSend(
+  static async assertMessageSendAllowed(
     db: DbClient,
     organizationId: string,
     channel: MessagingChannel,
@@ -83,7 +83,31 @@ export class MessagingEntitlementsService {
       );
     }
 
-    // 5. Commit increments
+    const effectiveSenderId =
+      channel === "sms" &&
+      organization.workspaceVerificationStatus === "verified" &&
+      organization.senderId
+        ? organization.senderId
+        : channel === "sms"
+          ? this.DEFAULT_SMS_SENDER_ID
+          : null;
+
+    return {
+      senderId: effectiveSenderId,
+    };
+  }
+
+  static async captureMessageSend(
+    db: DbClient,
+    organizationId: string,
+    channel: MessagingChannel,
+    units = 1
+  ): Promise<void> {
+    const usageCostMinor = BillingCatalogService.getMessageUsageCostMinor(
+      channel,
+      units
+    );
+
     await db.organization.update({
       where: { id: organizationId },
       data: {
@@ -106,18 +130,14 @@ export class MessagingEntitlementsService {
             : {}),
       },
     });
+  }
 
-    const effectiveSenderId =
-      channel === "sms" &&
-      organization.workspaceVerificationStatus === "verified" &&
-      organization.senderId
-        ? organization.senderId
-        : channel === "sms"
-          ? this.DEFAULT_SMS_SENDER_ID
-          : null;
-
-    return {
-      senderId: effectiveSenderId,
-    };
+  static async reserveMessageSend(
+    db: DbClient,
+    organizationId: string,
+    channel: MessagingChannel,
+    units = 1
+  ): Promise<{ senderId: string | null }> {
+    return this.assertMessageSendAllowed(db, organizationId, channel, units);
   }
 }

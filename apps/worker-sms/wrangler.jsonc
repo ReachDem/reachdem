@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reachdem-worker-sms",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "find_additional_modules": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true }
+  },
+  "vars": { "WORKER_ENV": "development" },
+  "queues": {
+    "producers": [{ "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" }],
+    "consumers": [
+      {
+        "queue": "reachdem-sms-queue",
+        "max_batch_size": 50,
+        "max_batch_timeout": 2,
+        "max_concurrency": 10,
+        "max_retries": 5
+      }
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "reachdem-worker-sms-staging",
+      "vars": { "WORKER_ENV": "staging" },
+      "queues": {
+        "producers": [
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-staging" }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-sms-queue-staging",
+            "max_batch_size": 50,
+            "max_batch_timeout": 2,
+            "max_concurrency": 10,
+            "max_retries": 5
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "reachdem-worker-sms",
+      "vars": { "WORKER_ENV": "production" },
+      "queues": {
+        "producers": [
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-v2-production" }
+        ],
+        "consumers": [
+          {
+            "queue": "reachdem-sms-queue-v2-production",
+            "max_batch_size": 50,
+            "max_batch_timeout": 2,
+            "max_concurrency": 10,
+            "max_retries": 5
+          }
+        ]
+      }
+    }
+  }
+}

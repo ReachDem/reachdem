@@ -140,28 +140,6 @@ export class RequestCampaignLaunchUseCase {
             }
           : undefined;
 
-      await tx.organization.update({
-        where: { id: organizationId },
-        data: {
-          creditBalance: {
-            decrement: usageCostMinor,
-          },
-          ...(campaign.channel === "sms"
-            ? {
-                smsQuotaUsed: {
-                  increment: eligibleTargetCount,
-                },
-              }
-            : campaign.channel === "email"
-              ? {
-                  emailQuotaUsed: {
-                    increment: eligibleTargetCount,
-                  },
-                }
-              : {}),
-        },
-      });
-
       await tx.campaign.update({
         where: { id: campaignId },
         data: {

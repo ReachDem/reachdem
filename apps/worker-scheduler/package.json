@@ -1,0 +1,27 @@
+{
+  "name": "@reachdem/worker-scheduler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "types": "wrangler types",
+    "check": "wrangler deploy --dry-run",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reachdem/core": "workspace:*",
+    "@reachdem/database": "workspace:*",
+    "@reachdem/jobs": "workspace:*",
+    "@reachdem/shared": "workspace:*",
+    "@reachdem/worker-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.39.0"
+  }
+}

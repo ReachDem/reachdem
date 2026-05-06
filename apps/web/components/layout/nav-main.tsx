@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   IconCirclePlusFilled,
   IconMessage,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { TipsCard } from "@/components/onboarding/tips-card";
 import { getTipContent } from "@/components/onboarding/tips-engine";
+import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 
 export function NavMain({
   items,
@@ -37,6 +39,8 @@ export function NavMain({
     }[];
   }[];
 }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -45,6 +49,7 @@ export function NavMain({
             <SidebarMenuButton
               tooltip="New Campaign"
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              onClick={() => setDialogOpen(true)}
             >
               <IconCirclePlusFilled />
               <span>New Campaign</span>
@@ -53,12 +58,14 @@ export function NavMain({
               size="icon"
               className="size-8 bg-transparent group-data-[collapsible=icon]:opacity-0"
               variant="outline"
+              onClick={() => setDialogOpen(true)}
             >
               <IconMessage />
               <span className="sr-only">Quick SMS</span>
             </Button>
           </SidebarMenuItem>
         </SidebarMenu>
+        <NewCampaignDialog open={dialogOpen} onOpenChange={setDialogOpen} />
         <SidebarMenu>
           {items.map((item) =>
             item.items ? (

@@ -506,7 +506,7 @@ describe("Campaigns API - REAL DATABASE INTEGRATION", () => {
     const organization = await prisma.organization.findUnique({
       where: { id: REAL_ORG_ID },
     });
-    expect(organization?.smsQuotaUsed).toBe(1);
+    expect(organization?.smsQuotaUsed).toBe(0);
     expect(organization?.creditBalance).toBe(5000);
 
     const updatedCampaign = await prisma.campaign.findUnique({
