@@ -1,0 +1,76 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reachdem-worker-scheduler",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "find_additional_modules": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true }
+  },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "WORKER_ENV": "development",
+    "SCHEDULER_API_BASE_URL": "http://localhost:3000"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "CAMPAIGN_LAUNCH_QUEUE",
+        "queue": "reachdem-campaign-launch-queue"
+      },
+      { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue" },
+      { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue" },
+      { "binding": "WHATSAPP_QUEUE", "queue": "reachdem-whatsapp-queue" }
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "reachdem-worker-scheduler-staging",
+      "vars": {
+        "WORKER_ENV": "staging",
+        "SCHEDULER_API_BASE_URL": "https://staging.reachdem.cc"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-staging"
+          },
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-staging" },
+          { "binding": "EMAIL_QUEUE", "queue": "reachdem-email-queue-staging" },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-staging"
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "reachdem-worker-scheduler",
+      "vars": {
+        "WORKER_ENV": "production",
+        "SCHEDULER_API_BASE_URL": "https://develop.reachdem.cc"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CAMPAIGN_LAUNCH_QUEUE",
+            "queue": "reachdem-campaign-launch-queue-v2-production"
+          },
+          { "binding": "SMS_QUEUE", "queue": "reachdem-sms-queue-v2-production" },
+          {
+            "binding": "EMAIL_QUEUE",
+            "queue": "reachdem-email-queue-v2-production"
+          },
+          {
+            "binding": "WHATSAPP_QUEUE",
+            "queue": "reachdem-whatsapp-queue-v2-production"
+          }
+        ]
+      }
+    }
+  }
+}

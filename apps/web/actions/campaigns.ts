@@ -624,3 +624,36 @@ export async function getOrgSmsConfig(): Promise<{
     };
   }
 }
+
+export async function createGroupForManualContacts(
+  contactIds: string[],
+  campaignName: string
+): Promise<{ success: boolean; groupId?: string; error?: string }> {
+  try {
+    const { organizationId } = await getOrganizationId();
+    const groupName = `${campaignName} - Contacts (${new Date().toLocaleDateString("fr-FR")})`;
+
+    const group = await GroupService.createGroup(organizationId, {
+      name: groupName,
+      description: `Auto-created group for campaign "${campaignName}"`,
+    });
+
+    const { GroupMemberService } = await import("@reachdem/core");
+    await GroupMemberService.addGroupMembers(
+      group.id,
+      organizationId,
+      contactIds
+    );
+
+    return { success: true, groupId: group.id };
+  } catch (error) {
+    console.error("[createGroupForManualContacts] Error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to create contact group",
+    };
+  }
+}

@@ -5,9 +5,12 @@ import type { SmsExecutionJob } from "@reachdem/shared";
 import { ActivityLogger } from "./activity-logger.service";
 import { CampaignStatsService } from "./campaign-stats.service";
 import { personalizeTemplate } from "../utils/message-personalization";
+import { MessagingEntitlementsService } from "./messaging-entitlements.service";
+import { MessageInsufficientCreditsError } from "../errors/messaging.errors";
 
 interface ProcessJobOptions {
   republish: (job: SmsExecutionJob) => Promise<void>;
+  maxDeliveryCycles?: number;
 }
 
 export class ProcessSmsMessageJobUseCase {
@@ -73,6 +76,11 @@ export class ProcessSmsMessageJobUseCase {
       return "skipped";
     }
 
+    const allowed = await this.assertBillableSendAllowed(message);
+    if (!allowed) {
+      return "failed";
+    }
+
     const baseAttemptNo = message.attempts.length;
     const campaignTarget = await prisma.campaignTarget.findFirst({
       where: {
@@ -129,13 +137,21 @@ export class ProcessSmsMessageJobUseCase {
     }
 
     if (result.success) {
-      await prisma.message.update({
-        where: { id: message.id },
-        data: {
-          from: result.senderUsed,
-          status: "sent",
-          providerSelected: result.providerName,
-        },
+      await prisma.$transaction(async (tx) => {
+        await MessagingEntitlementsService.captureMessageSend(
+          tx,
+          job.organization_id,
+          "sms"
+        );
+
+        await tx.message.update({
+          where: { id: message.id },
+          data: {
+            from: result.senderUsed,
+            status: "sent",
+            providerSelected: result.providerName,
+          },
+        });
       });
 
       await this.markCampaignTarget(message.id, "sent");
@@ -145,7 +161,9 @@ export class ProcessSmsMessageJobUseCase {
       return "sent";
     }
 
-    if (job.delivery_cycle < 3) {
+    const maxDeliveryCycles = options.maxDeliveryCycles ?? 3;
+
+    if (job.delivery_cycle < maxDeliveryCycles) {
       console.warn("[SMS Delivery] Requeue after failed provider attempts", {
         messageId: message.id,
         organizationId: job.organization_id,
@@ -275,10 +293,60 @@ export class ProcessSmsMessageJobUseCase {
     });
   }
 
+  private static async assertBillableSendAllowed(message: {
+    id: string;
+    organizationId: string;
+    correlationId: string;
+    campaignId: string | null;
+  }): Promise<boolean> {
+    try {
+      await MessagingEntitlementsService.assertMessageSendAllowed(
+        prisma,
+        message.organizationId,
+        "sms"
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof MessageInsufficientCreditsError)) {
+        throw error;
+      }
+
+      await prisma.message.update({
+        where: { id: message.id },
+        data: { status: "failed" },
+      });
+
+      await this.markCampaignTarget(message.id, "failed");
+      await this.finalizeCampaignIfReady(message.campaignId);
+      await CampaignStatsService.invalidate(message.campaignId);
+
+      await ActivityLogger.log({
+        organizationId: message.organizationId,
+        correlationId: message.correlationId,
+        category: "sms",
+        action: "send_failed",
+        resourceType: "message",
+        resourceId: message.id,
+        status: "failed",
+        meta: {
+          message: error.message,
+          reason: "insufficient_credits_before_send",
+        },
+      });
+
+      return false;
+    }
+  }
+
   private static async finalizeCampaignIfReady(
     campaignId: string | null
   ): Promise<void> {
     if (!campaignId) return;
+
+    const pendingCount = await prisma.campaignTarget.count({
+      where: { campaignId, status: "pending" },
+    });
+    if (pendingCount > 0) return;
 
     const groupedStatuses = await prisma.campaignTarget.groupBy({
       by: ["status"],
@@ -289,9 +357,6 @@ export class ProcessSmsMessageJobUseCase {
     const counts = new Map(
       groupedStatuses.map((item) => [item.status, item._count._all])
     );
-    const pendingCount = counts.get("pending") ?? 0;
-    if (pendingCount > 0) return;
-
     const sentCount = counts.get("sent") ?? 0;
     const unsuccessfulCount =
       (counts.get("failed") ?? 0) + (counts.get("skipped") ?? 0);

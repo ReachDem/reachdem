@@ -17,6 +17,14 @@
     "db:studio": "pnpm --filter @reachdem/database db:studio",
     "backfill:api-keys": "dotenv -e .env -- tsx scripts/backfill-default-api-keys.ts",
     "link-campaign-stats": "tsx scripts/link-campaign-stats.ts",
+    "workers:types": "pnpm -r --filter @reachdem/worker-email --filter @reachdem/worker-sms --filter @reachdem/worker-whatsapp --filter @reachdem/worker-campaign --filter @reachdem/worker-scheduler types",
+    "workers:check": "pnpm -r --filter @reachdem/worker-email --filter @reachdem/worker-sms --filter @reachdem/worker-whatsapp --filter @reachdem/worker-campaign --filter @reachdem/worker-scheduler check",
+    "workers:test": "pnpm -r --filter @reachdem/jobs --filter @reachdem/worker-kit --filter @reachdem/worker-email --filter @reachdem/worker-sms --filter @reachdem/worker-whatsapp --filter @reachdem/worker-campaign --filter @reachdem/worker-scheduler test",
+    "workers:deploy:staging": "node scripts/workers-deploy-and-sync.mjs --env staging",
+    "workers:deploy:production": "node scripts/workers-deploy-and-sync.mjs --env production",
+    "workers:secrets:staging": "node scripts/workers-sync-secrets.mjs --env staging",
+    "workers:secrets:production": "node scripts/workers-sync-secrets.mjs --env production",
+    "workers:env:audit": "node scripts/workers-env-audit.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,md,json,css}\"",
     "prepare": "husky"
@@ -50,7 +58,10 @@
   "pnpm": {
     "overrides": {
       "react": "19.0.0",
-      "react-dom": "19.0.0"
+      "react-dom": "19.0.0",
+      "@react-email/editor>@tiptap/core": "3.22.5",
+      "@react-email/editor>@tiptap/pm": "3.22.5",
+      "@react-email/editor>@tiptap/react": "3.22.5"
     }
   }
 }

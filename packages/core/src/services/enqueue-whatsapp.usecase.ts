@@ -46,7 +46,7 @@ export class EnqueueWhatsAppUseCase {
     const correlationId = randomUUID();
     const message = await prisma.$transaction(async (tx) => {
       if (!input.campaignId) {
-        await MessagingEntitlementsService.reserveMessageSend(
+        await MessagingEntitlementsService.assertMessageSendAllowed(
           tx,
           organizationId,
           "whatsapp"

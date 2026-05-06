@@ -6,6 +6,7 @@ import { Providers } from "@/components/shared/providers";
 import { ThemeScript } from "@/components/shared/theme-script";
 import { getThemeScript } from "@/lib/theme";
 import { Analytics } from "@vercel/analytics/next";
+import { MaintenanceBanner } from "@/components/shared/maintenance-banner";
 
 const neueMontreal = localFont({
   src: [
@@ -56,7 +57,10 @@ export default function RootLayout({
       <head />
       <body className={`${neueMontreal.variable} font-sans antialiased`}>
         <ThemeScript script={themeScript} />
-        <Providers>{children}</Providers>
+        <Providers>
+          <MaintenanceBanner />
+          {children}
+        </Providers>
         <Analytics />
       </body>
     </html>
