@@ -12,6 +12,7 @@ import {
   convertMajorToMinor,
   convertMinorToMajor,
   getCurrencyMinorExponent,
+  normalizePaymentCustomerName,
 } from "@reachdem/shared";
 import { useSession } from "@reachdem/auth/client";
 import { Button } from "@/components/ui/button";
@@ -80,13 +81,58 @@ const COUNTRY_CONFIG = {
 
 type CountryCode = keyof typeof COUNTRY_CONFIG;
 
-function splitCustomerName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+const CM_MTN_PREFIXES = [
+  "650",
+  "651",
+  "652",
+  "653",
+  "654",
+  "670",
+  "671",
+  "672",
+  "673",
+  "674",
+  "675",
+  "676",
+  "677",
+  "678",
+  "679",
+  "680",
+  "681",
+  "682",
+  "683",
+];
+const CM_ORANGE_PREFIXES = [
+  "655",
+  "656",
+  "657",
+  "658",
+  "659",
+  "690",
+  "691",
+  "692",
+  "693",
+  "694",
+  "695",
+  "696",
+  "697",
+  "698",
+  "699",
+  "686",
+  "687",
+  "688",
+  "689",
+  "640",
+];
 
-  return {
-    first: parts[0] || "ReachDem",
-    last: parts.slice(1).join(" ") || "Customer",
-  };
+function detectCameroonOperator(phoneDigits: string): "MTN" | "ORANGE" | null {
+  const normalized = phoneDigits.replace(/^237/, "");
+  if (!/^6\d{8}$/.test(normalized)) return null;
+
+  const prefix = normalized.substring(0, 3);
+  if (CM_MTN_PREFIXES.includes(prefix)) return "MTN";
+  if (CM_ORANGE_PREFIXES.includes(prefix)) return "ORANGE";
+  return null;
 }
 
 function getDefaultCountry(
@@ -231,6 +277,14 @@ export function CreditTopUpDialog({
   }, [selectedCountry, selectedMethod]);
 
   useEffect(() => {
+    if (selectedCountry !== "CM" || !phone) return;
+    const detected = detectCameroonOperator(phone);
+    if (detected) {
+      setNetwork(detected);
+    }
+  }, [phone, selectedCountry]);
+
+  useEffect(() => {
     if (
       countryChoices.length > 0 &&
       !countryChoices.some(([code]) => code === selectedCountry)
@@ -306,8 +360,8 @@ export function CreditTopUpDialog({
       return;
     }
 
-    if (!fullName.trim()) {
-      toast.error("Please enter the customer name for this payment.");
+    if (!fullName.trim() || fullName.trim().length < 3) {
+      toast.error("Please enter your full name (first and last name).");
       return;
     }
 
@@ -371,7 +425,7 @@ export function CreditTopUpDialog({
       currency: activeCurrency,
       amountMinor: convertMajorToMinor(enteredAmount, activeCurrency),
       paymentMethodType: method,
-      customerName: splitCustomerName(fullName),
+      customerName: normalizePaymentCustomerName(fullName),
       email: session.user.email || "support@reachdem.com",
       phone: {
         countryCode: activeCountry.phoneCode,
@@ -542,8 +596,28 @@ export function CreditTopUpDialog({
                       Phone number
                     </label>
                     <div className="flex gap-2">
-                      <div className="flex shrink-0 items-center rounded-lg border border-[#2a2a2a] bg-[#111] px-3 py-2.5 text-sm text-neutral-400">
-                        +{activeCountry.phoneCode}
+                      <div className="relative shrink-0">
+                        <select
+                          value={selectedCountry}
+                          onChange={(event) =>
+                            setSelectedCountry(
+                              event.target.value as CountryCode
+                            )
+                          }
+                          className="h-full appearance-none rounded-lg border border-[#2a2a2a] bg-[#111] py-2.5 pr-7 pl-3 text-sm text-neutral-400 focus:border-[#555] focus:outline-none"
+                          disabled={isProcessing}
+                        >
+                          {countryChoices.map(([code, config]) => (
+                            <option
+                              key={code}
+                              value={code}
+                              className="bg-[#111] text-white"
+                            >
+                              +{config.phoneCode}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-1.5 h-3 w-3 -translate-y-1/2 text-neutral-500" />
                       </div>
                       <Input
                         type="tel"
@@ -699,8 +773,26 @@ export function CreditTopUpDialog({
                   {getPhoneLabel("mobile_money")}
                 </label>
                 <div className="flex gap-2">
-                  <div className="flex shrink-0 items-center rounded-lg border border-[#333] bg-transparent px-3 py-2.5 text-sm text-neutral-400">
-                    +{activeCountry.phoneCode}
+                  <div className="relative shrink-0">
+                    <select
+                      value={selectedCountry}
+                      onChange={(event) =>
+                        setSelectedCountry(event.target.value as CountryCode)
+                      }
+                      className="h-full appearance-none rounded-lg border border-[#333] bg-transparent py-2.5 pr-7 pl-3 text-sm text-neutral-400 focus:border-[#555] focus:outline-none"
+                      disabled={isProcessing}
+                    >
+                      {countryChoices.map(([code, config]) => (
+                        <option
+                          key={code}
+                          value={code}
+                          className="bg-[#111] text-white"
+                        >
+                          +{config.phoneCode}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-1.5 h-3 w-3 -translate-y-1/2 text-neutral-500" />
                   </div>
                   <Input
                     type="tel"
@@ -713,6 +805,18 @@ export function CreditTopUpDialog({
                     disabled={isProcessing}
                   />
                 </div>
+                {selectedCountry === "CM" &&
+                phone &&
+                detectCameroonOperator(phone) ? (
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Detected:{" "}
+                    <span className="font-medium text-white">
+                      {detectCameroonOperator(phone) === "MTN"
+                        ? "MTN Mobile Money"
+                        : "Orange Money"}
+                    </span>
+                  </p>
+                ) : null}
               </div>
 
               <Button

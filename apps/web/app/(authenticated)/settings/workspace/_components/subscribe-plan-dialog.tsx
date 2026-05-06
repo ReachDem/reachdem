@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { WorkspaceBillingSummary } from "@reachdem/shared";
+import { normalizePaymentCustomerName } from "@reachdem/shared";
 import { useSession } from "@reachdem/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,59 @@ const COUNTRY_CONFIG = {
 } as const;
 
 type CountryCode = keyof typeof COUNTRY_CONFIG;
+
+const CM_MTN_PREFIXES = [
+  "650",
+  "651",
+  "652",
+  "653",
+  "654",
+  "670",
+  "671",
+  "672",
+  "673",
+  "674",
+  "675",
+  "676",
+  "677",
+  "678",
+  "679",
+  "680",
+  "681",
+  "682",
+  "683",
+];
+const CM_ORANGE_PREFIXES = [
+  "655",
+  "656",
+  "657",
+  "658",
+  "659",
+  "690",
+  "691",
+  "692",
+  "693",
+  "694",
+  "695",
+  "696",
+  "697",
+  "698",
+  "699",
+  "686",
+  "687",
+  "688",
+  "689",
+  "640",
+];
+
+function detectCameroonOperator(phoneDigits: string): "MTN" | "ORANGE" | null {
+  const normalized = phoneDigits.replace(/\D/g, "").replace(/^237/, "");
+  if (!/^6\d{8}$/.test(normalized)) return null;
+  const prefix = normalized.substring(0, 3);
+  if (CM_MTN_PREFIXES.includes(prefix)) return "MTN";
+  if (CM_ORANGE_PREFIXES.includes(prefix)) return "ORANGE";
+  return null;
+}
 
 function getDefaultCountry(currency: string): CountryCode {
   const match = Object.entries(COUNTRY_CONFIG).find(
@@ -133,6 +187,14 @@ export function SubscribePlanDialog({
   }, [open, plan, session?.user?.name, setPaymentState]);
 
   useEffect(() => {
+    if (selectedCountry !== "CM" || !phone) return;
+    const detected = detectCameroonOperator(phone);
+    if (detected) {
+      setNetwork(detected);
+    }
+  }, [phone, selectedCountry]);
+
+  useEffect(() => {
     if (paymentState.status === "success") {
       onOpenChange(false);
       router.push("/billing/success?method=subscription");
@@ -197,9 +259,8 @@ export function SubscribePlanDialog({
       return;
     }
 
-    const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-    const firstName = nameParts[0] ?? "ReachDem";
-    const lastName = nameParts.slice(1).join(" ") || "Customer";
+    const { first: firstName, last: lastName } =
+      normalizePaymentCustomerName(fullName);
 
     await initiatePayment({
       kind: "subscription",
@@ -298,9 +359,25 @@ export function SubscribePlanDialog({
               Mobile Money Number
             </label>
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-9 items-center rounded-md border border-white/10 bg-white/5 px-3 text-sm text-neutral-400">
-                +{activeCountry.phoneCode}
-              </span>
+              <select
+                value={selectedCountry}
+                onChange={(e) => {
+                  const code = e.target.value as CountryCode;
+                  setSelectedCountry(code);
+                  setNetwork(NETWORKS_BY_COUNTRY[code]?.[0]?.value ?? "MTN");
+                }}
+                className="inline-flex h-9 appearance-none items-center rounded-md border border-white/10 bg-white/5 px-3 pr-6 text-sm text-neutral-400 focus:outline-none"
+              >
+                {Object.entries(COUNTRY_CONFIG).map(([code, cfg]) => (
+                  <option
+                    key={code}
+                    value={code}
+                    className="bg-[#1c1c1c] text-white"
+                  >
+                    +{cfg.phoneCode}
+                  </option>
+                ))}
+              </select>
               <Input
                 type="tel"
                 inputMode="numeric"
@@ -312,6 +389,18 @@ export function SubscribePlanDialog({
                 className="border-white/10 bg-white/5 text-white placeholder:text-neutral-600 focus-visible:ring-0"
               />
             </div>
+            {selectedCountry === "CM" &&
+            phone &&
+            detectCameroonOperator(phone) ? (
+              <p className="text-xs text-neutral-400">
+                Detected:{" "}
+                <span className="font-medium text-white">
+                  {detectCameroonOperator(phone) === "MTN"
+                    ? "MTN Mobile Money"
+                    : "Orange Money"}
+                </span>
+              </p>
+            ) : null}
           </div>
 
           {/* Name */}

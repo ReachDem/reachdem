@@ -84,8 +84,8 @@ export type CreatePaymentSessionDto = z.infer<
 >;
 
 export const paymentCustomerNameSchema = z.object({
-  first: z.string().trim().min(1),
-  last: z.string().trim().min(1),
+  first: z.string().trim().min(2).max(50),
+  last: z.string().trim().min(2).max(50),
 });
 
 export const paymentPhoneSchema = z.object({

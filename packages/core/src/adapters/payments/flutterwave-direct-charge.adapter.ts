@@ -178,9 +178,12 @@ async function parseJsonResponse(
   context: string
 ): Promise<Record<string, unknown>> {
   if (!response.ok) {
-    throw new Error(
-      `${context}: ${response.status} - ${await response.text()}`
-    );
+    const body = await response.text();
+    console.error(`[Flutterwave] ${context}`, {
+      status: response.status,
+      body,
+    });
+    throw new Error(`${context}: ${response.status} - ${body}`);
   }
 
   return (await response.json()) as Record<string, unknown>;

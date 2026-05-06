@@ -14,6 +14,7 @@ export * from "./validations/workspace-billing";
 export * from "./utils/contact-channel-validation";
 export * from "./utils/currency-conversion";
 export * from "./utils/payment-feedback";
+export * from "./utils/payment-customer-name";
 
 // Re-export type definitions for the frontend and backend
 export * from "./types";
