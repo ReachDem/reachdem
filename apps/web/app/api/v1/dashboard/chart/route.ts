@@ -32,7 +32,7 @@ export const GET = withWorkspace(async ({ organizationId }) => {
         DATE("createdAt") as day,
         channel,
         COUNT(*)::bigint as total
-      FROM "Message"
+      FROM "message"
       WHERE "organizationId" = ${organizationId}
         AND "createdAt" >= ${startDate}
       GROUP BY DATE("createdAt"), channel
