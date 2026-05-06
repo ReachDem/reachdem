@@ -1,12 +1,18 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { workers, vercelEnvironmentsByDeployEnv } from "./workers-manifest.mjs";
+import {
+  workers,
+  vercelDatabaseEnvironmentsByDeployEnv,
+  vercelEnvironmentsByDeployEnv,
+} from "./workers-manifest.mjs";
 
 const args = new Set(process.argv.slice(2));
 const targetEnv = args.has("--env")
   ? process.argv[process.argv.indexOf("--env") + 1]
   : "staging";
 const syncVercel = args.has("--sync-vercel");
+const syncVercelDatabase = args.has("--sync-vercel-database");
+const databaseOnly = args.has("--database-only");
 
 if (!["staging", "production"].includes(targetEnv)) {
   throw new Error("--env must be staging or production");
@@ -50,6 +56,18 @@ function pick(...keys) {
   return undefined;
 }
 
+function pickScoped(name) {
+  if (targetEnv === "production") {
+    return pick(`${name}_PRODUCTION`, `${name}_PROD`);
+  }
+
+  return pick(
+    `${name}_STAGING`,
+    `${name}_DEVELOPMENT`,
+    `${name}_DEV`
+  );
+}
+
 function runSecretPut(worker, key, value) {
   const result = spawnSync("pnpm", ["exec", "wrangler", "secret", "put", key, "--env", targetEnv], {
     cwd: worker.dir,
@@ -80,16 +98,17 @@ function setVercelEnv(name, value, environment) {
     shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const result = spawnSync("vercel", ["env", "add", name, ...scopeArgs, "--value", value, "--yes"], {
+  const result = spawnSync("vercel", ["env", "add", name, ...scopeArgs, "--yes"], {
     cwd: "apps/web",
+    input: `${value}\n`,
     encoding: "utf8",
     shell: process.platform === "win32",
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
   if (result.status !== 0) {
     throw new Error(
-      `Failed to set ${name} for Vercel ${environment}: ${result.stderr || result.stdout}`
+      `Failed to set ${name} for Vercel ${environment}: ${result.error?.message || result.stderr || result.stdout}`
     );
   }
 
@@ -101,9 +120,17 @@ const common = {
     "REACHDEM_WORKER_INTERNAL_SECRET",
     "INTERNAL_API_SECRET"
   ),
-  DATABASE_URL: pick("DATABASE_URL"),
-  PRISMA_ACCELERATE_URL: pick("PRISMA_ACCELERATE_URL"),
+  DATABASE_URL: pickScoped("DATABASE_URL"),
+  PRISMA_ACCELERATE_URL: pickScoped("PRISMA_ACCELERATE_URL"),
 };
+
+if (!common.DATABASE_URL) {
+  throw new Error(
+    targetEnv === "production"
+      ? "Missing DATABASE_URL_PRODUCTION locally. Refusing to fall back to generic DATABASE_URL for production."
+      : "Missing DATABASE_URL_STAGING, DATABASE_URL_DEVELOPMENT, or DATABASE_URL_DEV locally. Refusing to fall back to generic DATABASE_URL for staging."
+  );
+}
 
 const domainSecrets = {
   email: {
@@ -156,7 +183,9 @@ const domainSecrets = {
 };
 
 for (const worker of workers) {
-  const secrets = { ...common, ...(domainSecrets[worker.domain] ?? {}) };
+  const secrets = databaseOnly
+    ? { DATABASE_URL: common.DATABASE_URL }
+    : { ...common, ...(domainSecrets[worker.domain] ?? {}) };
   for (const [key, value] of Object.entries(secrets)) {
     if (!value) {
       console.log(`[cloudflare] ${worker.domain}: ${key} missing locally`);
@@ -174,5 +203,11 @@ if (syncVercel) {
 
   for (const vercelEnv of vercelEnvironmentsByDeployEnv[targetEnv]) {
     setVercelEnv("REACHDEM_WORKER_INTERNAL_SECRET", internalSecret, vercelEnv);
+  }
+}
+
+if (syncVercelDatabase) {
+  for (const vercelEnv of vercelDatabaseEnvironmentsByDeployEnv[targetEnv]) {
+    setVercelEnv("DATABASE_URL", common.DATABASE_URL, vercelEnv);
   }
 }

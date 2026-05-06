@@ -91,3 +91,8 @@ export const vercelEnvironmentsByDeployEnv = {
   staging: ["preview:current", "development"],
   production: ["production"],
 };
+
+export const vercelDatabaseEnvironmentsByDeployEnv = {
+  staging: ["development", "preview:current", "preview:develop"],
+  production: ["production"],
+};

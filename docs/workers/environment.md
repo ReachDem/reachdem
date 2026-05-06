@@ -22,6 +22,15 @@ Les secrets ne doivent jamais être commités. Les variables Cloudflare sont pos
 | `DATABASE_URL`                    | workers métier | URL PostgreSQL directe.                   |
 | `PRISMA_ACCELERATE_URL`           | workers métier | Alternative Prisma Accelerate.            |
 
+`DATABASE_URL` est le nom runtime dans Cloudflare. La source locale doit etre
+scopee avant synchronisation :
+
+- `DATABASE_URL_DEVELOPMENT` ou `DATABASE_URL_STAGING` -> workers `staging` et Vercel `development`/`preview`.
+- `DATABASE_URL_PRODUCTION` -> workers `production` et Vercel `production`.
+
+Le script refuse d'utiliser le `DATABASE_URL` generique pour Cloudflare afin
+d'eviter qu'une base de developpement soit envoyee en production ou l'inverse.
+
 ## Variables par domaine
 
 Email :
