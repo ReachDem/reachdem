@@ -107,7 +107,7 @@ const CM_ORANGE_PREFIXES = [
 
 function detectCameroonOperator(phoneDigits: string): "MTN" | "ORANGE" | null {
   const normalized = phoneDigits.replace(/\D/g, "").replace(/^237/, "");
-  if (!/^6\d{8}$/.test(normalized)) return null;
+  if (normalized.length < 3 || normalized[0] !== "6") return null;
   const prefix = normalized.substring(0, 3);
   if (CM_MTN_PREFIXES.includes(prefix)) return "MTN";
   if (CM_ORANGE_PREFIXES.includes(prefix)) return "ORANGE";
