@@ -1,6 +1,7 @@
 const NAME_MIN = 2;
 const NAME_MAX = 50;
-const ALLOWED_CHARS = /[^a-zA-ZÀ-ÿ\s,.''-]/g;
+const ALLOWED_CHARS = /[^\p{L}\s,.''-]/gu;
+const HAS_LETTER = /\p{L}/u;
 
 function sanitize(value: string): string {
   return value.replace(ALLOWED_CHARS, "").trim();
@@ -24,9 +25,14 @@ export function normalizePaymentCustomerName(fullName: string): {
   first: string;
   last: string;
 } {
-  const parts = sanitize(fullName).split(/\s+/).filter(Boolean);
-  let first = parts[0] || "Customer";
-  let last = parts.slice(1).join(" ") || "Customer";
+  const sanitized = sanitize(fullName);
+  const parts = sanitized.split(/\s+/).filter(Boolean);
+
+  let first = parts[0] && HAS_LETTER.test(parts[0]) ? parts[0] : "Customer";
+  let last =
+    parts.length > 1 && HAS_LETTER.test(parts.slice(1).join(" "))
+      ? parts.slice(1).join(" ")
+      : "Customer";
 
   if (first.length < NAME_MIN) {
     first = first.padEnd(NAME_MIN, ".");

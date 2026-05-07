@@ -35,7 +35,8 @@
       "Read(//c/Users/Belrick/AppData/Local/Temp/**)",
       "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-a.png\")",
       "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-b.png\")",
-      "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-c.png\")"
+      "Bash(start \"\" \"/c/Users/Belrick/AppData/Local/Temp/mockup-option-c.png\")",
+      "Bash(pnpm --filter @reachdem/shared exec tsc --noEmit)"
     ],
     "additionalDirectories": [
       "\\root\\.gstack\\projects\\ReachDem-reachdem\\ceo-plans"
